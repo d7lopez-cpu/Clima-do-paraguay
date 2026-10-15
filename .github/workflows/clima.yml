@@ -1,0 +1,40 @@
+name: Actualizar clima
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"     # cada 30 minutos (GitHub puede demorarse unos minutos)
+  workflow_dispatch:            # permite ejecutarlo a mano desde la pestaña Actions
+
+permissions:
+  contents: write
+
+concurrency:
+  group: actualizar-clima
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Recuperar las localidades ya resueltas (si existen)
+        run: curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/datos/lugares.json" -o lugares_previos.json || echo "{}" > lugares_previos.json
+
+      - name: Bajar el clima de Open-Meteo
+        run: python3 scripts/actualizar_clima.py
+
+      - name: Publicar los datos en la rama "datos"
+        run: |
+          mkdir -p /tmp/publicar
+          cp datos.json horas.json lugares.json /tmp/publicar/
+          git config user.name "clima-bot"
+          git config user.email "clima-bot@users.noreply.github.com"
+          git checkout --orphan datos
+          git rm -rf . > /dev/null 2>&1 || true
+          cp /tmp/publicar/*.json .
+          git add datos.json horas.json lugares.json
+          git commit -m "Datos del clima $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push --force origin datos
