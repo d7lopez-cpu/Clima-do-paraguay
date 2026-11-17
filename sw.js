@@ -1,13 +1,15 @@
 /* Clima PY — Service Worker
  * - Guarda la app (HTML, manifest e iconos) para que abra sin internet.
- * - La página se pide primero a la red (así siempre ves la última versión) y, si no hay internet, usa la copia guardada.
+ * - La página y su código (estilos.css, geo.js, app.js) se piden primero a la red (así siempre ves la última versión) y, si no hay internet, usa la copia guardada.
  * - Los datos del clima (Open-Meteo, METAR, RainViewer) NO se guardan aquí: la app ya conserva los últimos datos por su cuenta
  *   y así nunca se muestra un pronóstico viejo como si fuera nuevo.
  * Para publicar una versión nueva de la app, cambia el número de VERSION.
  */
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = 'clima-py-' + VERSION;
-const APP = ['./', 'index.html', 'manifest.webmanifest', 'icono-192.png', 'apple-touch-icon.png'];
+const APP = ['./', 'index.html', 'estilos.css', 'geo.js', 'app.js', 'manifest.webmanifest', 'icono-192.png', 'apple-touch-icon.png'];
+// Código de la app: igual que la página, se pide primero a la red para que HTML, CSS y JS siempre sean de la misma versión
+const CODIGO = /\.(css|js)$/;
 
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
@@ -48,6 +50,21 @@ self.addEventListener('fetch', e => {
         const c = await caches.open(CACHE);
         return (await c.match(req, { ignoreSearch: true })) || (await c.match('index.html')) || (await c.match('./')) ||
           new Response('Sin conexión', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+      }
+    })());
+    return;
+  }
+
+  // Código (CSS y JS): red primero (revalidando la caché HTTP), copia guardada si no hay internet
+  if (CODIGO.test(url.pathname) && !url.pathname.endsWith('/sw.js')) {
+    e.respondWith((async () => {
+      const c = await caches.open(CACHE);
+      try {
+        const r = await fetch(req, { cache: 'no-cache' });
+        if (r && r.ok) c.put(req, r.clone());
+        return r;
+      } catch (_) {
+        return (await c.match(req, { ignoreSearch: true })) || new Response('', { status: 504 });
       }
     })());
     return;
