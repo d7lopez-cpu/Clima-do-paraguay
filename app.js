@@ -19,7 +19,7 @@
   // Cada capa dice qué dato mostrar, en qué rango y con qué colores.
   const CAPAS = {
     temp: { icono: '🌡️', nombre: 'Temperatura', campo: 'temperature_2m', min: 5, max: 40, dec: 0, corto: '°', largo: '°C',
-      color: v => `hsl(${Math.round(225 - norm(v, 5, 40) * 225)}, 85%, 55%)`, alto: '🔥 Más calurosa', bajo: '❄️ Más fría' },
+      color: v => escalaTemp(v), alto: '🔥 Más calurosa', bajo: '❄️ Más fría' },
     humedad: { icono: '💧', nombre: 'Humedad', campo: 'relative_humidity_2m', min: 20, max: 100, dec: 0, corto: '%', largo: '%',
       color: v => `hsl(${Math.round(45 + norm(v, 20, 100) * 170)}, 75%, 55%)`, alto: '💧 Más húmeda', bajo: '🏜️ Más seca' },
     viento: { icono: '💨', nombre: 'Viento', campo: 'wind_speed_10m', min: 0, max: 40, dec: 0, corto: ' km/h', largo: ' km/h',
@@ -28,6 +28,18 @@
       color: v => { const x = norm(v, 0, 4); return `hsl(210, ${Math.round(18 + x * 67)}%, ${Math.round(68 - x * 30)}%)`; },
       alto: '🌧️ Más lluvia', bajo: '☀️ Más seca' }
   };
+  // Escala de temperatura: azul (frío) → verde agua (templado) → amarillo → naranja → rojo (calor)
+  const PARADAS_TEMP = [[5, '#3b6cf6'], [12, '#38bdf8'], [19, '#5eead4'], [25, '#fde047'], [30, '#fb923c'], [35, '#ef4444'], [40, '#be123c']];
+  function escalaTemp(v) {
+    const P = PARADAS_TEMP, x = limitar(v, P[0][0], P[P.length - 1][0]);
+    let i = 1; while (i < P.length - 1 && x > P[i][0]) i++;
+    const [t0, c0] = P[i - 1], [t1, c1] = P[i], k = (x - t0) / (t1 - t0);
+    const a = [1, 3, 5].map(j => parseInt(c0.slice(j, j + 2), 16)), b = [1, 3, 5].map(j => parseInt(c1.slice(j, j + 2), 16));
+    return `rgb(${a.map((y, j) => Math.round(y + (b[j] - y) * k)).join(',')})`;
+  }
+  // Para TEXTO sobre fondo claro, los colores vivos (amarillo, verde agua) se oscurecen para que se lean bien
+  const esClaro = () => document.documentElement.dataset.tema === 'claro';
+  const paraTexto = c => esClaro() ? `oklch(from ${c} 0.56 calc(c * 1.35) h)` : c;   // mismo tono, más oscuro e intenso
   let capaId = 'temp';
   const capa = () => CAPAS[capaId];
   const esNumero = v => typeof v === 'number' && isFinite(v);
@@ -811,7 +823,7 @@
     $('capas').innerHTML = Object.entries(CAPAS).map(([id, c]) =>
       `<button class="capa${id === capaId ? ' on' : ''}" role="tab" aria-selected="${id === capaId}" data-capa="${id}">${c.icono} ${c.nombre}</button>`).join('');
     const c = capa(), paradas = [];
-    for (let i = 0; i <= 6; i++) paradas.push(c.color(c.min + (c.max - c.min) * i / 6));
+    for (let i = 0; i <= 14; i++) paradas.push(c.color(c.min + (c.max - c.min) * i / 14));
     $('grad').style.background = `linear-gradient(90deg, ${paradas.join(',')})`;
     $('legIni').textContent = fmt(c.min, true);
     $('legFin').textContent = fmt(c.max, true) + (capaId === 'lluvia' || capaId === 'viento' || capaId === 'humedad' ? '+' : '');
@@ -1212,7 +1224,11 @@
     $('btnTema').textContent = claro ? '🌙' : '☀️';
     $('btnTema').setAttribute('aria-label', claro ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro');
   }
-  $('btnTema').addEventListener('click', () => { guardar('clima-py-tema', leer('clima-py-tema', 'oscuro') === 'claro' ? 'oscuro' : 'claro'); pintarTema(); });
+  $('btnTema').addEventListener('click', () => {
+    guardar('clima-py-tema', leer('clima-py-tema', 'oscuro') === 'claro' ? 'oscuro' : 'claro'); pintarTema();
+    refrescarVistas();                                             // los colores de texto cambian según el tema
+    if (detalleActual && detalleActual.c.n === seleccionada) pintarDetalle();
+  });
   const pintarUnidad = () => { $('btnUnidad').textContent = usaF ? '°F' : '°C'; };
   $('btnUnidad').addEventListener('click', () => {
     usaF = !usaF; guardar('clima-py-f', usaF ? '1' : '0');
@@ -1447,8 +1463,7 @@
   }
   function armarParticulas() {
     const poco = (navigator.hardwareConcurrency || 4) <= 4, area = cvW * cvH;
-    gotas = Array.from({ length: Math.min(Math.round(area / (poco ? 14000 : 9000) * amb.lluvia), 200) },
-      () => ({ x: Math.random() * cvW, y: Math.random() * cvH, l: 10 + Math.random() * 14, v: 0.7 + Math.random() * 0.6 }));
+    gotas = [];                                                    // la lluvia se dibuja solo en el paisaje de arriba (no sobre los datos)
     estrellas = (amb.tipo === 'despejado' || amb.tipo === 'parcial')
       ? Array.from({ length: Math.round(area / 9000) }, () => ({ x: Math.random() * cvW, y: Math.random() * cvH * 0.7, r: 0.3 + Math.random() * 1.1, f: Math.random() * 6.28 })) : [];
     const n = { despejado: 0, parcial: 3, nublado: 5, niebla: 5, lluvia: 5, tormenta: 5 }[amb.tipo];
@@ -1803,11 +1818,11 @@
     const tarjeta = (titulo, v, sub, ir, color) =>
       `<${ir ? 'button' : 'div'} class="stat"${ir ? ` data-ir="${ir}"` : ''}><small>${titulo}</small><b${color ? ` style="color:${color}"` : ''}>${v}</b><span>${sub}</span></${ir ? 'button' : 'div'}>`;
     $('stats').innerHTML =
-      tarjeta(`Promedio · ${c.nombre.toLowerCase()}`, c.dec ? prom.toFixed(c.dec) + c.largo : Math.round(prom * 10) / 10 + c.largo, `${con.length} ciudades`, '', colorValor(prom)) +
-      tarjeta(c.alto, fmt(valor(alta), true), alta.n, alta.n, colorValor(valor(alta))) +
+      tarjeta(`Promedio · ${c.nombre.toLowerCase()}`, c.dec ? prom.toFixed(c.dec) + c.largo : Math.round(prom * 10) / 10 + c.largo, `${con.length} ciudades`, '', paraTexto(colorValor(prom))) +
+      tarjeta(c.alto, fmt(valor(alta), true), alta.n, alta.n, paraTexto(colorValor(valor(alta)))) +
       (capaId === 'lluvia'
         ? tarjeta('☀️ Sin lluvia ahora', secas, 'ciudades secas', '', '')
-        : tarjeta(c.bajo, fmt(valor(baja), true), baja.n, baja.n, colorValor(valor(baja)))) +
+        : tarjeta(c.bajo, fmt(valor(baja), true), baja.n, baja.n, paraTexto(colorValor(valor(baja))))) +
       (conLluvia.length ? tarjeta('🌧️ Con lluvia ahora', conLluvia.length, 'ej.: ' + conLluvia[0].n, conLluvia[0].n, '')
                         : tarjeta('🌧️ Con lluvia ahora', 0, 'ninguna ciudad', '', ''));
   }
@@ -1816,6 +1831,7 @@
     if (b) elegir(b.dataset.ir, { zoom: true });
   });
 
+  let verTodas = false;                   // la lista muestra solo las ciudades principales hasta que se pide verlas todas
   function dibujarLista() {
     const orden = $('orden').value;
     const lista = CIUDADES.filter(coincide);
@@ -1828,13 +1844,17 @@
       if (vb === null) return -1;
       return orden === 'mayor' ? vb - va : va - vb;
     });
-    const favs = lista.filter(c => favoritas.has(c.n)), resto = lista.filter(c => !favoritas.has(c.n));
+    const favs = lista.filter(c => favoritas.has(c.n)), todas = lista.filter(c => !favoritas.has(c.n));
+    // Sin búsqueda, sin filtro y ordenada por nombre: primero solo las ciudades principales (al ordenar por valor se ven todas)
+    const resumida = !verTodas && !filtroActivo() && orden === 'nombre';
+    const resto = resumida ? todas.filter(c => c.g <= 2 || c.n === seleccionada) : todas;
+    const tituloResto = resumida ? 'Ciudades principales' : 'Todas';
     const fila = c => {
       const d = datos[c.n], x = valor(c), fav = favoritas.has(c.n);
       return `<div class="item${c.n === seleccionada ? ' activo' : ''}" role="listitem">
         <button class="item-main" data-ciudad="${c.n}">
-          <span class="nom">${d ? clima(d.weather_code, d.is_day).emoji : '⏳'} ${c.n}<small>${nombreDep(c.dep)}</small></span>
-          <span class="t" style="color:${x === null ? 'var(--suave)' : colorValor(x)}">${fmt(x)}</span>
+          <span class="nom"><span class="e">${d ? clima(d.weather_code, d.is_day).emoji : '⏳'}</span> ${c.n}<small>${nombreDep(c.dep)}</small></span>
+          <span class="t" style="color:${x === null ? 'var(--suave)' : paraTexto(colorValor(x))}">${fmt(x)}</span>
         </button>
         <button class="estrella${fav ? ' on' : ''}" data-fav="${c.n}" aria-label="${fav ? 'Quitar ' + c.n + ' de favoritas' : 'Marcar ' + c.n + ' como favorita'}">${fav ? '★' : '☆'}</button>
       </div>`;
@@ -1842,12 +1862,15 @@
     const cont = $('lista'), scroll = cont.scrollTop;
     $('contador').textContent = `(${lista.length})`;
     cont.innerHTML = lista.length
-      ? (favs.length ? '<div class="sep">★ Favoritas</div>' + favs.map(fila).join('') + (resto.length ? '<div class="sep">Todas</div>' : '') : '') + resto.map(fila).join('')
+      ? (favs.length ? '<div class="sep">★ Favoritas</div>' + favs.map(fila).join('') : '') +
+        (resto.length && (favs.length || resumida) ? `<div class="sep">${tituloResto}</div>` : '') + resto.map(fila).join('') +
+        (resto.length < todas.length ? '<button class="btn ver-todas" id="verTodas">Ver todas las ciudades</button>' : '')
       : '<div class="vacio">No hay ciudades con ese filtro.<br><button class="btn" id="quitarFiltros">Quitar filtros</button></div>';
     cont.scrollTop = scroll;
   }
   $('lista').addEventListener('click', e => {
     if (e.target.id === 'quitarFiltros') { limpiarFiltros(); return; }
+    if (e.target.id === 'verTodas') { verTodas = true; dibujarLista(); return; }
     const fav = e.target.closest('[data-fav]');
     if (fav) { alternarFav(fav.dataset.fav); return; }
     const it = e.target.closest('[data-ciudad]');
@@ -1925,7 +1948,7 @@
           </div>
           <div class="dep-nombre">${c.dep === 'Asunción' ? 'Capital del país' : 'Departamento ' + c.dep}</div>
           <div class="temp-fila">
-            <span class="temp-grande" style="color:${esNumero(t) ? capaTemp(t) : 'inherit'}">${esNumero(t) ? Math.round(aU(t)) + '°' + UT() : '--'}</span>
+            <span class="temp-grande" style="color:${esNumero(t) ? paraTexto(capaTemp(t)) : 'inherit'}">${esNumero(t) ? Math.round(aU(t)) + '°' + UT() : '--'}</span>
             <span class="minmax">${d ? `↑ ${grados(d.daily.temperature_2m_max[0])} ↓ ${grados(d.daily.temperature_2m_min[0])}` : ''}</span>
           </div>
           <div class="estado">${w.texto}</div>
@@ -2452,7 +2475,7 @@
     "🔥 Más calurosa": "🔥 Hakuvéva", "❄️ Más fría": "❄️ Ro'yvéva", "💧 Más húmeda": "💧 Humedad ijyvatevéva", "🏜️ Más seca": "🏜️ Ipiruvéva",
     "💨 Más ventosa": "💨 Yvytu hatãvéva", "🍃 Más calma": "🍃 Kirirĩvéva", "🌧️ Más lluvia": "🌧️ Ama hetavéva", "☀️ Más seca": "☀️ Ipiruvéva",
     "🌧️ Con lluvia ahora": "🌧️ Oky ko'ág̃a", "☀️ Sin lluvia ahora": "☀️ Ndaipóri ama ko'ág̃a", "ciudades secas": "táva ndaipóri ama", "ninguna ciudad": "ni peteĩ táva",
-    "★ Favoritas": "★ Jeporavopyre", "Todas": "Opavave", "No hay ciudades con ese filtro.": "Ndaipóri táva ko filtro ndive.", "Quitar filtros": "Emboguete filtro",
+    "★ Favoritas": "★ Jeporavopyre", "Todas": "Opavave", "Ciudades principales": "Táva tuichavéva", "Ver todas las ciudades": "Ehecha opaite táva", "No hay ciudades con ese filtro.": "Ndaipóri táva ko filtro ndive.", "Quitar filtros": "Emboguete filtro",
     "Sin datos": "Ndaipóri marandu", "sin datos": "ndaipóri marandu", "Sin datos por ahora": "Ndaipóri marandu ko'ág̃a", "Cargando…": "Eha'ãrõ…", "Buscando…": "Ojeheka…", "Reintentar": "Eha'ã jey",
     "Hoy": "Ko árape", "Mañana": "Ko'ẽrõ", "— ninguna —": "— mba'eve —",
     // --- momentos del día ---
