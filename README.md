@@ -39,12 +39,14 @@ En vez de que cada visitante consulte cientos de ciudades a Open-Meteo, un proce
 | `manifest.webmanifest` | Nombre e íconos para instalar la app |
 | `scripts/actualizar_clima.py` | Descarga el clima de todas las ciudades (solo usa Python estándar) |
 | `.github/workflows/clima.yml` | Ejecuta el script cada 30 minutos y publica en la rama `datos` |
+| `scripts/revisar.mjs` y `.github/workflows/revisar.yml` | Revisión automática: en cada cambio comprueba que el código no tenga errores y que las ciudades y archivos estén bien |
 
 ## Tareas comunes
 
 - **Agregar o mover una ciudad:** edita la lista `ciudades` dentro de `geo.js` (`n` nombre, `lat`, `lon`, `dep` departamento, `g` tamaño de 1 a 4). El script lee la misma lista, no hay que cambiarla en otro lugar.
 - **Publicar una versión nueva:** después de cambiar `index.html`, `app.js`, `estilos.css` o `geo.js`, sube el número de `VERSION` en `sw.js` para que los celulares renueven su copia guardada.
 - **Actualizar el clima a mano:** pestaña *Actions* → *Actualizar clima* → *Run workflow*.
+- **Revisar que nada esté roto:** GitHub lo hace solo en cada cambio (✅ o ❌ junto al commit). A mano: `node scripts/revisar.mjs`.
 - **Probar en tu computadora:** desde la carpeta del proyecto, ejecuta `python3 -m http.server` y abre http://localhost:8000.
 
 ## Fuentes de datos
