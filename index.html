@@ -718,7 +718,7 @@ const GEO = {"deps":[{"n":"Asunción","r":[[[-57.642,-25.38],[-57.636,-25.369],[
   // ---- Una sola fuente de datos: Open-Meteo (clima, calidad del aire y búsqueda de lugares) ----
   // Open-Meteo ya mezcla por su cuenta los mejores modelos para cada punto, así que se pide una sola vez, sin combinar nada aquí.
   const OM = { clima: 'https://api.open-meteo.com/v1/forecast', aire: 'https://air-quality-api.open-meteo.com/v1/air-quality', lugares: 'https://geocoding-api.open-meteo.com/v1/search' };
-  const pedirClima = url => pedir(url);
+  const pedirClima = (url, ms, reintentos) => pedir(url, ms, reintentos);
 
   const TAM_LOTE = 40;
   // Las ciudades principales (g 1 a 3) se piden en cada actualización. Las localidades extra (g 4) solo cada ~55 min
@@ -3231,22 +3231,8 @@ const GEO = {"deps":[{"n":"Asunción","r":[[[-57.642,-25.38],[-57.636,-25.369],[
 
   // ---- Localidades adicionales: alternativa cartográfica basada en geocodificación pública; solo se aceptan resultados dentro del departamento correcto y separados de marcadores existentes ----
   // Cada resultado solo se acepta si cae dentro del departamento correcto y no repite una ciudad que ya existe. Se guarda en el dispositivo.
+  // Vacío a propósito: la app ya tiene el total acordado de 263 localidades (ver MAX_LOCALIDADES).
   const PENDIENTES = {
-    'Concepción': ['Azotey', 'San Alfredo'],
-    'San Pedro': ['Liberación', 'San Pablo', 'Santa Rosa del Aguaray', 'San Vicente Pancholo', 'General Resquín', 'Yrybucuá', 'Colonia Friesland', 'Colonia Volendam', 'Colonia Río Verde'],
-    'Cordillera': ['Juan de Mena', 'Loma Grande', 'Nueva Colombia', 'Primero de Marzo', 'San José Obrero', 'Valenzuela'],
-    'Guairá': ['Capitán Mauricio José Troche', 'Garay', 'Ñumí', 'Paso Yobái', 'San Salvador', 'Tebicuary', 'Yataity'],
-    'Caaguazú': ['Nueva Toledo', 'Santa Rosa del Mbutuy', 'Simón Bolívar', 'Tembiaporã', 'Tres de Febrero'],
-    'Caazapá': ['Tavaí'],
-    'Itapúa': ['Alto Verá', 'Cambyretá', 'Capitán Meza', 'Itapúa Poty', 'José Leandro Oviedo', 'La Paz', 'Mayor Otaño', 'Nueva Alborada', 'San Rafael del Paraná', 'Yatytay', 'Pirapey', 'Naranjito'],
-    'Paraguarí': ['Escobar', 'General Bernardino Caballero', 'María Antonia'],
-    'Alto Paraná': ['Domingo Martínez de Irala', 'Doctor Raúl Peña', 'Iruña', 'San Cristóbal', 'Santa Fe del Paraná', 'Santa Rosa del Monday', 'Tavapy'],
-    'Ñeembucú': ['Desmochados'],
-    'Canindeyú': ['Yasy Cañy', 'Itanará', 'Maracaná', 'Yby Pytã', 'Puerto Adela', 'Francisco Caballero Álvarez', 'Colonia Nueva Durango'],
-    'Presidente Hayes': ['General José María Bruguez', 'Teniente Esteban Martínez', 'Campo Aceval'],
-    'Amambay': ['Chirigüelo'],
-    'Boquerón': ['Cruce Pioneros', 'Teniente Montanía'],
-    'Alto Paraguay': ['Puerto Guaraní', 'Puerto Sastre', 'Puerto Leda', 'Toro Pampa']
   };
   const LS_LUGARES = 'clima-py-lugares-v1';
   let lugaresListo = false;
@@ -3265,7 +3251,7 @@ const GEO = {"deps":[{"n":"Asunción","r":[[[-57.642,-25.38],[-57.636,-25.369],[
     const p = Math.PI / 180, h = Math.sin((c - a) * p / 2) ** 2 + Math.cos(a * p) * Math.cos(c * p) * Math.sin((d - b) * p / 2) ** 2;
     return 12742 * Math.asin(Math.sqrt(h));
   }
-  // La base contiene 258 localidades; se admiten solo 5 adicionales para mantener el total acordado de 263.
+  // La base ya contiene las 263 localidades acordadas, así que no se agregan más (PENDIENTES está vacío).
   const MAX_LOCALIDADES = 263;
   function sumarLugar(n, dep, lat, lon) {
     if (CIUDADES.length >= MAX_LOCALIDADES || typeof n !== 'string' || !n.trim() || !dep || !esNumero(lat) || !esNumero(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return false;

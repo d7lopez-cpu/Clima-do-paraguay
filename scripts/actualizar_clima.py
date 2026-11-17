@@ -55,7 +55,8 @@ def km(a, b, c, d):
 def resolver_lugares(geo, pendientes, ciudades, previos):
     """Busca las coordenadas de los distritos que faltan. Un resultado solo se acepta si cae dentro del departamento
     correcto y no repite una ciudad que ya existe. Lo ya resuelto (en la corrida anterior) no se vuelve a pedir."""
-    res = dict(previos)
+    vigentes = {n for nombres in pendientes.values() for n in nombres}
+    res = {n: v for n, v in previos.items() if n in vigentes}   # se olvidan las que ya no están en PENDIENTES
     conocidas = {c[0] for c in ciudades}
     for dep, nombres in pendientes.items():
         for n in nombres:

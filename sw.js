@@ -5,7 +5,7 @@
  *   y así nunca se muestra un pronóstico viejo como si fuera nuevo.
  * Para publicar una versión nueva de la app, cambia el número de VERSION.
  */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = 'clima-py-' + VERSION;
 const APP = ['./', 'index.html', 'manifest.webmanifest', 'icono-192.png', 'apple-touch-icon.png'];
 
