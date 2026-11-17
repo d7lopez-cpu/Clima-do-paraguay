@@ -3,7 +3,7 @@
 y los guarda en datos.json y horas.json. Lo ejecuta GitHub Actions cada 30 minutos, así cada
 persona que abre la app lee estos archivos en vez de consultar a Open-Meteo por su cuenta.
 
-Las ciudades se leen de index.html (la lista GEO), así que no hay que mantener otra copia.
+Las ciudades se leen de geo.js (la lista GEO), así que no hay que mantener otra copia.
 Solo usa la biblioteca estándar de Python (no hay que instalar nada).
 """
 import json, math, re, sys, time, unicodedata, urllib.parse, urllib.request, urllib.error
@@ -16,12 +16,13 @@ CAMPOS_ACTUAL = "temperature_2m,relative_humidity_2m,wind_speed_10m,precipitatio
 CAMPOS_HORAS = "temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation"
 
 
-def leer_geo(ruta="index.html"):
-    html = open(ruta, encoding="utf-8").read()
-    i = html.index("const GEO = ") + len("const GEO = ")
-    j = html.index("\n", i)
-    geo = json.loads(html[i:j].rstrip().rstrip(";"))
-    m = re.search(r"const PENDIENTES = \{(.*?)\n  \};", html, re.S)      # localidades cuyas coordenadas se buscan con el geocodificador
+def leer_geo(ruta_geo="geo.js", ruta_app="app.js"):
+    texto = open(ruta_geo, encoding="utf-8").read()
+    i = texto.index("const GEO = ") + len("const GEO = ")
+    j = texto.index("\n", i)
+    geo = json.loads(texto[i:j].rstrip().rstrip(";"))
+    app = open(ruta_app, encoding="utf-8").read()
+    m = re.search(r"const PENDIENTES = \{(.*?)\n  \};", app, re.S)      # localidades cuyas coordenadas se buscan con el geocodificador
     pendientes = json.loads("{" + m.group(1).replace("'", '"') + "}") if m else {}
     return geo, pendientes
 
