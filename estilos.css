@@ -13,10 +13,12 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; background: #0b2545; color-scheme: dark; }
   body {
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: "Inter", "Segoe UI Variable", "SF Pro Text", system-ui, -apple-system, Roboto, sans-serif;
+    letter-spacing: 0;
+    -webkit-font-smoothing: antialiased;
     color: var(--texto);
     min-height: 100vh;
-    padding: 20px;
+    padding: clamp(12px, 3vw, 30px);
     background: linear-gradient(160deg, #0c2a4d 0%, #1b5384 55%, #2a78ad 100%) fixed;
     transition: background 0.6s;
     overflow-wrap: anywhere;
@@ -170,7 +172,6 @@
   footer a { color: var(--acento); }
 
   @media (max-width: 900px) {
-    body { padding: 12px; }
     .cuadricula { grid-template-columns: minmax(0, 1fr); }
     .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .lista-caja { min-height: 0; }
@@ -249,7 +250,6 @@
 
   /* ============ REDISEÑO v2: cristal, aire y jerarquía ============ */
   :root { --r: 22px; --sombra: 0 14px 34px -16px rgba(0, 0, 0, 0.6); --brillo: inset 0 1px 0 rgba(255, 255, 255, 0.09); --grad: linear-gradient(135deg, #38bdf8, #22d3ee); }
-  body { padding: clamp(12px, 3vw, 30px); font-family: "Inter", "SF Pro Display", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; letter-spacing: -0.01em; -webkit-font-smoothing: antialiased; }
   .contenedor { max-width: 1260px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
   .contenedor > * { margin: 0 !important; }
   :focus-visible { outline: 2px solid var(--acento); outline-offset: 3px; border-radius: 12px; }
@@ -358,7 +358,6 @@
   /* ============ REDISEÑO v3: sobrio, claro y profesional ============ */
   :root { --r: 16px; --acento: #4cc3ff; --grad: #38bdf8; --suave: #9db0c9; --sombra: 0 1px 2px rgba(0,0,0,.28), 0 14px 30px -20px rgba(0,0,0,.6); }
   :root:not([data-tema=claro]) { --card: rgba(9, 16, 32, 0.74); --borde: rgba(255, 255, 255, 0.10); --fondo-mini: rgba(255, 255, 255, 0.045); }
-  body { font-family: "Inter", "Segoe UI Variable", "SF Pro Text", system-ui, -apple-system, Roboto, sans-serif; letter-spacing: 0; }
   .ic { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   /* Cabecera */
   header { align-items: center; padding: 2px 0 20px; border-bottom: 1px solid var(--borde); }
@@ -415,15 +414,31 @@
   @media (max-width:560px) { .radar-tools .btn { flex:1 1 calc(50% - 8px); } .radar-opacidad { flex:1 1 100%; justify-content:space-between; } .radar-opacidad input { flex:1; max-width:180px; } }
 
   /* Ajuste de la escena climática: el canvas debe cubrir siempre toda la tarjeta. */
-  .escena { position: relative; width: 100%; min-width: 0; height: clamp(210px, 42vw, 310px); isolation: isolate; }
+  .escena { position: relative; width: 100%; min-width: 0; height: clamp(150px, 15vw, 190px); isolation: isolate; }
   .escena canvas { inset: 0; width: 100% !important; height: 100% !important; max-width: none; }
   .escena-etq { z-index: 2; max-width: calc(100% - 28px); }
   .escena-etq span { max-width: 100%; overflow-wrap: anywhere; }
   @media (max-width: 520px) {
-    .escena { height: clamp(220px, 58vw, 290px); }
+    .escena { height: clamp(150px, 42vw, 190px); }
     .escena-etq { left: 10px; right: 10px; top: 10px; gap: 6px; }
     .escena-etq span { font-size: .78rem; padding: 5px 10px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .escena { animation: none !important; }
   }
+
+  /* ============ MEJORAS VISUALES: contraste del modo claro y lista ============ */
+  /* Botón "Ver todas las ciudades" al final de la lista resumida */
+  .ver-todas { flex: 0 0 auto; width: 100%; margin-top: 4px; padding: 9px 12px; }
+  /* Modo claro: colores de estado más oscuros, para que se lean sobre fondo claro */
+  :root[data-tema=claro] { --ok: #15803d; --aviso: #b45309; --error: #b91c1c; --amarillo: #b45309; }
+  /* Avisos (UV extremo, tormenta…): texto oscuro sobre amarillo suave */
+  :root[data-tema=claro] .alerta { background: #fef3c7; border-color: #f59e0b; color: #78350f; }
+  /* Cuadros flotantes del mapa y mensajes: fondo claro con texto oscuro */
+  :root[data-tema=claro] #tooltip, :root[data-tema=claro] .chip-sel, :root[data-tema=claro] .pista, :root[data-tema=claro] #aviso {
+    background: rgba(255, 255, 255, 0.95); color: var(--texto); box-shadow: 0 6px 18px -8px rgba(15, 40, 80, 0.4); }
+  /* Íconos del clima: muchas nubes son blancas y se pierden sobre fondo claro; un contorno suave las hace visibles */
+  :root[data-tema=claro] .e, :root[data-tema=claro] .item-main .e { filter: drop-shadow(0 0 1px rgba(15, 40, 80, 0.55)); }
+  :root[data-tema=claro] .icono-grande { filter: drop-shadow(0 0 1.5px rgba(15, 40, 80, 0.5)) drop-shadow(0 6px 14px rgba(15, 40, 80, 0.25)); }
+  /* Mapa: departamentos más opacos para que la escala de colores se vea viva sobre el fondo oscuro */
+  .dep { fill-opacity: 0.78; } .dep:hover, .dep.filtrado { fill-opacity: 0.92; }

@@ -1,0 +1,39 @@
+name: Revisar código
+
+# Se ejecuta en cada cambio que llega a main y en cada pull request.
+# Si algo está roto, GitHub muestra una ❌ roja y el pull request avisa antes de fusionarlo.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Revisar la app (sintaxis, ciudades y archivos)
+        run: node scripts/revisar.mjs
+
+      - name: Revisar el script del clima (Python)
+        run: |
+          python3 -m py_compile scripts/actualizar_clima.py
+          python3 -B -c "
+          import sys; sys.path.insert(0, 'scripts')
+          import actualizar_clima as a
+          geo, pendientes = a.leer_geo()
+          print(len(geo['ciudades']), 'ciudades leídas por el script')
+          assert len(geo['ciudades']) > 0
+          "
