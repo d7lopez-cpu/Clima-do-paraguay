@@ -442,3 +442,21 @@
   :root[data-tema=claro] .icono-grande { filter: drop-shadow(0 0 1.5px rgba(15, 40, 80, 0.5)) drop-shadow(0 6px 14px rgba(15, 40, 80, 0.25)); }
   /* Mapa: departamentos más opacos para que la escala de colores se vea viva sobre el fondo oscuro */
   .dep { fill-opacity: 0.78; } .dep:hover, .dep.filtrado { fill-opacity: 0.92; }
+
+  /* ============ MAPA EN MODO CLARO ============ */
+  /* Fondo celeste muy suave (como el "agua" alrededor del país) y rótulos oscuros; las etiquetas
+     de ciudad pasan a texto oscuro con halo blanco, que se lee sobre toda la escala de temperatura. */
+  :root[data-tema=claro] .mapa-contenedor { background: radial-gradient(circle at 30% 20%, #f4f9fe, #dcebf7); border-color: rgba(15, 40, 80, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), inset 0 0 60px rgba(60, 120, 180, 0.12); }
+  :root[data-tema=claro] .base { fill: #f7fafd; }
+  :root[data-tema=claro] .contorno { stroke: rgba(15, 40, 80, 0.5); }
+  :root[data-tema=claro] .vecino { fill: rgba(15, 40, 80, 0.07); stroke: rgba(15, 40, 80, 0.3); }
+  :root[data-tema=claro] .rotulo-pais { fill: #4a5d78; }
+  :root[data-tema=claro] .nom-dep { fill: #0f1c2e; fill-opacity: 0.72; paint-order: stroke; stroke: rgba(255, 255, 255, 0.7); stroke-width: 2.5px; stroke-linejoin: round; }
+  :root[data-tema=claro] .punto { stroke: #0f1c2e; }
+  :root[data-tema=claro] .punto.sel { stroke: #b45309; }
+  :root[data-tema=claro] .anillo { stroke: #0a6fb0; }
+  :root[data-tema=claro] .etiqueta { fill: #0f1c2e; stroke: #ffffff; }
+  :root[data-tema=claro] .etiqueta.sel { fill: #7c2d12; }
+  :root[data-tema=claro] .chip-sel { border-color: rgba(15, 40, 80, 0.28); }
+  :root[data-tema=claro] #tooltip { border-color: rgba(15, 40, 80, 0.28); }
