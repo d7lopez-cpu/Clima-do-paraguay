@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generado por android/scripts/generar-recursos.mjs desde index.html: no editar a mano -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M7 14h10a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.6A3.3 3.3 0 0 0 7 14z" android:strokeColor="#eef2ff" android:strokeWidth="1.6"
+        android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"/>
+    <path android:pathData="M9 17.5a1 1 0 1 0 0 2a1 1 0 1 0 0-2zM15 17.5a1 1 0 1 0 0 2a1 1 0 1 0 0-2zM12 20a1 1 0 1 0 0 2a1 1 0 1 0 0-2z" android:strokeColor="#bae6fd" android:strokeWidth="1.6"
+        android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"/>
+</vector>

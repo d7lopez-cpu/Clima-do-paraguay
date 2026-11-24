@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_nombre">Clima PY</string>
+    <string name="widget_nombre">Clima PY</string>
+    <string name="widget_desc">El clima de ahora en tu ciudad, con máxima y mínima del día</string>
+    <string name="config_titulo">Elige la ciudad</string>
+    <string name="buscar">Buscar ciudad o departamento</string>
+</resources>

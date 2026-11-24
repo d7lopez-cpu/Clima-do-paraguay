@@ -6,6 +6,8 @@ El clima de **263 ciudades y localidades de Paraguay** en un mapa: temperatura, 
 
 Se puede instalar en el celular como una app (desde el menú del navegador: *Agregar a la pantalla de inicio*) y abre aunque no haya internet, mostrando los últimos datos guardados.
 
+📱 **App Android con widget:** [descargar ClimaPY.apk](https://github.com/d7lopez-cpu/Clima-do-paraguay/releases/latest) (desde el celular). Trae la app completa y un **widget para la pantalla de inicio** con la temperatura, el estado, la máxima y la mínima de la ciudad que elijas. Para agregarlo: mantén presionado un espacio vacío de la pantalla de inicio → *Widgets* → *Clima PY*.
+
 ## Qué ofrece
 
 - **Mapa de los 18 departamentos** con capas de temperatura, humedad, viento y lluvia, y un deslizador para ver las próximas 24 horas.
@@ -50,6 +52,8 @@ En vez de que cada visitante consulte cientos de ciudades a Open-Meteo, un proce
 | `manifest.webmanifest` | Nombre e íconos para instalar la app |
 | `scripts/actualizar_clima.py` | Descarga el clima de todas las ciudades (solo usa Python estándar) |
 | `.github/workflows/clima.yml` | Ejecuta el script cada 30 minutos y publica en la rama `datos` |
+| `android/` y `.github/workflows/android.yml` | App Android (Java, sin dependencias externas): la app web dentro de la app y el widget de pantalla de inicio. GitHub Actions compila el APK en cada cambio y, en `main`, lo publica en *Releases*. El widget pide el clima de su ciudad a Open-Meteo cada 30 min (y si falla, usa `datos.json` de la rama `datos`) |
+| `android/scripts/generar-recursos.mjs` | Genera los recursos de la app Android desde la web: íconos del clima (de `index.html`), ñandutí (de `icono.svg`) y la lista de ciudades (de `geo.js`). El flujo lo corre solo antes de compilar |
 | `scripts/revisar.mjs` y `.github/workflows/revisar.yml` | Revisión automática: en cada cambio comprueba que el código no tenga errores y que las ciudades y archivos estén bien |
 
 ## Tareas comunes
@@ -59,6 +63,7 @@ En vez de que cada visitante consulte cientos de ciudades a Open-Meteo, un proce
 - **Aligerar los mapas:** `geo.js` ya está simplificado (−40 % de peso). Si se vuelve a generar, hay que partir del archivo original (no de uno ya simplificado): `git show 17b6f36:geo.js > /tmp/original.js` y luego `node scripts/simplificar-geo.mjs --entrada /tmp/original.js --eps-dep 0.007 --eps-vec 0.01`. Con `--eps-dep 0.005` se conserva más detalle (−34 %).
 - **Actualizar el clima a mano:** pestaña *Actions* → *Actualizar clima* → *Run workflow*.
 - **Probar la animación en todas sus variantes:** en la consola del navegador, `climaAnim.fijar({ vistaPrevia: { tipo: 'tormenta', fase: 'noche' } })` (tipos: despejado, parcial, nublado, lluvia, tormenta, niebla; fases: amanecer, dia, atardecer, noche) y `climaAnim.fijar({ vistaPrevia: null })` para volver al clima real.
+- **Nueva versión de la app Android:** se publica sola al fusionar en `main` cualquier cambio en `android/`, `geo.js`, `index.html` o `icono.svg`; a mano: *Actions* → *App Android* → *Run workflow*. La firma usa la llave de `android/firma` (pública: sirve para instalar y actualizar el APK a mano, no para Play Store). Para una llave privada, guarda en los secretos del repositorio `ANDROID_KEYSTORE_B64` (el `.jks` en base64) y `ANDROID_KEYSTORE_PASS`; ojo: al cambiar de llave hay que desinstalar la app una vez.
 - **Revisar que nada esté roto:** GitHub lo hace solo en cada cambio (✅ o ❌ junto al commit). A mano: `node scripts/revisar.mjs`.
 - **Probar en tu computadora:** desde la carpeta del proyecto, ejecuta `python3 -m http.server` y abre http://localhost:8000.
 

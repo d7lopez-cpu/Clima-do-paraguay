@@ -1,0 +1,77 @@
+name: App Android
+
+# Construye la app Android (Clima PY + widget de pantalla de inicio).
+# En cualquier rama: el APK queda como artefacto de la corrida. En main: además se publica como «Release» para bajarlo desde el celular.
+on:
+  push:
+    paths:
+      - 'android/**'
+      - 'geo.js'
+      - 'icono.svg'
+      - 'icono-192.png'
+      - 'index.html'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Recursos desde la app web (íconos, ñandutí, ciudades)
+        run: node android/scripts/generar-recursos.mjs
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+
+      # Si el repositorio tiene una llave de firma propia en los secretos, se usa esa; si no, la incluida en android/firma
+      - name: Firma
+        env:
+          LLAVE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          LLAVE_CLAVE: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+        run: |
+          if [ -n "$LLAVE_B64" ]; then
+            echo "$LLAVE_B64" | base64 -d > "$RUNNER_TEMP/llave.jks"
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/llave.jks" >> "$GITHUB_ENV"
+            echo "KEYSTORE_PASS=$LLAVE_CLAVE" >> "$GITHUB_ENV"
+          fi
+
+      - name: Compilar el APK
+        run: gradle -p android assembleRelease --no-daemon --stacktrace
+
+      - name: Preparar el APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk ClimaPY.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClimaPY-android
+          path: ClimaPY.apk
+
+      - name: Publicar para descargar desde el celular
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "android-v${{ github.run_number }}" ClimaPY.apk \
+            --title "Clima PY para Android · versión ${{ github.run_number }}" \
+            --latest \
+            --notes "App Clima PY con widget para la pantalla de inicio.
+
+          Cómo instalarla: abre esta página en el celular, toca ClimaPY.apk, y cuando Android lo pida permite «instalar apps de este origen». Las versiones nuevas se instalan encima de la anterior sin perder nada.
+
+          Para agregar el widget: mantén presionado un espacio vacío de la pantalla de inicio → Widgets → Clima PY, y elige tu ciudad."

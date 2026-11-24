@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tokens de «Cristal guaraní» (modo oscuro, el predeterminado) -->
+    <color name="fondo1">#0A1433</color>
+    <color name="fondo2">#172A63</color>
+    <color name="fondo3">#2B2463</color>
+    <color name="texto">#EEF2FF</color>
+    <color name="texto_suave">#C3CDF0</color>
+    <color name="lapacho">#F4A3C6</color>
+    <color name="sol">#FDE68A</color>
+    <color name="celeste">#93C5FD</color>
+    <color name="rojo">#E8574C</color>
+    <color name="azul">#6C8CFF</color>
+    <color name="vidrio">#12FFFFFF</color>
+    <color name="borde">#1FFFFFFF</color>
+</resources>

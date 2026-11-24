@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vidrio nocturno: degradado de la noche paraguaya con un borde fino -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient android:angle="300" android:startColor="@color/fondo1" android:centerColor="@color/fondo2" android:endColor="@color/fondo3" />
+    <corners android:radius="24dp" />
+    <stroke android:width="1dp" android:color="@color/borde" />
+</shape>
