@@ -3053,7 +3053,9 @@
 
   // Solo se actualiza sola si la pestaña está visible (así no se gastan consultas a la API)
   const intervaloActualizacion = setInterval(() => { if (!document.hidden) actualizarTodo(); }, INTERVALO);
-  window.addEventListener('pagehide', () => { clearInterval(intervaloActualizacion); clearInterval(intervaloEstado); clearInterval(intervaloCielo); clearTimeout(reintentoAuto); clearTimeout(temporizador); pararAnimacionRadar(); pararReloj(); }, { once: true });
+  // Si la página queda en la caché atrás/adelante (persisted), los temporizadores se congelan solos y deben seguir al volver:
+  // antes se borraban y, al regresar con «atrás», la app ya no se actualizaba ni pasaba del día a la noche.
+  window.addEventListener('pagehide', e => { if (e.persisted) return; clearInterval(intervaloActualizacion); clearInterval(intervaloEstado); clearInterval(intervaloCielo); clearTimeout(reintentoAuto); clearTimeout(temporizador); pararAnimacionRadar(); pararReloj(); });
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && Date.now() - ultimaOk > INTERVALO) actualizarTodo();
   });
@@ -3487,12 +3489,12 @@
   aplicarLugaresGuardados();
   pintarConteos();
 
-  window.addEventListener('pagehide', () => {
-    if (au) { clearInterval(au.intervaloAves); clearInterval(au.intervaloGotas); try { au.ctx.close(); } catch (_) {} }
+  window.addEventListener('pagehide', e => {
+    if (e.persisted) return;                                       // ver arriba: al volver desde la caché todo debe seguir andando
     clearInterval(intervaloActualizacion); clearInterval(intervaloEstado); clearInterval(intervaloCielo);
     clearInterval(radarTimer); clearInterval(relojMapa);
     clearTimeout(reintentoAuto); clearTimeout(tAjuste); clearTimeout(temporizadorPista);
-  }, { once: true });
+  });
 
   pintarFavs();
   pintarCapas();
