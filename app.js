@@ -2684,6 +2684,22 @@
   aplicarNavidad();
 
   // ============ 7) RESUMEN, LISTA Y DETALLE ============
+  // Íconos de los controles: el set propio de estilos.css (scripts/iconos.mjs). La estrella se llena sola con la clase .on.
+  const ICONO_ESTRELLA = '<span class="i i-estrella" aria-hidden="true"></span>';
+  // Microinteracciones: las animaciones están en estilos.css (sección 19, con los tokens --d-*) y no corren con
+  // «reducir movimiento». Aquí solo se ponen y quitan las clases que las disparan.
+  function animarEntrada(el) {                                     // el bloque entra suave (cambio de ciudad o de pestaña)
+    if (!el) return;
+    el.classList.remove('entra'); void el.offsetWidth; el.classList.add('entra');
+    el.addEventListener('animationend', function fin(e) { if (e.target === el) { el.classList.remove('entra'); el.removeEventListener('animationend', fin); } });
+  }
+  function animarCascada(el) {                                     // los hijos aparecen uno tras otro (--i = su orden)
+    if (!el) return;
+    [...el.children].forEach((h, i) => h.style.setProperty('--i', i));
+    el.classList.add('cascada');
+    clearTimeout(el._tCascada); el._tCascada = setTimeout(() => el.classList.remove('cascada'), 1600);
+  }
+  let statsVistas = false;                                         // el resumen aparece en cascada solo la primera vez
   function dibujarStats() {
     const con = CIUDADES.filter(c => valor(c) !== null);
     if (!con.length) { $('stats').innerHTML = ''; return; }
@@ -2703,6 +2719,7 @@
         : tarjeta(c.bajo, fmt(valor(baja), true), baja.n, baja.n, paraTexto(colorValor(valor(baja))))) +
       (conLluvia.length ? tarjeta('🌧️ Con lluvia ahora', conLluvia.length, 'ej.: ' + conLluvia[0].n, conLluvia[0].n, '')
                         : tarjeta('🌧️ Con lluvia ahora', 0, 'ninguna ciudad', '', ''));
+    if (!statsVistas) { statsVistas = true; animarCascada($('stats')); }
   }
   $('stats').addEventListener('click', e => {
     const b = e.target.closest('[data-ir]');
@@ -2734,7 +2751,7 @@
           <span class="nom"><span class="e">${d ? clima(d.weather_code, d.is_day).emoji : '⏳'}</span> ${c.n}<small>${nombreDep(c.dep)}</small></span>
           <span class="t" style="color:${x === null ? 'var(--suave)' : paraTexto(colorValor(x))}">${fmt(x)}</span>
         </button>
-        <button class="estrella${fav ? ' on' : ''}" data-fav="${c.n}" aria-label="${fav ? 'Quitar ' + c.n + ' de favoritas' : 'Marcar ' + c.n + ' como favorita'}">${fav ? '★' : '☆'}</button>
+        <button class="estrella${fav ? ' on' : ''}" data-fav="${c.n}" aria-label="${fav ? 'Quitar ' + c.n + ' de favoritas' : 'Marcar ' + c.n + ' como favorita'}">${ICONO_ESTRELLA}</button>
       </div>`;
     };
     const cont = $('lista'), scroll = cont.scrollTop;
@@ -2778,7 +2795,7 @@
     dibujarLista();
     pintarFavs();
     const b = document.querySelector('#detalle .estrella');
-    if (b && b.dataset.fav === n) { b.classList.toggle('on', favoritas.has(n)); b.textContent = favoritas.has(n) ? '★' : '☆'; }
+    if (b && b.dataset.fav === n) { b.classList.toggle('on', favoritas.has(n)); b.setAttribute('aria-pressed', String(favoritas.has(n))); }   // el ícono cambia solo con .on (estilos.css)
   }
 
   // --- Detalle de la ciudad elegida ---
@@ -2822,8 +2839,8 @@
         <div>
           <div class="ciudad-fila">
             <span class="ciudad-nombre">${c.n}</span>
-            <button class="estrella${fav ? ' on' : ''}" data-fav="${c.n}" aria-label="Favorita">${fav ? '★' : '☆'}</button>
-            ${d ? `<button class="btn" data-compartir="1" aria-label="Compartir el clima de esta ciudad">📤 Compartir</button>` : ''}
+            <button class="estrella${fav ? ' on' : ''}" data-fav="${c.n}" aria-label="Favorita" aria-pressed="${fav}">${ICONO_ESTRELLA}</button>
+            ${d ? `<button class="btn con-ic" data-compartir="1" aria-label="Compartir el clima de esta ciudad"><span class="i i-compartir" aria-hidden="true"></span><span>Compartir</span></button>` : ''}
             ${d && !navigator.share ? `<button class="btn" data-compartir="wa" aria-label="Enviar el clima por WhatsApp">WhatsApp</button>` : ''}
           </div>
           <div class="dep-nombre">${c.dep === 'Asunción' ? 'Capital del país' : 'Departamento ' + c.dep}</div>
@@ -2927,7 +2944,7 @@
     const c = porNombre.get(seleccionada);
     const mi = ++tokenDetalle;
     const previo = detalleActual && detalleActual.c.n === c.n;
-    if (!previo) pintarPrevio(c);               // enseguida se ve la ciudad elegida, con lo que ya sabemos
+    if (!previo) { pintarPrevio(c); animarEntrada($('detalle')); }   // enseguida se ve la ciudad elegida, con lo que ya sabemos
     $('detalle').setAttribute('aria-busy', 'true');
     try {
       const d = await cargarDetalle(c);
@@ -2953,12 +2970,27 @@
     const { c, d } = detalleActual;
     $('detalle').innerHTML = htmlCabecera(c, d.current, d) + `
       <div class="pestanas" role="tablist" aria-label="Vista del pronóstico">
-        <button class="pestana${pestana === 'horas' ? ' on' : ''}" data-tab="horas" role="tab" aria-selected="${pestana === 'horas'}">Próximas horas</button>
-        <button class="pestana${pestana === 'grafico' ? ' on' : ''}" data-tab="grafico" role="tab" aria-selected="${pestana === 'grafico'}">Gráfico 24 h</button>
-        <button class="pestana${pestana === 'dias' ? ' on' : ''}" data-tab="dias" role="tab" aria-selected="${pestana === 'dias'}">Próximos días</button>
+        ${PESTANAS.map(([id, txt]) => `<button class="pestana${pestana === id ? ' on' : ''}" data-tab="${id}" id="tab-${id}" role="tab" aria-controls="pronostico" aria-selected="${pestana === id}" tabindex="${pestana === id ? 0 : -1}">${txt}</button>`).join('')}
       </div>
-      <div id="pronostico">${htmlPronostico(d)}</div>`;
+      <div id="pronostico" role="tabpanel" aria-labelledby="tab-${pestana}">${htmlPronostico(d)}</div>`;
     llenarAire(c);
+  }
+  const PESTANAS = [['horas', 'Próximas horas'], ['grafico', 'Gráfico 24 h'], ['dias', 'Próximos días']];
+  // Cambiar de pestaña solo redibuja el pronóstico (no toda la tarjeta), con una entrada suave
+  function cambiarPestana(id, enfocar) {
+    if (!detalleActual || !PESTANAS.some(([x]) => x === id)) return;
+    pestana = id;
+    document.querySelectorAll('#detalle [data-tab]').forEach(b => {
+      const on = b.dataset.tab === id;
+      b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1;
+      if (on && enfocar) b.focus();
+    });
+    const caja = $('pronostico');
+    if (!caja) { pintarDetalle(); return; }
+    caja.setAttribute('aria-labelledby', 'tab-' + id);
+    caja.innerHTML = htmlPronostico(detalleActual.d);
+    const fila = caja.querySelector('.fila-scroll, .dias');
+    if (fila) animarCascada(fila); else animarEntrada(caja);
   }
   // ---- Compartir el clima de la ciudad (Web Share; si no existe: copiar enlace y WhatsApp) ----
   function datosCompartir() {
@@ -2994,7 +3026,16 @@
     const fav = e.target.closest('[data-fav]');
     if (fav) { alternarFav(fav.dataset.fav); return; }
     const tab = e.target.closest('[data-tab]');
-    if (tab && detalleActual) { pestana = tab.dataset.tab; pintarDetalle(); }
+    if (tab && detalleActual) cambiarPestana(tab.dataset.tab);
+  });
+  // Pestañas con teclado: flechas, Inicio y Fin (patrón de pestañas de ARIA)
+  $('detalle').addEventListener('keydown', e => {
+    const tab = e.target.closest && e.target.closest('[role=tab]');
+    if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const ids = PESTANAS.map(([x]) => x), i = ids.indexOf(tab.dataset.tab);
+    const j = e.key === 'Home' ? 0 : e.key === 'End' ? ids.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + ids.length) % ids.length;
+    cambiarPestana(ids[j], true);
   });
 
   // Posición de la hora actual dentro de la lista "hourly" de la API
@@ -3364,7 +3405,7 @@
   const GN = {
     // --- pantalla principal ---
     "● Cargando…": "● Eha'ãrõ…", "● Sin conexión · usando datos guardados": "● Ndaipóri internet · oñemoĩ marandu oñeñongatúva",
-    "📲 Instalar": "📲 Emoĩ", "Buscar lugar": "Eheka tenda", "Comparar": "Ñembojoja", "Cerca de mí": "Che ag̃ui", "Actualizar": "Mbopyahu",
+    "📲 Instalar": "📲 Emoĩ", "Instalar": "Emoĩ", "Radar de lluvia": "Radar ama rehegua", "Rutas": "Tape", "Buscar lugar": "Eheka tenda", "Comparar": "Ñembojoja", "Cerca de mí": "Che ag̃ui", "Actualizar": "Mbopyahu",
     "Cargando el clima…": "Oñembyaty ára marandu…", "⚖️ Comparar ciudades": "⚖️ Ñembojoja táva",
     "Usa Ctrl + rueda para hacer zoom": "Eipuru Ctrl + rueda embotuicha térã emomichĩ hag̃ua",
     "Ahora": "Ko'ág̃a", "📡 Radar de lluvia": "📡 Radar ama rehegua", "Ⅱ Pausar": "Ⅱ Mbopyta", "Pausar": "Mbopyta", "▶ Reanudar": "▶ Eñepyrũ jey",

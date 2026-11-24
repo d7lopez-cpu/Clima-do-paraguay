@@ -23,24 +23,24 @@
     <div class="marca">
       <h1><img class="logo" src="icono-192.png" alt="" width="40" height="40">Clima <span>PY</span></h1>
       <p class="sub"><span id="subtitulo"></span><span id="estado" class="pill carga">● Cargando…</span></p>
-      <div class="pref"><button id="btnIdioma" class="btn" aria-label="Idioma" title="Idioma / Ñe'ẽ">🌐 ES</button><button id="btnTema" class="btn">☀️</button><button id="btnUnidad" class="btn">°C</button><button id="btnSonido" class="btn" aria-pressed="false" aria-label="Activar el sonido del clima" title="Sonido ambiente según el clima">🔈</button><button id="btnFx" class="btn" aria-pressed="true" aria-label="Efectos del cielo" title="Efectos del cielo">✨</button><button id="btnAjustesAnim" class="btn" aria-haspopup="dialog" aria-controls="dlgAnim" aria-label="Ajustes de animación" title="Ajustes de animación">⚙️</button><button id="btnAvisos" class="btn" aria-pressed="false" aria-label="Avisos de tormenta" title="Avisar de tormentas en tus ciudades favoritas (con la app abierta)">🔔</button><button id="btnInstalar" class="btn" hidden title="Instalar Clima PY como app">📲 Instalar</button></div>
+      <div class="pref"><button id="btnIdioma" class="btn" aria-label="Idioma" title="Idioma / Ñe'ẽ">🌐 ES</button><button id="btnTema" class="btn">☀️</button><button id="btnUnidad" class="btn">°C</button><button id="btnSonido" class="btn" aria-pressed="false" aria-label="Activar el sonido del clima" title="Sonido ambiente según el clima">🔈</button><button id="btnFx" class="btn con-ic" aria-pressed="true" aria-label="Efectos del cielo" title="Efectos del cielo"><span class="i i-destellos" aria-hidden="true"></span></button><button id="btnAjustesAnim" class="btn con-ic" aria-haspopup="dialog" aria-controls="dlgAnim" aria-label="Ajustes de animación" title="Ajustes de animación"><span class="i i-ajustes" aria-hidden="true"></span></button><button id="btnAvisos" class="btn con-ic" aria-pressed="false" aria-label="Avisos de tormenta" title="Avisar de tormentas en tus ciudades favoritas (con la app abierta)"><span class="i i-campana" aria-hidden="true"></span></button><button id="btnInstalar" class="btn con-ic" hidden title="Instalar Clima PY como app"><span class="i i-instalar" aria-hidden="true"></span><span>Instalar</span></button></div>
     </div>
     <div class="acciones">
       <input id="buscador" type="search" placeholder="Buscar ciudad o lugar…" aria-label="Buscar ciudad" autocomplete="off">
-      <button id="btnLugar" title="Busca cualquier pueblo o barrio de Paraguay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Buscar lugar</button>
-      <button id="btnComparar" title="Comparar dos o tres ciudades"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Comparar</button>
-      <button id="btnUbicacion" title="Selecciona la ciudad más cercana a ti"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-5.6-7-11a7 7 0 0 1 14 0c0 5.4-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Cerca de mí</button>
-      <button id="btnActualizar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg>Actualizar</button>
+      <button id="btnLugar" title="Busca cualquier pueblo o barrio de Paraguay"><span class="i i-buscar" aria-hidden="true"></span>Buscar lugar</button>
+      <button id="btnComparar" title="Comparar dos o tres ciudades"><span class="i i-comparar" aria-hidden="true"></span>Comparar</button>
+      <button id="btnUbicacion" title="Selecciona la ciudad más cercana a ti"><span class="i i-ubicacion" aria-hidden="true"></span>Cerca de mí</button>
+      <button id="btnActualizar"><span class="i i-actualizar" aria-hidden="true"></span>Actualizar</button>
     </div>
   </header>
-  <div class="saludo-navidad" id="saludoNavidad" role="status" hidden><span>🎄 ¡Felices fiestas!</span><button type="button" class="btn" id="saludoCerrar" aria-label="Cerrar saludo" title="Cerrar saludo">✕</button></div>
+  <div class="saludo-navidad" id="saludoNavidad" role="status" hidden><span>🎄 ¡Felices fiestas!</span><button type="button" class="btn" id="saludoCerrar" aria-label="Cerrar saludo" title="Cerrar saludo"><span class="i i-cerrar" aria-hidden="true"></span></button></div>
   <div id="lugares" class="lugares" hidden></div>
 
   <section class="escena" id="escena" aria-label="Paisaje del clima actual">
     <canvas id="escenaCv" aria-hidden="true"></canvas>
     <div class="escena-etq" id="escenaEtq"></div>
     <div class="escena-previa" id="escenaPrevia" role="status" hidden>
-      <span class="ep-txt"><span aria-hidden="true">👁</span> <span>Vista previa:</span> <b id="epTipo"></b> · <b id="epFase"></b></span>
+      <span class="ep-txt"><span class="i i-ojo" aria-hidden="true"></span> <span>Vista previa:</span> <b id="epTipo"></b> · <b id="epFase"></b></span>
       <button type="button" id="epVolver" class="btn">Volver al clima real</button>
     </div>
   </section>
@@ -48,19 +48,31 @@
   <nav class="favs" id="favs" aria-label="Ciudades favoritas" hidden></nav>
 
   <h2 class="sr-only">Resumen nacional</h2>
-  <section class="stats" id="stats" aria-label="Resumen nacional"></section>
+  <section class="stats" id="stats" aria-label="Resumen nacional">
+    <!-- Esqueleto de carga: app.js lo reemplaza al llegar los datos -->
+    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
+    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
+    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
+    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
+  </section>
 
   <h2 class="sr-only">Clima de la ciudad elegida</h2>
 
   <section class="tarjeta" id="detalle" aria-busy="true">
-    <div class="vacio">Cargando el clima…</div>
+    <!-- Esqueleto de carga con la misma forma que el detalle, para que nada salte al llegar los datos -->
+    <div class="actual esqueleto" aria-hidden="true">
+      <div class="esq esq-icono"></div>
+      <div class="esq-col"><div class="esq esq-titulo"></div><div class="esq esq-linea"></div><div class="esq esq-temp"></div><div class="esq esq-linea esq-larga"></div></div>
+      <div class="datos"><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div></div>
+    </div>
+    <p class="sr-only">Cargando el clima…</p>
   </section>
 
   <section class="tarjeta" id="comparar" hidden aria-label="Comparar ciudades">
     <div class="comp-barra">
-      <h2>⚖️ Comparar ciudades</h2>
+      <h2 class="con-ic"><span class="i i-comparar" aria-hidden="true"></span><span>Comparar ciudades</span></h2>
       <div id="compSel" class="comp-sel"></div>
-      <button id="compCerrar" class="btn" aria-label="Cerrar comparación">✕</button>
+      <button id="compCerrar" class="btn con-ic" aria-label="Cerrar comparación"><span class="i i-cerrar" aria-hidden="true"></span></button>
     </div>
     <div id="compRes"></div>
   </section>
@@ -71,9 +83,9 @@
       <div class="mapa-barra">
         <div class="capas" id="capas" role="tablist" aria-label="Capa del mapa"></div>
         <div class="zoom">
-          <button id="zMas" aria-label="Acercar">+</button>
-          <button id="zMenos" aria-label="Alejar">−</button>
-          <button id="zReset" aria-label="Ver todo el país" title="Ver todo el país">⟲</button>
+          <button id="zMas" aria-label="Acercar"><span class="i i-mas" aria-hidden="true"></span></button>
+          <button id="zMenos" aria-label="Alejar"><span class="i i-menos" aria-hidden="true"></span></button>
+          <button id="zReset" aria-label="Ver todo el país" title="Ver todo el país"><span class="i i-encuadrar" aria-hidden="true"></span></button>
         </div>
       </div>
       <div class="mapa-contenedor" id="mapaCont">
@@ -88,10 +100,10 @@
         <span id="hEtq" aria-live="polite">Ahora</span>
       </div>
       <div class="extras radar-tools">
-        <button id="btnRadar" class="btn" title="Mostrar u ocultar el radar de lluvia" aria-pressed="false">📡 Radar de lluvia</button>
+        <button id="btnRadar" class="btn con-ic" title="Mostrar u ocultar el radar de lluvia" aria-pressed="false"><span class="i i-radar" aria-hidden="true"></span><span>Radar de lluvia</span></button>
         <button id="btnRadarPlay" class="btn" title="Pausar la animación del radar" aria-pressed="false" disabled>Ⅱ Pausar</button>
         <label class="radar-opacidad" for="radarOpacidad"><span>Opacidad</span><input id="radarOpacidad" type="range" min="20" max="100" value="78" step="5" disabled><span id="radarOpacidadVal">78%</span></label>
-        <button id="btnRutas" class="btn" title="Rutas principales (aproximadas)" aria-pressed="false">🛣️ Rutas</button>
+        <button id="btnRutas" class="btn con-ic" title="Rutas principales (aproximadas)" aria-pressed="false"><span class="i i-ruta" aria-hidden="true"></span><span>Rutas</span></button>
         <span id="radarEtq" class="ayuda" role="status" aria-live="polite">Radar desactivado</span>
       </div>
       <div class="leyenda"><span id="legIni"></span><div class="grad" id="grad"></div><span id="legFin"></span></div>
@@ -122,18 +134,18 @@
   </footer>
 </div>
 <nav class="barra-nav" aria-label="Ir a una sección">
-  <button data-ir="detalle" class="on"><i><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17 9.5a4.25 4.25 0 0 1 0 8.5z"/></svg></i><span>Clima</span></button>
-  <button data-ir="seccionMapa"><i><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg></i><span>Mapa</span></button>
-  <button data-ir="seccionLista"><i><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></i><span>Ciudades</span></button>
-  <button id="navComparar"><i><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg></i><span>Comparar</span></button>
+  <button data-ir="detalle" class="on"><i><span class="i i-nube" aria-hidden="true"></span></i><span>Clima</span></button>
+  <button data-ir="seccionMapa"><i><span class="i i-mapa" aria-hidden="true"></span></i><span>Mapa</span></button>
+  <button data-ir="seccionLista"><i><span class="i i-lista" aria-hidden="true"></span></i><span>Ciudades</span></button>
+  <button id="navComparar"><i><span class="i i-comparar" aria-hidden="true"></span></i><span>Comparar</span></button>
 </nav>
 <div id="aviso" role="status"></div>
 <div id="anuncio" class="sr-only" aria-live="polite"></div>
 
 <dialog id="dlgAnim" class="hoja-anim" aria-labelledby="daTitulo">
   <form method="dialog" class="da-cab">
-    <h2 id="daTitulo">⚙️ Ajustes de animación</h2>
-    <button class="btn da-cerrar" value="cerrar" aria-label="Cerrar" title="Cerrar">✕</button>
+    <h2 id="daTitulo" class="con-ic"><span class="i i-ajustes" aria-hidden="true"></span><span>Ajustes de animación</span></h2>
+    <button class="btn da-cerrar" value="cerrar" aria-label="Cerrar" title="Cerrar"><span class="i i-cerrar" aria-hidden="true"></span></button>
   </form>
   <div class="da-cuerpo">
     <p class="da-reducido" id="daReducido" hidden>Tu dispositivo pide reducir el movimiento: la animación se muestra quieta.</p>
