@@ -1686,7 +1686,8 @@
   }
   function etiquetaEscena(a) {                                     // las etiquetas sobre el cuadro: ciudad, clima y momento del día
     // en una vista previa se muestra el clima elegido (con el mismo texto que la app usa para un código típico de ese clima), no el real
-    const cod = amb.previa ? { despejado: 0, parcial: 2, nublado: 3, lluvia: 63, tormenta: 95, niebla: 45 }[amb.tipo] : a.weather_code;
+    const c0 = a.weather_code, real = [95, 96, 99].includes(c0) ? 'tormenta' : c0 >= 51 && c0 <= 86 ? 'lluvia' : c0 === 45 || c0 === 48 ? 'niebla' : c0 === 3 ? 'nublado' : c0 === 2 ? 'parcial' : 'despejado';
+    const cod = amb.previa && real !== amb.tipo ? { despejado: 0, parcial: 2, nublado: 3, lluvia: 63, tormenta: 95, niebla: 45 }[amb.tipo] : c0;   // si coincide con el real, se deja el texto real (p. ej. «Tormenta con granizo»)
     const w = clima(cod, amb.previa ? (amb.fase === 'noche' ? 0 : 1) : a.is_day), tx = [`📍 ${seleccionada}`, `${w.emoji} ${w.texto}`, { amanecer: '🌅 Amanecer', dia: '☀️ Día', atardecer: '🌇 Atardecer', noche: '🌙 Noche' }[amb.fase] || '☀️ Día'], caja = $('escenaEtq');
     caja.textContent = ''; tx.forEach(s => { const e = document.createElement('span'); e.textContent = s; caja.appendChild(e); });
   }
