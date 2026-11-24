@@ -1305,7 +1305,7 @@
   const ec = $('escenaCv'), ex = ec.getContext('2d');
   let eW = 0, eH = 0, eD = 1, eClave = '', eFirma = '', eNubes = [], eAves = [], eLuci = [], eEstr = [], eGotas = [], eGranizo = [], eHojas = [], ePetalos = [], eOndas = [], eNiebla = [], eRayo = null, eFugaz = null;
   let eTexNiebla = null, eSprLuci = null, eSombra = null, ultRayoT = -1, reGolpe = 0;
-  let eFoto = null, eFundido = 0, eEtq = [], eEtqSucio = true;        // fundido entre escenas · zonas ocupadas por las etiquetas
+  let eLuces = [], eViaL = null, eFoto = null, eFundido = 0, eEtq = [], eEtqSucio = true;        // fundido entre escenas · zonas ocupadas por las etiquetas
   const vAst = { ok: false, sx: 0, sy: 0, so: 0, mx: 0, my: 0, mf: 0 };   // sol y luna suavizados (no saltan al cambiar de momento del día)
   // Paralaje: el puntero sobre el cuadro (o la inclinación del celular, donde el navegador la da sin pedir permiso) corre un poco
   // cada capa según su distancia: lo lejano casi nada, las palmeras y la orilla lo que más. Nunca con movimiento reducido.
@@ -1483,8 +1483,30 @@
     for (const [a, b, c, d] of zonasEtq()) if (x + r > a && x - r < c && y + r > b && y - r < d) y = d + r;
     return y;
   }
+  // Vía Láctea: un arco de luz lechosa con una franja de polvo oscuro, dibujado una vez por tamaño (a baja resolución y luego
+  // ampliado: así queda difuso) con estrellitas finas encima. Al pintar solo se copia.
+  function texturaViaLactea(w, h) {
+    const lw = Math.ceil(w / 4), lh = Math.ceil(h / 4), lo = document.createElement('canvas'); lo.width = lw; lo.height = lh;
+    const g = lo.getContext('2d'), pto = u => { const v = 1 - u; return [lw * (-0.05 * v * v + 2 * 0.5 * u * v + 1.05 * u * u), lh * (0.95 * v * v + 2 * 0.02 * u * v + 0.6 * u * u)]; };
+    for (let i = 0; i < 160; i++) {
+      const u = Math.random(), [x, y] = pto(u), d = (Math.random() + Math.random() - 1) * lh * 0.16, r = lh * (0.06 + Math.random() * 0.12);
+      const gr = g.createRadialGradient(x, y + d, 0, x, y + d, r); gr.addColorStop(0, `rgba(205,212,255,${0.05 + Math.random() * 0.06})`); gr.addColorStop(1, 'rgba(205,212,255,0)');
+      g.fillStyle = gr; g.fillRect(x - r, y + d - r, r * 2, r * 2);
+    }
+    g.globalCompositeOperation = 'destination-out';                 // la franja de polvo que parte la Vía Láctea
+    for (let i = 0; i < 50; i++) {
+      const u = 0.15 + Math.random() * 0.7, [x, y] = pto(u), r = lh * (0.03 + Math.random() * 0.05);
+      const gr = g.createRadialGradient(x, y + lh * 0.02, 0, x, y + lh * 0.02, r); gr.addColorStop(0, 'rgba(0,0,0,0.25)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(x - r, y + lh * 0.02 - r, r * 2, r * 2);
+    }
+    const c = document.createElement('canvas'); c.width = Math.ceil(w * eD); c.height = Math.ceil(h * eD);
+    const f = c.getContext('2d'); f.drawImage(lo, 0, 0, c.width, c.height);
+    f.fillStyle = 'rgba(235,240,255,0.55)';
+    for (let i = 0; i < 260; i++) { const [x, y] = pto(Math.random()), d = (Math.random() + Math.random() - 1) * lh * 0.13; f.fillRect(x * 4 * eD, (y + d) * 4 * eD, eD * 0.7, eD * 0.7); }
+    return c;
+  }
   function armarEscena() {
-    const A = amb, simple = !prefsAnim.paisaje || !fx, part = g => !simple && efectoActivo(g);
+    const A = amb, simple = !prefsAnim.paisaje || !fx, part = g => !simple && efectoActivo(g), yAgua = eH * 0.74;
     const grandes = A.tipo === 'nublado' || A.tipo === 'lluvia' || A.tipo === 'tormenta', abierto = A.tipo === 'despejado' || A.tipo === 'parcial';
     const nN = { despejado: 2, parcial: 4, nublado: 6, niebla: 0, lluvia: 7, tormenta: 7 }[A.tipo];
     // las nubes dicen qué clima hace: su cantidad varía menos que la de las demás partículas
@@ -1495,9 +1517,16 @@
     }).sort((a, b) => a.z - b.z) : [];
     eAves = part('fauna') && A.tipo !== 'lluvia' && A.tipo !== 'tormenta' && A.tipo !== 'niebla' ? Array.from({ length: Math.max(1, cant(4)) }, () => ({ x: Math.random() * eW, y: eH * (0.12 + Math.random() * 0.25), v: 0.03 + Math.random() * 0.03, f: Math.random() * 6.28, s: eH * (0.025 + Math.random() * 0.02) })) : [];
     eLuci = part('fauna') && A.lluvia === 0 && A.tipo !== 'niebla' ? Array.from({ length: cant(16) }, () => ({ x: Math.random() * eW, y: eH * (0.55 + Math.random() * 0.4), f: Math.random() * 6.28, v: 0.0004 + Math.random() * 0.0006 })) : [];
+    eViaL = part('estrellas') && abierto ? texturaViaLactea(eW, eH * 0.62) : null;
+    // luces de una ciudad lejana sobre la colina, junto al agua (en 3 grupos), solo se ven al anochecer y de noche
+    eLuces = [];
+    for (let i = 0, n = Math.max(10, cant(28)); i < n; i++) {
+      const cx0 = [0.36, 0.5, 0.63][i % 3], x = eW * (cx0 + (Math.random() + Math.random() - 1) * 0.07), techo = altColina(x) + 2;
+      if (techo > yAgua - 3) continue;
+      eLuces.push({ x, y: Math.max(techo, yAgua - 2 - Math.random() * eH * 0.04), r: 0.6 + Math.random() * 0.7, c: Math.random() < 0.8 ? 0 : 1, k: i % 3 });
+    }
     eEstr = part('estrellas') && abierto ? Array.from({ length: cant(45) }, () => ({ x: Math.random() * eW, y: Math.random() * eH * 0.5, r: 0.4 + Math.random() * 1.1 })) : [];
     eGotas = part('lluvia') ? Array.from({ length: cant(A.lluvia * 70 * (A.granizo ? 0.6 : 1)) }, () => ({ x: Math.random() * eW, y: Math.random() * eH, l: eH * (0.05 + Math.random() * 0.05), v: 0.6 + Math.random() * 0.5 })) : [];
-    const yAgua = eH * 0.74;
     const nuevoGranizo = g => Object.assign(g, { x: Math.random() * eW, y: -Math.random() * eH * 0.4, vy: 0.3 + Math.random() * 0.2, vx: vientoVis() / 900, r: 1 + Math.random() * 1.3, suelo: yAgua + 3 + Math.random() * (eH - yAgua - 6), reb: 0 });
     eGranizo = part('lluvia') && A.granizo ? Array.from({ length: cant(34) }, () => { const g = nuevoGranizo({ nuevo: nuevoGranizo }); g.y = Math.random() * eH * 0.7; return g; }) : [];
     eHojas = part('viento') ? Array.from({ length: cant(limitar((vientoVis() - 12) / 25, 0, 1) * 18) }, () => ({ x: Math.random() * eW, y: eH * (0.35 + Math.random() * 0.6), v: 0.6 + Math.random() * 0.7, f: Math.random() * 6.28, a: Math.random() * 6.28, g: (Math.random() - 0.5) * 0.02, l: 1.6 + Math.random() * 1.8 })) : [];
@@ -1566,6 +1595,11 @@
       ex.fillStyle = '#fff';
       for (let k = 0; k < 4; k++) { ex.globalAlpha = kEstr * (0.3 + 0.55 * Math.sin(t / 900 + k * 1.7) ** 2); ex.beginPath(); for (let i = k; i < eEstr.length; i += 4) { const s = eEstr[i]; ex.moveTo(s.x + s.r, s.y); ex.arc(s.x, s.y, s.r, 0, 6.283); } ex.fill(); }
       ex.globalAlpha = 1;
+    }
+    if (eViaL && kEstr > 0.4) {                                     // Vía Láctea: noche despejada y sin luna (la luna llena la borra)
+      const il = (1 - Math.cos(2 * Math.PI * edadLuna())) / 2, luna = A.tipo === 'nublado' ? 0 : vAst.mf * kLuna * (0.15 + 0.85 * il);
+      const a = ((kEstr - 0.4) / 0.6) ** 2 * (A.tipo === 'despejado' ? 0.75 : 0.4) * limitar(1 - luna * 1.6, 0, 1);
+      if (a > 0.02) { ex.globalAlpha = a; ex.drawImage(eViaL, 0, 0, eW, eH * 0.62); ex.globalAlpha = 1; }
     }
     // estrella fugaz de vez en cuando, en noche despejada
     if (esp && anim && eEstr.length && kEstr > 0.6) {
@@ -1656,6 +1690,19 @@
     ex.translate(pX(0.45), 0); colinaEsc(eH * 0.65, eH * 0.07, 3, 7, 2.1, T[1]); ex.translate(-pX(0.45), 0);
     const gb2 = ex.createLinearGradient(0, eH * 0.6, 0, yAgua); gb2.addColorStop(0, `rgba(${hz},0)`); gb2.addColorStop(1, `rgba(${hz},${aBr * 0.45})`);
     ex.fillStyle = gb2; ex.fillRect(0, eH * 0.6, eW, yAgua - eH * 0.6);
+    const kCiu = eLuces.length ? (1 - kLuz) ** 1.5 * (A.tipo === 'niebla' ? 0.35 : A.lluvia ? 0.6 : 1) : 0;
+    if (kCiu > 0.02) {                                              // luces de la ciudad lejana: titilan muy despacio y tiñen apenas el cielo encima
+      const dxC = pX(0.45);
+      ex.save(); ex.translate(eW * 0.5 + dxC, yAgua); ex.scale(1, 0.22);
+      const gc = ex.createRadialGradient(0, 0, 0, 0, 0, eW * 0.22); gc.addColorStop(0, `rgba(255,190,120,${0.1 * kCiu})`); gc.addColorStop(1, 'rgba(255,190,120,0)');
+      ex.fillStyle = gc; ex.fillRect(-eW * 0.22, -eW * 0.22, eW * 0.44, eW * 0.22); ex.restore();
+      for (let c = 0; c < 2; c++) for (let k = 0; k < 3; k++) {
+        ex.fillStyle = c ? '#eaf0ff' : '#ffd08c'; ex.globalAlpha = kCiu * (0.7 + 0.3 * Math.sin(t / 1400 + k * 2.1)); ex.beginPath();
+        for (const l of eLuces) if (l.c === c && l.k === k) { ex.moveTo(l.x + dxC + l.r, l.y); ex.arc(l.x + dxC, l.y, l.r, 0, 6.283); }
+        ex.fill();
+      }
+      ex.globalAlpha = 1;
+    }
     // lapachos en flor sobre la colina (julio a septiembre): pequeños y apagados según la luz, para que sean un detalle
     if (esp && mesLapacho()) {
       const os = 1 - kLuz, s = eH * 0.05;
@@ -1699,6 +1746,11 @@
       }
       ex.globalAlpha = 1;
     };
+    if (kCiu > 0.02) {                                              // las luces de la ciudad se estiran en el agua
+      ex.fillStyle = '#ffcf8a'; ex.globalAlpha = kCiu * 0.32 * (1 - A.lluvia * 0.6); const dxC = pX(0.45);
+      for (const l of eLuces) { const L = 3 + l.r * 4 + Math.sin(t / 600 + l.x) * 1.5; ex.fillRect(l.x + dxC - 0.5 + Math.sin(t / 500 + l.y) * 0.6, yAgua + 1.5, 1, L); }
+      ex.globalAlpha = 1;
+    }
     if (refSol) reflejo(refSol);
     if (refLuna) reflejo(refLuna);
     if (eGotas.length || eOndas.length) {                         // anillos y salpicaduras de la lluvia sobre el río
@@ -1720,10 +1772,14 @@
     palmaEsc(eW * 0.92, yAgua - eH * 0.035, eH * 0.62, t + 400, T[3], vp); palmaEsc(eW * 0.84, yAgua - eH * 0.005, eH * 0.4, t + 1600, T[3], vp);
     ex.translate(-dxO, 0);
     // luciérnagas
-    if (kLuci > 0.02 && eLuci.length) eLuci.forEach(l => {
-      l.x += Math.sin(t * l.v + l.f) * 0.35 * (dt / 16); l.y += Math.cos(t * l.v * 1.3 + l.f) * 0.25 * (dt / 16);
-      ex.globalAlpha = kLuci * (0.25 + 0.75 * Math.max(0, Math.sin(t / 700 + l.f * 3))); ex.drawImage(eSprLuci, l.x - 9, l.y - 9, 18, 18);
-    });
+    if (kLuci > 0.02 && eLuci.length) {                            // luciérnagas: con viento derivan hacia un lado y, si es fuerte, casi no se ven
+      const vl = efectoActivo('viento') ? limitar((A.viento || 0) / 30, 0, 1) : 0, ocultas = 1 - limitar(((A.viento || 0) - 25) / 20, 0, 0.8);
+      eLuci.forEach(l => {
+        l.x += (Math.sin(t * l.v + l.f) * 0.35 + vl * (0.5 + (l.f % 1)) * 0.9) * (dt / 16); l.y += Math.cos(t * l.v * 1.3 + l.f) * 0.25 * (dt / 16);
+        if (l.x > eW + 10) l.x = -10;
+        ex.globalAlpha = kLuci * ocultas * (0.25 + 0.75 * Math.max(0, Math.sin(t / 700 + l.f * 3))); ex.drawImage(eSprLuci, l.x - 9, l.y - 9, 18, 18);
+      });
+    }
     ex.globalAlpha = 1;
     // hojas y polvo que arrastra el viento
     if (eHojas.length) {
