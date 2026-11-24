@@ -7,10 +7,11 @@
  *   y así nunca se muestra un pronóstico viejo como si fuera nuevo.
  * Para publicar una versión nueva de la app, cambia el número de VERSION.
  */
-const VERSION = 'v7';
+const VERSION = 'v8';
 const CACHE = 'clima-py-' + VERSION;
 const APP = ['./', 'index.html', 'estilos.css', 'geo.js', 'app.js', 'manifest.webmanifest', 'icono-192.png', 'apple-touch-icon.png',
-  'fonts/inter-latin-wght-normal.woff2', 'fonts/inter-vietnamese-wght-normal.woff2', 'icono-navidad.svg'];
+  'fonts/inter-latin-wght-normal.woff2', 'fonts/inter-vietnamese-wght-normal.woff2', 'icono-navidad.svg',
+  'fonts/fraunces-latin-wght-normal.woff2', 'fonts/fraunces-vietnamese-wght-normal.woff2', 'icono.svg', 'logo-nanduti-hilos.svg', 'logo-navidad.svg'];
 // Código de la app: igual que la página, se pide primero a la red para que HTML, CSS y JS siempre sean de la misma versión
 const CODIGO = /\.(css|js)$/;
 // Datos geográficos: pesados y casi inmutables -> caché primero, revalidando en segundo plano
