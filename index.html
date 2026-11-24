@@ -23,7 +23,7 @@
     <div class="marca">
       <h1><img class="logo" src="icono-192.png" alt="" width="40" height="40">Clima <span>PY</span></h1>
       <p class="sub"><span id="subtitulo"></span><span id="estado" class="pill carga">● Cargando…</span></p>
-      <div class="pref"><button id="btnIdioma" class="btn" aria-label="Idioma" title="Idioma / Ñe'ẽ">🌐 ES</button><button id="btnTema" class="btn">☀️</button><button id="btnUnidad" class="btn">°C</button><button id="btnSonido" class="btn" aria-pressed="false" aria-label="Activar el sonido del clima" title="Sonido ambiente según el clima">🔈</button><button id="btnFx" class="btn" aria-pressed="true" aria-label="Efectos del cielo" title="Efectos del cielo">✨</button><button id="btnAvisos" class="btn" aria-pressed="false" aria-label="Avisos de tormenta" title="Avisar de tormentas en tus ciudades favoritas (con la app abierta)">🔔</button><button id="btnInstalar" class="btn" hidden title="Instalar Clima PY como app">📲 Instalar</button></div>
+      <div class="pref"><button id="btnIdioma" class="btn" aria-label="Idioma" title="Idioma / Ñe'ẽ">🌐 ES</button><button id="btnTema" class="btn">☀️</button><button id="btnUnidad" class="btn">°C</button><button id="btnSonido" class="btn" aria-pressed="false" aria-label="Activar el sonido del clima" title="Sonido ambiente según el clima">🔈</button><button id="btnFx" class="btn" aria-pressed="true" aria-label="Efectos del cielo" title="Efectos del cielo">✨</button><button id="btnAjustesAnim" class="btn" aria-haspopup="dialog" aria-controls="dlgAnim" aria-label="Ajustes de animación" title="Ajustes de animación">⚙️</button><button id="btnAvisos" class="btn" aria-pressed="false" aria-label="Avisos de tormenta" title="Avisar de tormentas en tus ciudades favoritas (con la app abierta)">🔔</button><button id="btnInstalar" class="btn" hidden title="Instalar Clima PY como app">📲 Instalar</button></div>
     </div>
     <div class="acciones">
       <input id="buscador" type="search" placeholder="Buscar ciudad o lugar…" aria-label="Buscar ciudad" autocomplete="off">
@@ -33,11 +33,16 @@
       <button id="btnActualizar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg>Actualizar</button>
     </div>
   </header>
+  <div class="saludo-navidad" id="saludoNavidad" role="status" hidden><span>🎄 ¡Felices fiestas!</span><button type="button" class="btn" id="saludoCerrar" aria-label="Cerrar saludo" title="Cerrar saludo">✕</button></div>
   <div id="lugares" class="lugares" hidden></div>
 
   <section class="escena" id="escena" aria-label="Paisaje del clima actual">
     <canvas id="escenaCv" aria-hidden="true"></canvas>
     <div class="escena-etq" id="escenaEtq"></div>
+    <div class="escena-previa" id="escenaPrevia" role="status" hidden>
+      <span class="ep-txt"><span aria-hidden="true">👁</span> <span>Vista previa:</span> <b id="epTipo"></b> · <b id="epFase"></b></span>
+      <button type="button" id="epVolver" class="btn">Volver al clima real</button>
+    </div>
   </section>
 
   <nav class="favs" id="favs" aria-label="Ciudades favoritas" hidden></nav>
@@ -124,6 +129,102 @@
 </nav>
 <div id="aviso" role="status"></div>
 <div id="anuncio" class="sr-only" aria-live="polite"></div>
+
+<dialog id="dlgAnim" class="hoja-anim" aria-labelledby="daTitulo">
+  <form method="dialog" class="da-cab">
+    <h2 id="daTitulo">⚙️ Ajustes de animación</h2>
+    <button class="btn da-cerrar" value="cerrar" aria-label="Cerrar" title="Cerrar">✕</button>
+  </form>
+  <div class="da-cuerpo">
+    <p class="da-reducido" id="daReducido" hidden>Tu dispositivo pide reducir el movimiento: la animación se muestra quieta.</p>
+
+    <fieldset class="da-grupo">
+      <legend>General</legend>
+      <label class="da-interr"><span>Animación</span><input type="checkbox" id="daFx" role="switch"></label>
+      <label class="da-interr"><span>Fondo animado</span><input type="checkbox" id="daFondo" role="switch"></label>
+      <label class="da-interr"><span>Paisaje animado</span><input type="checkbox" id="daPaisaje" role="switch"></label>
+    </fieldset>
+
+    <fieldset class="da-grupo">
+      <legend>Intensidad</legend>
+      <div class="da-seg">
+        <label><input type="radio" name="daIntensidad" value="0.5"><span>Suave</span></label>
+        <label><input type="radio" name="daIntensidad" value="1"><span>Normal</span></label>
+        <label><input type="radio" name="daIntensidad" value="1.5"><span>Intensa</span></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="da-grupo">
+      <legend>Calidad</legend>
+      <div class="da-seg">
+        <label><input type="radio" name="daCalidad" value="auto" aria-describedby="daCalidadAyuda"><span>Automática</span></label>
+        <label><input type="radio" name="daCalidad" value="alta" aria-describedby="daCalidadAyuda"><span>Alta</span></label>
+        <label><input type="radio" name="daCalidad" value="ahorro" aria-describedby="daCalidadAyuda"><span>Ahorro de batería</span></label>
+      </div>
+      <p class="da-ayuda" id="daCalidadAyuda"></p>
+    </fieldset>
+
+    <fieldset class="da-grupo">
+      <legend>Efectos</legend>
+      <div class="da-efectos" id="daEfectos">
+        <label><input type="checkbox" data-efecto="lluvia"><span aria-hidden="true">🌧️</span><span>Lluvia y granizo</span></label>
+        <label><input type="checkbox" data-efecto="nubes"><span aria-hidden="true">☁️</span><span>Nubes</span></label>
+        <label><input type="checkbox" data-efecto="estrellas"><span aria-hidden="true">✨</span><span>Estrellas y luna</span></label>
+        <label><input type="checkbox" data-efecto="rayos"><span aria-hidden="true">⚡</span><span>Relámpagos</span></label>
+        <label><input type="checkbox" data-efecto="niebla"><span aria-hidden="true">🌫️</span><span>Niebla</span></label>
+        <label><input type="checkbox" data-efecto="fauna"><span aria-hidden="true">🐦</span><span>Aves y luciérnagas</span></label>
+        <label><input type="checkbox" data-efecto="viento"><span aria-hidden="true">🍃</span><span>Viento</span></label>
+        <label class="da-ancho"><input type="checkbox" data-efecto="especiales"><span aria-hidden="true">🌈</span><span>Efectos especiales <small>(arcoíris, estrellas fugaces, calor, lapachos)</small></span></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="da-grupo">
+      <legend>Sonido</legend>
+      <label class="da-vol" for="daVolumen"><span>Volumen</span><input type="range" id="daVolumen" min="0" max="100" step="5" aria-describedby="daVolAyuda"><output id="daVolumenVal" for="daVolumen">60%</output></label>
+      <p class="da-ayuda" id="daVolAyuda">El sonido se enciende con el botón 🔈 de arriba.</p>
+    </fieldset>
+
+    <fieldset class="da-grupo">
+      <legend>Vista previa</legend>
+      <p class="da-ayuda">Mira cómo se vería otro clima u otro momento del día. No cambia el pronóstico.</p>
+      <div class="da-sub" id="daTipoEtq">Clima</div>
+      <div class="da-chips" role="radiogroup" aria-labelledby="daTipoEtq">
+        <label><input type="radio" name="daTipo" value="despejado"><span>☀️ Despejado</span></label>
+        <label><input type="radio" name="daTipo" value="parcial"><span>⛅ Parcialmente nublado</span></label>
+        <label><input type="radio" name="daTipo" value="nublado"><span>☁️ Nublado</span></label>
+        <label><input type="radio" name="daTipo" value="lluvia"><span>🌧️ Lluvia</span></label>
+        <label><input type="radio" name="daTipo" value="tormenta"><span>⛈️ Tormenta</span></label>
+        <label><input type="radio" name="daTipo" value="niebla"><span>🌫️ Niebla</span></label>
+      </div>
+      <div class="da-sub" id="daFaseEtq">Momento del día</div>
+      <div class="da-chips" role="radiogroup" aria-labelledby="daFaseEtq">
+        <label><input type="radio" name="daFase" value="amanecer"><span>🌅 Amanecer</span></label>
+        <label><input type="radio" name="daFase" value="dia"><span>☀️ Día</span></label>
+        <label><input type="radio" name="daFase" value="atardecer"><span>🌇 Atardecer</span></label>
+        <label><input type="radio" name="daFase" value="noche"><span>🌙 Noche</span></label>
+      </div>
+      <div class="da-previa-pie">
+        <span class="da-ayuda" id="daPreviaEstado" aria-live="polite">Mostrando el clima real.</span>
+        <button type="button" class="btn" id="daPreviaVolver">Volver al clima real</button>
+      </div>
+    </fieldset>
+
+    <fieldset class="da-grupo">
+      <legend>Decoración navideña</legend>
+      <div class="da-seg">
+        <label><input type="radio" name="daNavidad" value="auto" aria-describedby="daNavidadAyuda"><span>Automática</span></label>
+        <label><input type="radio" name="daNavidad" value="si" aria-describedby="daNavidadAyuda"><span>Siempre</span></label>
+        <label><input type="radio" name="daNavidad" value="no" aria-describedby="daNavidadAyuda"><span>Nunca</span></label>
+      </div>
+      <p class="da-ayuda" id="daNavidadAyuda">Automática: del 1 de diciembre al 6 de enero (Reyes).</p>
+    </fieldset>
+
+    <div class="da-pie">
+      <button type="button" class="btn" id="daRestablecer">Restablecer valores predeterminados</button>
+      <form method="dialog"><button class="btn da-listo" value="listo">Listo</button></form>
+    </div>
+  </div>
+</dialog>
 
 <script src="geo.js"></script>
 <script src="app.js"></script>

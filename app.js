@@ -1252,10 +1252,59 @@
   const amb = { tipo: 'despejado', dia: true, dorado: false, lluvia: 0, viento: 0 };
   let ambClave = '', faseClave = '', cvW = 0, cvH = 0, gotas = [], estrellas = [], nubes = [], destello = 0, proxRayo = 0, rafCielo = 0, ultCielo = 0;
 
+  // ---- Preferencias de la animación ----
+  // Las elige cada persona (panel «Ajustes de animación») y se guardan solo en este navegador (clave 'clima-py-anim').
+  // CONTRATO entre las partes del código: el paisaje, el cielo y el sonido LEEN prefsAnim; el panel la CAMBIA solo con fijarPrefAnim({...}).
+  // `fx` (botón ✨) sigue siendo el interruptor general: si está apagado no se anima nada.
+  const TIPOS_CIELO = ['despejado', 'parcial', 'nublado', 'lluvia', 'tormenta', 'niebla'], FASES_DIA = ['amanecer', 'dia', 'atardecer', 'noche'];
+  const PREFS_ANIM_BASE = {
+    intensidad: 1,        // 0.5 suave · 1 normal · 1.5 intensa: multiplica la cantidad de partículas y el brillo de los efectos
+    calidad: 'auto',      // 'auto' (baja sola si el equipo va lento) · 'alta' · 'ahorro' (menos cuadros por segundo y menos partículas)
+    fondo: true,          // cielo animado detrás de toda la página (canvas #cielo)
+    paisaje: true,        // paisaje animado de arriba (canvas #escenaCv)
+    efectos: { lluvia: true, nubes: true, estrellas: true, rayos: true, niebla: true, fauna: true, viento: true, especiales: true },
+                          // fauna = aves, luciérnagas…; especiales = efectos de ocasión (arcoíris, estrellas fugaces, ondas de calor…)
+    volumen: 0.6          // 0 a 1: volumen del sonido del clima
+  };
+  function cargarPrefsAnim() {
+    const g = leerJSON('clima-py-anim', {}), p = JSON.parse(JSON.stringify(PREFS_ANIM_BASE));
+    if (!g || typeof g !== 'object' || Array.isArray(g)) return p;   // lo guardado se valida campo por campo: nunca se confía a ciegas
+    if ([0.5, 1, 1.5].includes(g.intensidad)) p.intensidad = g.intensidad;
+    if (['auto', 'alta', 'ahorro'].includes(g.calidad)) p.calidad = g.calidad;
+    for (const k of ['fondo', 'paisaje']) if (typeof g[k] === 'boolean') p[k] = g[k];
+    if (g.efectos && typeof g.efectos === 'object') for (const k of Object.keys(p.efectos)) if (typeof g.efectos[k] === 'boolean') p.efectos[k] = g.efectos[k];
+    if (typeof g.volumen === 'number' && g.volumen >= 0 && g.volumen <= 1) p.volumen = g.volumen;
+    return p;
+  }
+  const prefsAnim = cargarPrefsAnim();
+  prefsAnim.vistaPrevia = null;   // { tipo: TIPOS_CIELO, fase: FASES_DIA } para ver otro clima u hora sin esperar a que ocurra; NO se guarda
+  // Qué se DIBUJA depende solo de los efectos elegidos; `fx` decide si se MUEVE. Así, con ✨ apagado el paisaje queda
+  // quieto pero sigue mostrando el clima (nubes, luna, lluvia), en vez de un cielo vacío.
+  const efectoActivo = nombre => prefsAnim.efectos[nombre] !== false;
+  let ultimoAmbiente = null;      // último clima recibido por ambiente(), para volver a aplicarlo al cambiar preferencias o vista previa
+  function fijarPrefAnim(cambios) {
+    for (const [k, v] of Object.entries(cambios || {})) {
+      if (k === 'efectos' && v && typeof v === 'object') Object.assign(prefsAnim.efectos, v);
+      else if (k in prefsAnim) prefsAnim[k] = v;
+    }
+    const { vistaPrevia, ...guardable } = prefsAnim;
+    guardar('clima-py-anim', JSON.stringify(guardable));
+    if (Object.keys(cambios || {}).every(k => k === 'volumen')) { mezclar(); return; }   // el volumen solo toca el sonido: no se rearma la animación (el deslizador llama en cada movimiento)
+    ambClave = ''; faseClave = '';                                  // obliga a rearmar partículas y colores con las preferencias nuevas
+    if (ultimoAmbiente) ambiente(...ultimoAmbiente); else { armarParticulas(); reanudarCielo(); mezclar(); }
+  }
+  // Factor de calidad que usan los efectos para decidir cuántas partículas dibujar (1 = completa, menor = más liviana).
+  // Lo mantiene el bucle de animación: con calidad 'auto' lo baja si el equipo va lento; con 'ahorro' es fijo y bajo.
+  let nivelCalidad = prefsAnim.calidad === 'ahorro' ? 0.5 : 1;
+  // Acceso para pruebas automáticas y para la consola del navegador, p. ej.:
+  //   climaAnim.fijar({ vistaPrevia: { tipo: 'tormenta', fase: 'noche' } })   ·   climaAnim.fijar({ vistaPrevia: null })
+  window.climaAnim = Object.freeze({ fijar: fijarPrefAnim, prefs: () => JSON.parse(JSON.stringify(prefsAnim)), estado: () => ({ ...amb, nivelCalidad }) });
+
   // ============ PAISAJE ANIMADO (el cuadro de arriba) ============
   // Un paisaje del río con colinas y palmeras que cambia con el clima de la ciudad elegida y con la hora. Todo se dibuja aquí mismo.
   const ec = $('escenaCv'), ex = ec.getContext('2d');
-  let eW = 0, eH = 0, eClave = '', eNubes = [], eAves = [], eLuci = [], eEstr = [], eGotas = [], eOndas = [], eNiebla = [], eRayo = null;
+  let eW = 0, eH = 0, eD = 1, eClave = '', eFirma = '', eNubes = [], eAves = [], eLuci = [], eEstr = [], eGotas = [], eGranizo = [], eHojas = [], ePetalos = [], eOndas = [], eNiebla = [], eRayo = null, eFugaz = null;
+  let eTexNiebla = null, eSprLuci = null, eSombra = null, ultRayoT = -1, reGolpe = 0;
   const hexA = s => [1, 3, 5].map(i => parseInt(s.slice(i, i + 2), 16));
   const mezcla = (a, b, k) => { const x = hexA(a), y = hexA(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
   // colores de la tierra: [colinas lejanas, colinas cercanas, orilla, palmeras]
@@ -1273,9 +1322,32 @@
     return n.map((c, i) => mezcla(c, d[i], 0.5));          // cielo cubierto al amanecer/atardecer: a medio camino entre día y noche
   }
 
+  // ---- Lo que piden las preferencias (prefsAnim) ----
+  // Cantidad de partículas = base × intensidad × nivel de calidad (redondeado a cuartos para no rearmar la escena a cada rato).
+  const nivelR = () => Math.round(limitar(nivelCalidad || 1, 0.25, 1) * 4) / 4;
+  const multFx = () => (prefsAnim.intensidad || 1) * nivelR();
+  const cant = n => Math.round(n * multFx());
+  const claveFx = () => [fx ? 1 : 0, prefsAnim.intensidad, nivelR(), Object.keys(prefsAnim.efectos).map(k => prefsAnim.efectos[k] ? 1 : 0).join('')].join(',');
+  const vientoVis = () => (amb.viento || 0) + (amb.tipo === 'tormenta' ? 25 : 0);   // la tormenta siempre trae ráfagas
+  const mesLapacho = () => { const m = new Date().getMonth(); return m >= 6 && m <= 8; };   // julio a septiembre: lapachos en flor
+  // Edad de la luna (0 = nueva, 0,5 = llena), con la misma fórmula que el dato «Luna» del detalle
+  const edadLuna = () => { const P = 29.530588853; return ((((Date.now() - Date.UTC(2000, 0, 6, 18, 14)) / 86400000) % P + P) % P) / P; };
+  // Dibuja la luna con su fase real. En el hemisferio sur la luna creciente se ilumina por la IZQUIERDA.
+  function dibujarLuna(c, x, y, r, al) {
+    const f = edadLuna(), k = Math.cos(2 * Math.PI * f), lado = f < 0.5 ? -1 : 1, term = k > 0 ? lado : -lado;
+    c.save(); c.globalAlpha = al * 0.16; c.fillStyle = '#c3cfee'; c.beginPath(); c.arc(x, y, r, 0, 6.283); c.fill();   // luz cenicienta: el disco apenas se adivina
+    c.globalAlpha = al; c.fillStyle = '#eef2fc'; c.beginPath();
+    c.arc(x, y, r, -Math.PI / 2, Math.PI / 2, lado < 0);
+    if (term > 0) c.ellipse(x, y, r * Math.abs(k), r, 0, Math.PI / 2, -Math.PI / 2, true); else c.ellipse(x, y, r * Math.abs(k), r, 0, Math.PI / 2, Math.PI * 1.5, false);
+    c.closePath(); c.fill(); c.clip();
+    c.fillStyle = 'rgba(120,135,170,0.18)';                         // los "mares" de la luna
+    [[-0.3, -0.25, 0.28], [0.25, 0.1, 0.22], [-0.1, 0.38, 0.16]].forEach(([dx, dy, q]) => { c.beginPath(); c.arc(x + dx * r, y + dy * r, q * r, 0, 6.283); c.fill(); });
+    c.restore();
+  }
+
   // ---- Transición suave entre momentos del día ----
   // En vez de saltar de un color a otro, cada cuadro se acerca un poco al color objetivo (unos 3 s en total).
-  const vEsc = { Ph: null, Th: null, cc: '255,255,255', br: '255,255,255', esc: [0.85, 0, 1, 0, 0, 0, 1], crudo: null };
+  const vEsc = { Ph: null, Th: null, cc: '255,255,255', br: '255,255,255', esc: [0.85, 0, 1, 0, 0, 0, 1, 0, 0], crudo: null };
   const aHex = a => '#' + a.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
   const aRgb = x => String(x).split(',').map(Number);
   const mezA = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
@@ -1285,43 +1357,116 @@
     let T = TIERRA[est].map(aRgbHex), cc = aRgb({ tormenta: '48,54,84', lluvia: '104,120,142', dorado: '255,196,170', amanecer: '255,205,205', noche: '120,135,178', nublado: '200,208,218' }[est] || '255,255,255');
     let cca = est === 'noche' ? 0.5 : est === 'tormenta' || est === 'lluvia' ? 0.92 : 0.85;
     if (medio) { T = T.map((c, i) => mezA(c, aRgbHex(TIERRA.noche[i]), 0.4)); cc = mezA(cc, aRgb('120,135,178'), 0.4); }
+    if (A.tipo === 'niebla' && fase !== 'dia') T = T.map((c, i) => mezA(c, aRgbHex(TIERRA.noche[i]), fase === 'noche' ? 0.5 : 0.2));   // la niebla de noche no brilla
     const br = fase === 'noche' ? [170, 190, 240] : cre ? [255, 196, 130] : [255, 255, 255];
-    const nb = A.tipo === 'niebla' ? 0.55 : A.dorado ? 0.16 : A.tipo === 'lluvia' ? 0.2 : A.tipo === 'nublado' ? 0.07 : 0;
+    const nb = A.tipo === 'niebla' ? (fase === 'noche' ? 0.34 : cre ? 0.46 : 0.55) : A.dorado ? 0.16 : A.tipo === 'lluvia' ? 0.2 : A.tipo === 'nublado' ? 0.07 : 0;
     const estr = abierto ? (fase === 'noche' ? 1 : cre ? 0.35 : 0) : 0;
     const aves = fase === 'noche' ? 0 : cre ? 0.8 : 1;
     const luci = fase === 'noche' ? 1 : fase === 'atardecer' ? 0.6 : fase === 'amanecer' ? 0.25 : 0;
     const luna = fase === 'noche' ? 1 : cre ? 0.55 : 0, luz = fase === 'noche' ? 0 : cre ? 0.5 : 1;
-    return { P: paletaObjetivo().map(aRgbHex), T, cc, br, esc: [cca, estr, aves, luci, luna, nb, luz] };
+    const arco = A.tipo === 'lluvia' && A.lluvia <= 0.55 && fase === 'dia' ? 1 : 0;                       // arcoíris: lluvia débil con sol de día
+    const calor = fase === 'dia' && abierto && A.temp >= 35 ? limitar((A.temp - 34) / 4, 0.4, 1) : 0;      // ondas de calor desde 35 °C
+    return { P: paletaObjetivo().map(aRgbHex), T, cc, br, esc: [cca, estr, aves, luci, luna, nb, luz, arco, calor] };
   }
   function aRgbHex(h) { return hexA(h); }
   function avanzarVisual(dt, quieto) {
     const o = objetivosVisuales(), c = vEsc.crudo, k = quieto || !c ? 1 : 1 - Math.exp(-dt / 1100);
-    const mover = (cur, obj) => cur && k < 1 ? cur.map((v, i) => Array.isArray(v) ? mezA(v, obj[i], k) : v + (obj[i] - v) * k) : obj.map(v => Array.isArray(v) ? v.slice() : v);
+    const mover = (cur, obj) => obj.map((v, i) => cur && k < 1 && cur[i] !== undefined ? (Array.isArray(v) ? mezA(cur[i], v, k) : cur[i] + (v - cur[i]) * k) : (Array.isArray(v) ? v.slice() : v));
     const n = { P: mover(c && c.P, o.P), T: mover(c && c.T, o.T), cc: mover(c && c.cc, o.cc), br: mover(c && c.br, o.br), esc: mover(c && c.esc, o.esc) };
     vEsc.crudo = n;
     vEsc.Ph = n.P.map(aHex); vEsc.Th = n.T.map(aHex);
     vEsc.cc = n.cc.map(Math.round).join(','); vEsc.br = n.br.map(Math.round).join(','); vEsc.esc = n.esc;
   }
-  // Posición del sol y de la luna a lo largo de un arco, según la hora real: el sol sale, sube, baja y se pone; la luna sale al caer la noche
+  // Salida y puesta del sol que usan los astros: las reales o, si faltan durante una vista previa, unas típicas (6:00 y 19:00)
+  function solRef() {
+    if (amb.sol) return amb.sol;
+    if (!amb.previa) return null;
+    const h = new Date(); h.setHours(6, 0, 0, 0); return { sale: +h, pone: +h + 13 * 3600000 };
+  }
+  // Hora con la que se ubican el sol y la luna: la real, salvo en una vista previa de otro momento del día,
+  // donde se usa una hora típica de esa fase (así no aparece el sol en una vista previa de noche).
+  function horaAstros(s) {
+    const t = Date.now(); if (!amb.previa) return t;
+    const M = 60000, D = 86400000;
+    const real = t >= s.sale - 30 * M && t <= s.sale + 45 * M ? 'amanecer' : t >= s.pone - 45 * M && t <= s.pone + 30 * M ? 'atardecer' : t >= s.sale && t < s.pone ? 'dia' : 'noche';
+    if (real === amb.fase) return t;
+    return { amanecer: s.sale + 40 * M, dia: s.sale + 0.72 * (s.pone - s.sale), atardecer: s.pone - 40 * M, noche: s.pone + 0.78 * (s.sale + D - s.pone) }[amb.fase] || t;
+  }
+  // Posición del sol y de la luna a lo largo de un arco, según la hora: el sol sale, sube, baja y se pone; la luna sale al caer la noche
   function arcoAstros() {
-    const s = amb.sol; if (!s) return null;
-    const t = Date.now(), D = 86400000, fade = u => limitar(u / 0.05, 0, 1) * limitar((1 - u) / 0.05, 0, 1);
+    const s = solRef(); if (!s) return null;
+    const t = horaAstros(s), D = 86400000, fade = u => limitar(u / 0.05, 0, 1) * limitar((1 - u) / 0.05, 0, 1);
     const p = (t - s.sale) / (s.pone - s.sale);
     const ini = t >= s.pone ? s.pone : s.pone - D, fin = t >= s.pone ? s.sale + D : s.sale, q = (t - ini) / (fin - ini);
     const pos = u => { const v = limitar(u, 0, 1); return { x: 0.14 + 0.72 * v, alt: Math.sin(Math.PI * v), f: fade(u) }; };
     return { sol: pos(p), luna: pos(q) };
   }
+  // Decide cuándo cae un rayo (una sola vez por cuadro, lo dibuje el fondo, el paisaje o ninguno: el trueno suena igual)
+  function latidoRayo(t, dt) {
+    if (t === ultRayoT) return; ultRayoT = t;
+    if (amb.tipo !== 'tormenta') { destello = 0; return; }
+    if (t > proxRayo) { destello = 1; eRayo = null; reGolpe = Math.random() < 0.6 ? t + 110 + Math.random() * 90 : 0; trueno(); proxRayo = t + 7000 + Math.random() * 9000; }
+    else if (reGolpe && t > reGolpe) { destello = Math.max(destello, 0.8); reGolpe = 0; }     // el rayo parpadea: un segundo golpe enseguida
+    else if (destello > 0.02) destello *= Math.pow(0.86, dt / 33); else destello = 0;
+  }
+  // Un rayo ramificado: el tronco baja zigzagueando hasta el río y de él salen ramas más finas
+  function armarRayo(yFin) {
+    const trazos = [];
+    const rama = (x, y, dir, pasos, w, prof) => {
+      const pts = [[x, y]];
+      for (let i = 0; i < pasos && y < yFin; i++) {
+        x += (Math.random() - 0.5) * eH * 0.09 + dir * eH * 0.035; y += eH * (0.035 + Math.random() * 0.04); pts.push([x, y]);
+        if (prof < 2 && i > 0 && Math.random() < (prof ? 0.18 : 0.3)) rama(x, y, (Math.random() < 0.5 ? -1 : 1) * (0.9 + Math.random()), Math.round(pasos * 0.35), w * 0.55, prof + 1);
+      }
+      trazos.push({ pts, w });
+    };
+    rama(eW * (0.18 + Math.random() * 0.64), eH * 0.08, (Math.random() - 0.5) * 0.4, 40, 2.2, 0);
+    return trazos;
+  }
+  // Altura de las colinas cercanas en x (la misma curva que dibuja colinaEsc), para apoyar los lapachos
+  const altColina = x => eH * 0.65 - eH * 0.07 * (Math.sin(x / eW * 6.283 * 3 + 2.1) * 0.6 + Math.sin(x / eW * 6.283 * 7 + 2.1 * 2.3) * 0.4);
+  const LAPACHOS = [[0.36, '#e0569d'], [0.555, '#f2c230'], [0.64, '#d9649f']];       // lapacho rosado, amarillo y rosado
+  function texturaNiebla() {                                     // una tira de niebla que empalma consigo misma (se dibuja una vez)
+    const c = document.createElement('canvas'), W = 512, H = 128, g = c.getContext('2d'); c.width = W; c.height = H;
+    for (let i = 0; i < 30; i++) {
+      const x = Math.random() * W, y = 44 + Math.random() * 40, r = 18 + Math.random() * 26, a = 0.18 + Math.random() * 0.22;
+      for (const dx of [-W, 0, W]) { const gr = g.createRadialGradient(x + dx, y, 0, x + dx, y, r); gr.addColorStop(0, `rgba(232,238,244,${a})`); gr.addColorStop(1, 'rgba(232,238,244,0)'); g.fillStyle = gr; g.fillRect(x + dx - r, y - r, r * 2, r * 2); }
+    }
+    return c;
+  }
+  function spriteLuci() {                                        // el brillo de una luciérnaga, dibujado una vez y reutilizado
+    const c = document.createElement('canvas'); c.width = c.height = 36; const g = c.getContext('2d'), gr = g.createRadialGradient(18, 18, 0, 18, 18, 18);
+    gr.addColorStop(0, 'rgba(230,255,120,1)'); gr.addColorStop(0.25, 'rgba(230,255,120,0.55)'); gr.addColorStop(1, 'rgba(230,255,120,0)'); g.fillStyle = gr; g.fillRect(0, 0, 36, 36);
+    return c;
+  }
 
   function armarEscena() {
-    const A = amb, grandes = A.tipo === 'nublado' || A.tipo === 'lluvia' || A.tipo === 'tormenta', abierto = A.tipo === 'despejado' || A.tipo === 'parcial';
-    eNubes = Array.from({ length: { despejado: 2, parcial: 4, nublado: 6, niebla: 0, lluvia: 7, tormenta: 7 }[A.tipo] }, () => ({
-      x: Math.random() * eW, y: eH * (grandes ? 0.07 + Math.random() * 0.2 : 0.08 + Math.random() * 0.3), r: eH * (0.06 + Math.random() * 0.06) * (grandes ? 1.6 : 1), v: 0.008 + Math.random() * 0.014 }));
-    eAves = A.tipo !== 'lluvia' && A.tipo !== 'tormenta' && A.tipo !== 'niebla' ? Array.from({ length: 4 }, () => ({ x: Math.random() * eW, y: eH * (0.12 + Math.random() * 0.25), v: 0.03 + Math.random() * 0.03, f: Math.random() * 6.28, s: eH * (0.025 + Math.random() * 0.02) })) : [];
-    eLuci = A.lluvia === 0 && A.tipo !== 'niebla' ? Array.from({ length: 16 }, () => ({ x: Math.random() * eW, y: eH * (0.55 + Math.random() * 0.4), f: Math.random() * 6.28, v: 0.0004 + Math.random() * 0.0006 })) : [];
-    eEstr = abierto ? Array.from({ length: 45 }, () => ({ x: Math.random() * eW, y: Math.random() * eH * 0.5, r: 0.4 + Math.random() * 1.1, f: Math.random() * 6.28 })) : [];
-    eGotas = Array.from({ length: Math.round(A.lluvia * 70) }, () => ({ x: Math.random() * eW, y: Math.random() * eH, l: eH * (0.05 + Math.random() * 0.05), v: 0.6 + Math.random() * 0.5 }));
-    eNiebla = Array.from({ length: 3 }, (_, i) => ({ x: Math.random() * eW, y: eH * (0.5 + i * 0.12), v: 0.006 + i * 0.004 }));
-    eOndas = [];
+    const A = amb, simple = !prefsAnim.paisaje || !fx, part = g => !simple && efectoActivo(g);
+    const grandes = A.tipo === 'nublado' || A.tipo === 'lluvia' || A.tipo === 'tormenta', abierto = A.tipo === 'despejado' || A.tipo === 'parcial';
+    const nN = { despejado: 2, parcial: 4, nublado: 6, niebla: 0, lluvia: 7, tormenta: 7 }[A.tipo];
+    // las nubes dicen qué clima hace: su cantidad varía menos que la de las demás partículas
+    eNubes = efectoActivo('nubes') ? Array.from({ length: Math.round(nN * limitar(multFx(), 0.7, 1.3)) }, () => ({
+      x: Math.random() * eW, y: eH * (grandes ? 0.07 + Math.random() * 0.2 : 0.08 + Math.random() * 0.3), r: eH * (0.06 + Math.random() * 0.06) * (grandes ? 1.6 : 1), v: 0.008 + Math.random() * 0.014 })) : [];
+    eAves = part('fauna') && A.tipo !== 'lluvia' && A.tipo !== 'tormenta' && A.tipo !== 'niebla' ? Array.from({ length: Math.max(1, cant(4)) }, () => ({ x: Math.random() * eW, y: eH * (0.12 + Math.random() * 0.25), v: 0.03 + Math.random() * 0.03, f: Math.random() * 6.28, s: eH * (0.025 + Math.random() * 0.02) })) : [];
+    eLuci = part('fauna') && A.lluvia === 0 && A.tipo !== 'niebla' ? Array.from({ length: cant(16) }, () => ({ x: Math.random() * eW, y: eH * (0.55 + Math.random() * 0.4), f: Math.random() * 6.28, v: 0.0004 + Math.random() * 0.0006 })) : [];
+    eEstr = part('estrellas') && abierto ? Array.from({ length: cant(45) }, () => ({ x: Math.random() * eW, y: Math.random() * eH * 0.5, r: 0.4 + Math.random() * 1.1 })) : [];
+    eGotas = part('lluvia') ? Array.from({ length: cant(A.lluvia * 70 * (A.granizo ? 0.6 : 1)) }, () => ({ x: Math.random() * eW, y: Math.random() * eH, l: eH * (0.05 + Math.random() * 0.05), v: 0.6 + Math.random() * 0.5 })) : [];
+    const yAgua = eH * 0.74;
+    const nuevoGranizo = g => Object.assign(g, { x: Math.random() * eW, y: -Math.random() * eH * 0.4, vy: 0.3 + Math.random() * 0.2, vx: vientoVis() / 900, r: 1 + Math.random() * 1.3, suelo: yAgua + 3 + Math.random() * (eH - yAgua - 6), reb: 0 });
+    eGranizo = part('lluvia') && A.granizo ? Array.from({ length: cant(34) }, () => { const g = nuevoGranizo({ nuevo: nuevoGranizo }); g.y = Math.random() * eH * 0.7; return g; }) : [];
+    eHojas = part('viento') ? Array.from({ length: cant(limitar((vientoVis() - 12) / 25, 0, 1) * 18) }, () => ({ x: Math.random() * eW, y: eH * (0.35 + Math.random() * 0.6), v: 0.6 + Math.random() * 0.7, f: Math.random() * 6.28, a: Math.random() * 6.28, g: (Math.random() - 0.5) * 0.02, l: 1.6 + Math.random() * 1.8 })) : [];
+    ePetalos = part('especiales') && mesLapacho() ? Array.from({ length: cant(10) }, (_, i) => ({ i: i % 3, x: eW * LAPACHOS[i % 3][0], y: eH * (0.5 + Math.random() * 0.3), v: 0.5 + Math.random() * 0.5, f: Math.random() * 6.28 })) : [];
+    if (!eTexNiebla) eTexNiebla = texturaNiebla();
+    const tw = Math.max(eW * 0.7, eH * 3);
+    // cada capa de niebla se escala UNA vez a su tamaño final: al pintarla solo se copia (mucho más barato que estirarla en cada cuadro)
+    eNiebla = efectoActivo('niebla') && (A.tipo === 'niebla' || A.tipo === 'lluvia' || A.tipo === 'nublado' || abierto) ? Array.from({ length: 3 }, (_, i) => {
+      const h = eH * (0.3 + i * 0.08), c = document.createElement('canvas'); c.width = Math.ceil(tw * eD); c.height = Math.ceil(h * eD);
+      c.getContext('2d').drawImage(eTexNiebla, 0, 0, c.width, c.height);
+      return { x: Math.random() * tw, y: eH * (0.44 + i * 0.14), h, tw, c, v: 0.005 + i * 0.006, a: 0.55 + i * 0.22 };
+    }) : [];
+    eOndas = []; eFugaz = null; eRayo = null;
+    if (!eSprLuci) eSprLuci = spriteLuci();
+    eSombra = ex.createLinearGradient(0, 0, 0, eH * 0.4); eSombra.addColorStop(0, 'rgba(0,0,0,0.28)'); eSombra.addColorStop(1, 'rgba(0,0,0,0)');
   }
   function nubeEsc(x, y, r) {                                      // una nube: varias bolitas que se funden en una sola forma
     ex.beginPath();
@@ -1333,13 +1478,15 @@
     for (let x = 0; x <= eW + 8; x += 8) { const u = x / eW * 6.283; ex.lineTo(x, y0 - amp * (Math.sin(u * f1 + ph) * 0.6 + Math.sin(u * f2 + ph * 2.3) * 0.4)); }
     ex.lineTo(eW, eH); ex.closePath(); ex.fill();
   }
-  function palmaEsc(x, y, s, t, color) {                           // palmera: tronco curvo y hojas que se mecen con el viento
-    const v = amb.viento, bal = Math.sin(t / 1700 + x) * (0.012 + v / 600) * s, tx = x + s * 0.05 + bal, ty = y - s;
+  function palmaEsc(x, y, s, t, color, v) {                        // palmera: tronco curvo y hojas que se mecen (y se inclinan) con el viento
+    const raf = 0.6 + 0.4 * Math.sin(t / 2300 + x * 0.01), lean = Math.min(0.09, v / 700) * raf;
+    const bal = Math.sin(t / 1700 + x) * (0.012 + v / 600) * s, tx = x + s * 0.05 + bal + lean * s, ty = y - s;
     ex.strokeStyle = color; ex.lineCap = 'round'; ex.lineWidth = Math.max(2, s * 0.05);
     ex.beginPath(); ex.moveTo(x, y); ex.quadraticCurveTo(x + s * 0.01, y - s * 0.55, tx, ty); ex.stroke();
     ex.lineWidth = Math.max(1.4, s * 0.028);
+    const giro = Math.min(0.45, v / 110) * raf;                    // con viento las hojas se van hacia un lado
     for (let i = 0; i < 9; i++) {
-      const ang = -Math.PI / 2 + (i - 4) * 0.4 + Math.sin(t / 900 + i + x) * 0.035 * (1 + v / 15), L = s * 0.4 * (0.85 + 0.15 * Math.cos(i * 1.3));
+      const ang = -Math.PI / 2 + (i - 4) * 0.4 * (1 - giro * 0.3) + giro + Math.sin(t / (900 - Math.min(500, v * 8)) + i + x) * 0.035 * (1 + v / 15), L = s * 0.4 * (0.85 + 0.15 * Math.cos(i * 1.3));
       ex.beginPath(); ex.moveTo(tx, ty);
       ex.quadraticCurveTo(tx + Math.cos(ang) * L * 0.55, ty + Math.sin(ang) * L * 0.75 - L * 0.12, tx + Math.cos(ang) * L, ty + Math.sin(ang) * L * 0.55 + L * 0.42); ex.stroke();
     }
@@ -1347,40 +1494,67 @@
   function pintarEscena(t, dt, quieto) {
     const w = ec.clientWidth, h = ec.clientHeight;
     if (!w || !h) return;
-    if (w !== eW || h !== eH) { const d = Math.min(window.devicePixelRatio || 1, 2); eW = w; eH = h; ec.width = Math.round(w * d); ec.height = Math.round(h * d); ex.setTransform(d, 0, 0, d, 0, 0); eClave = ''; }
-    if (eClave !== ambClave + '|' + eW) { eClave = ambClave + '|' + eW; armarEscena(); }
+    if (!quieto) latidoRayo(t, dt || 0);
+    const simple = !prefsAnim.paisaje || !fx, d = Math.min(window.devicePixelRatio || 1, nivelR() < 0.75 ? 1 : 2);   // con calidad baja, menos píxeles
+    if (w !== eW || h !== eH || d !== eD) { eW = w; eH = h; eD = d; ec.width = Math.round(w * d); ec.height = Math.round(h * d); ex.setTransform(d, 0, 0, d, 0, 0); eClave = ''; }
+    const clave = [ambClave, eW, eH, claveFx(), simple ? 1 : 0, amb.granizo ? 1 : 0, Math.round(vientoVis() / 8), mesLapacho() ? 1 : 0].join('|');
+    if (eClave !== clave) { eClave = clave; eFirma = ''; armarEscena(); }
     if (!vEsc.Ph) avanzarVisual(0, true);
+    if (simple && !quieto) {                                      // paisaje apagado: un cuadro quieto que se repinta solo si cambian los colores (o cada minuto, por el sol)
+      const firma = vEsc.Ph.join() + vEsc.Th[0] + Math.floor(Date.now() / 60000);
+      if (firma === eFirma) return;
+      eFirma = firma;
+    }
+    if (quieto || simple) dt = 0;
+    const anim = !quieto && !simple;
     const A = amb, P = vEsc.Ph, T = vEsc.Th, yAgua = eH * 0.74, vis = A.tipo === 'despejado' || A.tipo === 'parcial';
-    const [kCca, kEstr, kAves, kLuci, kLuna, kNb] = vEsc.esc, ast = arcoAstros();
-    if (quieto) dt = 0;
+    const [kCca, kEstr, kAves, kLuci, kLuna, kNb, kLuz, kArco = 0, kCalor = 0] = vEsc.esc, ast = arcoAstros(), esp = efectoActivo('especiales');
     // cielo
     const g = ex.createLinearGradient(0, 0, 0, yAgua); g.addColorStop(0, P[0]); g.addColorStop(0.55, P[1]); g.addColorStop(1, P[2]);
     ex.fillStyle = g; ex.fillRect(0, 0, eW, eH);
-    eEstr.forEach(s => { ex.globalAlpha = kEstr * (0.3 + 0.55 * Math.sin(t / 900 + s.f) ** 2); ex.fillStyle = '#fff'; ex.beginPath(); ex.arc(s.x, s.y, s.r, 0, 6.283); ex.fill(); }); ex.globalAlpha = 1;
-    // sol y luna: recorren un arco según la hora real (el sol sale, sube, baja y se pone; la luna sale al caer la noche)
+    if (eEstr.length && kEstr > 0.01) {                            // estrellas: en 4 grupos que titilan a destiempo (4 trazos en vez de uno por estrella)
+      ex.fillStyle = '#fff';
+      for (let k = 0; k < 4; k++) { ex.globalAlpha = kEstr * (0.3 + 0.55 * Math.sin(t / 900 + k * 1.7) ** 2); ex.beginPath(); for (let i = k; i < eEstr.length; i += 4) { const s = eEstr[i]; ex.moveTo(s.x + s.r, s.y); ex.arc(s.x, s.y, s.r, 0, 6.283); } ex.fill(); }
+      ex.globalAlpha = 1;
+    }
+    // estrella fugaz de vez en cuando, en noche despejada
+    if (esp && anim && eEstr.length && kEstr > 0.6) {
+      if (!eFugaz && Math.random() < dt / 9000 * prefsAnim.intensidad) { const dir = Math.random() < 0.5 ? -1 : 1; eFugaz = { x: eW * (0.25 + Math.random() * 0.6), y: eH * (0.05 + Math.random() * 0.2), vx: dir * (0.3 + Math.random() * 0.2), vy: 0.1 + Math.random() * 0.07, vida: 0, dur: 650 + Math.random() * 350 }; }
+      if (eFugaz) {
+        const f = eFugaz; f.vida += dt; f.x += f.vx * dt; f.y += f.vy * dt;
+        const u = f.vida / f.dur, n = Math.hypot(f.vx, f.vy), L = eH * 0.22;
+        if (u >= 1) eFugaz = null;
+        else { const a = Math.sin(Math.PI * u) * kEstr, x2 = f.x - f.vx / n * L, y2 = f.y - f.vy / n * L, gf = ex.createLinearGradient(f.x, f.y, x2, y2); gf.addColorStop(0, `rgba(255,255,255,${a})`); gf.addColorStop(1, 'rgba(255,255,255,0)'); ex.strokeStyle = gf; ex.lineWidth = 1.4; ex.lineCap = 'round'; ex.beginPath(); ex.moveTo(f.x, f.y); ex.lineTo(x2, y2); ex.stroke(); }
+      }
+    }
+    // sol y luna: recorren un arco según la hora (el sol sale, sube, baja y se pone; la luna sale al caer la noche)
     const R = eH * 0.075, yHor = eH * 0.62, aMax = eH * 0.44, S = ast && ast.sol, L = ast && ast.luna;
-    const sx = S ? eW * S.x : eW * 0.72, sy = S ? yHor - S.alt * aMax : eH * 0.22, altSol = S ? S.alt : 1, sobre = S ? S.f : 1;
+    const sx = S ? eW * S.x : eW * 0.72, sy = S ? yHor - S.alt * aMax : eH * 0.22, altSol = S ? S.alt : 1, sobre = S ? S.f : A.fase === 'noche' ? 0 : 1;
     if (sobre > 0.01 && (vis || A.tipo === 'nublado' || A.tipo === 'niebla')) {
       const k = limitar(altSol / 0.45, 0, 1);                     // sol bajo = naranja; sol alto = amarillo claro
       const al = (vis ? 1 : A.tipo === 'nublado' ? 0.45 : 0.3) * sobre, col = `255,${Math.round(150 + 86 * k)},${Math.round(80 + 90 * k)}`;
       const gl = ex.createRadialGradient(sx, sy, 0, sx, sy, R * 5); gl.addColorStop(0, `rgba(${col},${0.55 * al})`); gl.addColorStop(1, `rgba(${col},0)`);
-      ex.fillStyle = gl; ex.fillRect(0, 0, eW, eH);
+      ex.fillStyle = gl; ex.fillRect(sx - R * 5, sy - R * 5, R * 10, R * 10);
       if (vis && k > 0.7) { ex.save(); ex.globalAlpha = (k - 0.7) / 0.3 * sobre; ex.translate(sx, sy); ex.rotate(t / 9000); ex.fillStyle = 'rgba(255,240,190,0.07)'; for (let i = 0; i < 12; i++) { ex.rotate(0.5236); ex.beginPath(); ex.moveTo(0, 0); ex.lineTo(-R * 0.5, -R * 6.5); ex.lineTo(R * 0.5, -R * 6.5); ex.fill(); } ex.restore(); }
       ex.fillStyle = mezcla('#ffb982', '#fff6cf', k); ex.globalAlpha = al; ex.beginPath(); ex.arc(sx, sy, R, 0, 6.283); ex.fill(); ex.globalAlpha = 1;
     }
-    if (L && L.f > 0.01 && kLuna > 0.01 && A.tipo !== 'lluvia' && A.tipo !== 'tormenta') {
+    if (efectoActivo('estrellas') && L && L.f > 0.01 && kLuna > 0.01 && A.tipo !== 'lluvia' && A.tipo !== 'tormenta') {
       const mx = eW * L.x, my = yHor - L.alt * aMax;
-      const il = luna().ilum / 100, al = (A.tipo === 'niebla' ? 0.4 : A.tipo === 'nublado' ? 0.6 : 1) * kLuna * L.f;
-      const gl = ex.createRadialGradient(mx, my, 0, mx, my, R * 4.5); gl.addColorStop(0, `rgba(190,208,255,${0.3 * al * (0.4 + il)})`); gl.addColorStop(1, 'rgba(190,208,255,0)');
-      ex.fillStyle = gl; ex.fillRect(0, 0, eW, eH);
-      ex.save(); ex.globalAlpha = al; ex.beginPath(); ex.arc(mx, my, R * 0.85, 0, 6.283); ex.clip();
-      ex.fillStyle = '#e8eefc'; ex.fillRect(mx - R, my - R, R * 2, R * 2);
-      ex.fillStyle = P[1]; ex.globalAlpha = al * 0.96; ex.beginPath(); ex.arc(mx + (1 - il) * R * 1.7, my, R * 0.85, 0, 6.283); ex.fill();   // la sombra: cuanto menos iluminada, más tapa
-      ex.restore();
+      const il = (1 - Math.cos(2 * Math.PI * edadLuna())) / 2, al = (A.tipo === 'niebla' ? 0.4 : A.tipo === 'nublado' ? 0.6 : 1) * kLuna * L.f;
+      const gl = ex.createRadialGradient(mx, my, 0, mx, my, R * 4.5); gl.addColorStop(0, `rgba(190,208,255,${0.34 * al * il})`); gl.addColorStop(1, 'rgba(190,208,255,0)');
+      ex.fillStyle = gl; ex.fillRect(mx - R * 4.5, my - R * 4.5, R * 9, R * 9);
+      dibujarLuna(ex, mx, my, R * 0.85, al);
     }
     // nubes y aves
     ex.fillStyle = `rgba(${vEsc.cc},${kCca})`;
     eNubes.forEach(n => { n.x += n.v * dt * (1 + A.viento / 20); if (n.x - n.r * 3 > eW) n.x = -n.r * 3; nubeEsc(n.x, n.y, n.r); });
+    // arcoíris: lluvia débil con sol de día, del lado opuesto al sol
+    if (esp && kArco > 0.01) {
+      const ax = eW * limitar(1 - (S ? S.x : 0.72), 0.3, 0.7), ar = Math.min(eW * 0.42, eH * 0.62), ay = yHor + eH * 0.1, a = 0.26 * kArco * Math.min(1.2, prefsAnim.intensidad);
+      const ga = ex.createRadialGradient(ax, ay, ar * 0.84, ax, ay, ar);
+      [[0, '150,80,200', 0], [0.14, '150,80,200', 0.55], [0.3, '70,110,235', 1], [0.47, '80,200,110', 1], [0.63, '250,232,80', 1], [0.8, '255,150,60', 1], [0.92, '240,70,60', 0.9], [1, '240,70,60', 0]].forEach(([o, c, m]) => ga.addColorStop(o, `rgba(${c},${a * m})`));
+      ex.fillStyle = ga; ex.beginPath(); ex.arc(ax, ay, ar, Math.PI, 0); ex.arc(ax, ay, ar * 0.84, 0, Math.PI, true); ex.fill();
+    }
     ex.strokeStyle = `rgba(25,35,50,${0.75 * kAves})`; ex.lineWidth = 1.6; ex.lineCap = 'round';
     if (kAves > 0.02) eAves.forEach(b => {
       b.x += b.v * dt; if (b.x > eW + 20) b.x = -20;
@@ -1390,6 +1564,31 @@
     // colinas lejanas y cercanas
     colinaEsc(eH * 0.56, eH * 0.07, 2, 5, 0.6, T[0]);
     colinaEsc(eH * 0.65, eH * 0.07, 3, 7, 2.1, T[1]);
+    // lapachos en flor sobre la colina (julio a septiembre): pequeños y apagados según la luz, para que sean un detalle
+    if (esp && mesLapacho()) {
+      const os = 1 - kLuz, s = eH * 0.05;
+      LAPACHOS.forEach(([fx0, col]) => {
+        const x = eW * fx0, y = altColina(x) + 2, c = mezcla(mezcla(col, T[1], 0.2 + os * 0.55), '#dfe6ea', kNb * 0.6);
+        ex.strokeStyle = T[2]; ex.lineWidth = Math.max(1.2, s * 0.09); ex.beginPath(); ex.moveTo(x, y); ex.lineTo(x, y - s * 0.75); ex.stroke();
+        ex.fillStyle = c; ex.beginPath();
+        [[0, -1, 0.5], [-0.42, -0.82, 0.38], [0.44, -0.84, 0.36], [-0.15, -1.25, 0.34], [0.22, -1.18, 0.33]].forEach(([dx, dy, k]) => { ex.moveTo(x + dx * s + k * s, y + dy * s); ex.arc(x + dx * s, y + dy * s, k * s, 0, 6.283); });
+        ex.fill();
+      });
+      if (ePetalos.length) {
+        const vv = vientoVis(); ex.fillStyle = mezcla('#f08cbf', T[1], 0.2 + os * 0.5); ex.beginPath();
+        ePetalos.forEach(p => {
+          if (dt) { p.x += (0.004 + vv / 3000) * p.v * dt; p.y += 0.006 * p.v * dt; p.f += dt / 500; if (p.y > yAgua || p.x > eW) { const lx = eW * LAPACHOS[p.i][0]; p.x = lx + (Math.random() - 0.5) * eH * 0.05; p.y = altColina(lx) - eH * 0.05; } }
+          const x = p.x + Math.sin(p.f) * 3; ex.moveTo(x + 1.3, p.y); ex.arc(x, p.y, 1.3, 0, 6.283);
+        });
+        ex.fill();
+      }
+    }
+    // ondas de calor: el aire sobre las colinas tiembla (se corre en franjas finas, como un espejismo)
+    if (esp && anim && kCalor > 0.02) {
+      const y0 = Math.round(eH * 0.47), y1 = Math.round(yAgua), paso = 3;
+      for (let y = y0; y < y1; y += paso) ex.drawImage(ec, 0, y * eD, ec.width, paso * eD, Math.sin(y * 0.55 + t / 170) * 2 * kCalor, y, eW, paso);
+      const gc = ex.createLinearGradient(0, y0, 0, y1); gc.addColorStop(0, 'rgba(255,214,160,0)'); gc.addColorStop(1, `rgba(255,214,160,${0.1 * kCalor})`); ex.fillStyle = gc; ex.fillRect(0, y0, eW, y1 - y0);
+    }
     // río: toma el color del cielo, con destellos que se mueven
     const ga = ex.createLinearGradient(0, yAgua, 0, eH); ga.addColorStop(0, mezcla(P[2], '#0b1c2c', 0.18)); ga.addColorStop(1, mezcla(P[1], '#06101c', 0.55));
     ex.fillStyle = ga; ex.fillRect(0, yAgua, eW, eH - yAgua);
@@ -1398,52 +1597,101 @@
       const cerca = vis && sobre > 0.3 && altSol > 0 && i % 3 === 0, x = cerca ? sx + Math.sin(i * 7.1 + t / 1800) * eW * 0.04 : (i * 97 + t * 0.012 * (i % 3 + 1)) % eW, y = yAgua + ((i * 37) % 100) / 100 * hAg;
       ex.fillStyle = `rgba(${brillo},${(cerca ? 0.2 : 0.06) + 0.06 * Math.sin(t / 700 + i)})`; ex.fillRect(x, y, 10 + (i * 13) % 26, 1.6);
     }
-    if (A.lluvia > 0) {                                            // ondas de la lluvia sobre el río
-      if (!quieto && Math.random() < A.lluvia * 0.55 * dt / 16) eOndas.push({ x: Math.random() * eW, y: yAgua + 6 + Math.random() * (hAg - 10), r: 0, a: 0.5 });
+    if (eGotas.length || eOndas.length) {                         // anillos y salpicaduras de la lluvia sobre el río
+      if (anim && eGotas.length && Math.random() < A.lluvia * 0.55 * multFx() * dt / 16) eOndas.push({ x: Math.random() * eW, y: yAgua + 6 + Math.random() * (hAg - 10), r: 0, a: 0.5 });
       ex.lineWidth = 1; eOndas = eOndas.filter(o => o.a > 0.02);
-      eOndas.forEach(o => { o.r += dt * 0.012; o.a -= dt * 0.0007; ex.strokeStyle = `rgba(220,235,255,${o.a})`; ex.beginPath(); ex.ellipse(o.x, o.y, o.r, o.r * 0.35, 0, 0, 6.283); ex.stroke(); });
+      eOndas.forEach(o => {
+        o.r += dt * 0.012; o.a -= dt * 0.0007; ex.strokeStyle = `rgba(220,235,255,${o.a})`; ex.beginPath(); ex.ellipse(o.x, o.y, o.r, o.r * 0.35, 0, 0, 6.283);
+        if (o.r < 2) { const s = (2 - o.r) * 0.7; ex.moveTo(o.x - 0.8, o.y - 0.5); ex.lineTo(o.x - 0.8 - s, o.y - 0.5 - s * 1.5); ex.moveTo(o.x + 0.8, o.y - 0.5); ex.lineTo(o.x + 0.8 + s, o.y - 0.5 - s * 1.5); }   // la gota que salta
+        ex.stroke();
+      });
     }
     // orillas y palmeras
     ex.fillStyle = T[2];
     ex.beginPath(); ex.moveTo(0, eH); ex.lineTo(0, yAgua - eH * 0.05); ex.quadraticCurveTo(eW * 0.2, yAgua - eH * 0.02, eW * 0.3, eH); ex.fill();
     ex.beginPath(); ex.moveTo(eW, eH); ex.lineTo(eW, yAgua - eH * 0.04); ex.quadraticCurveTo(eW * 0.84, yAgua - eH * 0.01, eW * 0.72, eH); ex.fill();
-    palmaEsc(eW * 0.08, yAgua - eH * 0.04, eH * 0.7, t, T[3]); palmaEsc(eW * 0.17, yAgua - eH * 0.01, eH * 0.44, t + 900, T[3]);
-    palmaEsc(eW * 0.92, yAgua - eH * 0.035, eH * 0.62, t + 400, T[3]); palmaEsc(eW * 0.84, yAgua - eH * 0.005, eH * 0.4, t + 1600, T[3]);
+    const vp = efectoActivo('viento') && !simple ? vientoVis() : 0;
+    palmaEsc(eW * 0.08, yAgua - eH * 0.04, eH * 0.7, t, T[3], vp); palmaEsc(eW * 0.17, yAgua - eH * 0.01, eH * 0.44, t + 900, T[3], vp);
+    palmaEsc(eW * 0.92, yAgua - eH * 0.035, eH * 0.62, t + 400, T[3], vp); palmaEsc(eW * 0.84, yAgua - eH * 0.005, eH * 0.4, t + 1600, T[3], vp);
     // luciérnagas
-    if (kLuci > 0.02) eLuci.forEach(l => {
+    if (kLuci > 0.02 && eLuci.length) eLuci.forEach(l => {
       l.x += Math.sin(t * l.v + l.f) * 0.35 * (dt / 16); l.y += Math.cos(t * l.v * 1.3 + l.f) * 0.25 * (dt / 16);
-      const a = kLuci * (0.25 + 0.75 * Math.max(0, Math.sin(t / 700 + l.f * 3))), gl = ex.createRadialGradient(l.x, l.y, 0, l.x, l.y, 9);
-      gl.addColorStop(0, `rgba(230,255,120,${a})`); gl.addColorStop(1, 'rgba(230,255,120,0)'); ex.fillStyle = gl; ex.fillRect(l.x - 9, l.y - 9, 18, 18);
+      ex.globalAlpha = kLuci * (0.25 + 0.75 * Math.max(0, Math.sin(t / 700 + l.f * 3))); ex.drawImage(eSprLuci, l.x - 9, l.y - 9, 18, 18);
     });
-    // niebla: bandas que se desplazan despacio
-    const nb = kNb;
-    if (nb > 0.005) eNiebla.forEach(f => {
-      f.x += f.v * dt; if (f.x > eW) f.x -= eW * 2;
-      const gf = ex.createLinearGradient(0, f.y - eH * 0.2, 0, f.y + eH * 0.2); gf.addColorStop(0, 'rgba(225,232,238,0)'); gf.addColorStop(0.5, `rgba(225,232,238,${nb})`); gf.addColorStop(1, 'rgba(225,232,238,0)');
-      ex.fillStyle = gf; ex.fillRect(f.x - eW, f.y - eH * 0.2, eW * 3, eH * 0.4);
-    });
+    ex.globalAlpha = 1;
+    // hojas y polvo que arrastra el viento
+    if (eHojas.length) {
+      const vv = vientoVis(), vel = 0.03 + vv / 450;
+      ex.strokeStyle = mezcla(T[2], '#a07c3c', 0.45); ex.lineWidth = 2.2; ex.lineCap = 'round'; ex.beginPath();
+      eHojas.forEach(l => {
+        if (dt) {
+          l.x += vel * l.v * dt; l.y += (Math.sin(t / 380 + l.f) * 0.025 + l.g) * dt; l.a += (0.004 + vv / 6000) * l.v * dt;
+          if (l.x > eW + 10 || l.y > eH || l.y < eH * 0.2) { l.x = -10 - Math.random() * eW * 0.3; l.y = eH * (0.35 + Math.random() * 0.6); }
+        }
+        const c = Math.cos(l.a) * l.l, s = Math.sin(l.a) * l.l * 0.6; ex.moveTo(l.x - c, l.y - s); ex.lineTo(l.x + c, l.y + s);
+      });
+      ex.stroke();
+    }
+    // niebla: capas que se desplazan despacio, cada una a su velocidad
+    const nb = efectoActivo('niebla') ? kNb : 0;
+    if (nb > 0.005) {
+      const cn = mezA([225, 232, 238], [120, 134, 156], (1 - kLuz) * 0.6).map(Math.round).join(',');   // de noche la niebla es gris azulada
+      const gf = ex.createLinearGradient(0, eH * 0.35, 0, eH); gf.addColorStop(0, `rgba(${cn},0)`); gf.addColorStop(0.55, `rgba(${cn},${nb * 0.55})`); gf.addColorStop(1, `rgba(${cn},${nb * 0.3})`);
+      ex.fillStyle = gf; ex.fillRect(0, eH * 0.35, eW, eH * 0.65);
+      eNiebla.forEach(f => {
+        const tw = f.tw; f.x = (f.x + f.v * dt) % tw;
+        ex.globalAlpha = Math.min(1, nb * f.a * (1 + 0.6 * kLuz));
+        for (let x = Math.round((f.x - tw) * eD) / eD; x < eW; x += tw) ex.drawImage(f.c, x, Math.round((f.y - f.h / 2) * eD) / eD, tw, f.h);
+      });
+      ex.globalAlpha = 1;
+    }
     // lluvia
     if (eGotas.length) {
-      const r = limitar(A.viento / 60, 0, 0.5); ex.strokeStyle = 'rgba(205,225,255,0.38)'; ex.lineWidth = 1; ex.beginPath();
+      const r = limitar(vientoVis() / 60, 0, 0.5); ex.strokeStyle = 'rgba(205,225,255,0.38)'; ex.lineWidth = 1; ex.beginPath();
       eGotas.forEach(d => { d.y += d.v * dt * 0.7; d.x += d.v * dt * 0.7 * r; if (d.y > eH) { d.y = -d.l; d.x = Math.random() * eW; } if (d.x > eW) d.x -= eW; ex.moveTo(d.x, d.y); ex.lineTo(d.x - d.l * r, d.y - d.l); });
       ex.stroke();
     }
-    // relámpago: se ilumina todo y cae un rayo ramificado
-    if (A.tipo === 'tormenta') {
-      if (destello > 0.8 && !eRayo) {
-        let x = eW * (0.15 + Math.random() * 0.6), y = eH * 0.1; eRayo = [[x, y]];
-        while (y < yAgua - 4) { x += (Math.random() - 0.5) * eH * 0.16; y += eH * (0.05 + Math.random() * 0.07); eRayo.push([x, y]); }
-      }
-      if (destello > 0.1 && eRayo) {
-        ex.fillStyle = `rgba(215,225,255,${destello * 0.3})`; ex.fillRect(0, 0, eW, eH);
-        ex.strokeStyle = `rgba(245,248,255,${Math.min(1, destello * 1.3)})`; ex.lineWidth = 2.2; ex.shadowColor = '#aac4ff'; ex.shadowBlur = 14;
-        ex.beginPath(); eRayo.forEach((p, i) => i ? ex.lineTo(p[0], p[1]) : ex.moveTo(p[0], p[1])); ex.stroke(); ex.shadowBlur = 0;
-      } else if (destello <= 0.1) eRayo = null;
+    // granizo (tormenta con granizo): cae rápido, rebota en las orillas y salpica en el río
+    if (eGranizo.length) {
+      ex.strokeStyle = 'rgba(225,235,255,0.35)'; ex.lineWidth = 1.2; ex.beginPath();   // estela corta: así el granizo se lee cayendo y no como estrellas
+      eGranizo.forEach(g => { if (g.vy > 0.25) { ex.moveTo(g.x, g.y - g.r); ex.lineTo(g.x - g.vx * 14, g.y - g.vy * 14); } });
+      ex.stroke();
+      ex.fillStyle = 'rgba(236,243,255,0.92)'; ex.beginPath();
+      eGranizo.forEach(g => {
+        if (dt) {
+          g.vy += 0.0016 * dt; g.y += g.vy * dt; g.x += g.vx * dt;
+          if (g.y >= g.suelo && g.vy > 0) {
+            const agua = g.x > eW * 0.3 && g.x < eW * 0.72;
+            if (!agua && g.reb < 2) { g.y = g.suelo; g.vy *= -0.32; g.vx = (Math.random() - 0.5) * 0.12; g.reb++; }
+            else { if (agua && eOndas.length < 40) eOndas.push({ x: g.x, y: g.suelo, r: 0, a: 0.45 }); g.nuevo(g); }
+          }
+          if (g.x > eW) g.x -= eW;
+        }
+        ex.moveTo(g.x + g.r, g.y); ex.arc(g.x, g.y, g.r, 0, 6.283);
+      });
+      ex.fill();
     }
-    const gv = ex.createLinearGradient(0, 0, 0, eH * 0.4); gv.addColorStop(0, 'rgba(0,0,0,0.28)'); gv.addColorStop(1, 'rgba(0,0,0,0)'); ex.fillStyle = gv; ex.fillRect(0, 0, eW, eH * 0.4);   // sombra arriba para que se lean las etiquetas
+    // relámpago: se ilumina todo y cae un rayo ramificado (a veces el destello queda dentro de las nubes)
+    if (A.tipo === 'tormenta' && efectoActivo('rayos') && !simple) {
+      if (destello > 0.8 && !eRayo) eRayo = Math.random() < 0.7 ? armarRayo(yAgua - 2) : [];
+      if (destello > 0.05) {
+        ex.fillStyle = `rgba(215,225,255,${destello * 0.3})`; ex.fillRect(0, 0, eW, eH);
+        if (eRayo && eRayo.length) {
+          ex.lineCap = 'round'; ex.lineJoin = 'round';
+          for (const [ancho, col] of [[5, `rgba(160,190,255,${0.22 * destello})`], [1, `rgba(248,250,255,${Math.min(1, destello * 1.3)})`]]) {
+            ex.strokeStyle = col;
+            eRayo.forEach(r => { ex.lineWidth = r.w * ancho; ex.beginPath(); r.pts.forEach((p, i) => i ? ex.lineTo(p[0], p[1]) : ex.moveTo(p[0], p[1])); ex.stroke(); });
+          }
+        }
+      } else eRayo = null;
+    }
+    ex.fillStyle = eSombra; ex.fillRect(0, 0, eW, eH * 0.4);   // sombra arriba para que se lean las etiquetas
   }
   function etiquetaEscena(a) {                                     // las etiquetas sobre el cuadro: ciudad, clima y momento del día
-    const w = clima(a.weather_code, a.is_day), tx = [`📍 ${seleccionada}`, `${w.emoji} ${w.texto}`, { amanecer: '🌅 Amanecer', dia: '☀️ Día', atardecer: '🌇 Atardecer', noche: '🌙 Noche' }[amb.fase] || '☀️ Día'], caja = $('escenaEtq');
+    // en una vista previa se muestra el clima elegido (con el mismo texto que la app usa para un código típico de ese clima), no el real
+    const c0 = a.weather_code, real = [95, 96, 99].includes(c0) ? 'tormenta' : c0 >= 51 && c0 <= 86 ? 'lluvia' : c0 === 45 || c0 === 48 ? 'niebla' : c0 === 3 ? 'nublado' : c0 === 2 ? 'parcial' : 'despejado';
+    const cod = amb.previa && real !== amb.tipo ? { despejado: 0, parcial: 2, nublado: 3, lluvia: 63, tormenta: 95, niebla: 45 }[amb.tipo] : c0;   // si coincide con el real, se deja el texto real (p. ej. «Tormenta con granizo»)
+    const w = clima(cod, amb.previa ? (amb.fase === 'noche' ? 0 : 1) : a.is_day), tx = [`📍 ${seleccionada}`, `${w.emoji} ${w.texto}`, { amanecer: '🌅 Amanecer', dia: '☀️ Día', atardecer: '🌇 Atardecer', noche: '🌙 Noche' }[amb.fase] || '☀️ Día'], caja = $('escenaEtq');
     caja.textContent = ''; tx.forEach(s => { const e = document.createElement('span'); e.textContent = s; caja.appendChild(e); });
   }
   // Barra de navegación del celular
@@ -1459,17 +1707,33 @@
     cvW = innerWidth; cvH = innerHeight;
     cv.width = Math.round(cvW * dpr); cv.height = Math.round(cvH * dpr);
     cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cieloLimpio = false;
     armarParticulas();
   }
+  let cClave = '', cieloLimpio = false, cAcum = 0, cDestello = 0;
+  const claveCielo = () => [amb.tipo, cvW, cvH, claveFx()].join('|');
   function armarParticulas() {
-    const poco = (navigator.hardwareConcurrency || 4) <= 4, area = cvW * cvH;
+    cClave = claveCielo();
+    const area = cvW * cvH, abierto = amb.tipo === 'despejado' || amb.tipo === 'parcial';
     gotas = [];                                                    // la lluvia se dibuja solo en el paisaje de arriba (no sobre los datos)
-    estrellas = (amb.tipo === 'despejado' || amb.tipo === 'parcial')
-      ? Array.from({ length: Math.round(area / 9000) }, () => ({ x: Math.random() * cvW, y: Math.random() * cvH * 0.7, r: 0.3 + Math.random() * 1.1, f: Math.random() * 6.28 })) : [];
+    estrellas = abierto && efectoActivo('estrellas')
+      ? Array.from({ length: cant(area / 9000) }, () => ({ x: Math.random() * cvW, y: Math.random() * cvH * 0.7, r: 0.3 + Math.random() * 1.1 })) : [];
     const n = { despejado: 0, parcial: 3, nublado: 5, niebla: 5, lluvia: 5, tormenta: 5 }[amb.tipo];
-    nubes = Array.from({ length: n }, () => ({ x: Math.random() * cvW, y: cvH * (0.05 + Math.random() * 0.45), r: cvW * (0.18 + Math.random() * 0.18), v: 0.01 + Math.random() * 0.02 }));
+    nubes = efectoActivo('nubes') ? Array.from({ length: Math.round(n * limitar(multFx(), 0.7, 1.3)) }, () => ({ x: Math.random() * cvW, y: cvH * (0.05 + Math.random() * 0.45), r: cvW * (0.18 + Math.random() * 0.18), v: 0.01 + Math.random() * 0.02 })) : [];
   }
   function pintarCielo(t, dt, quieto) {
+    if (!quieto) latidoRayo(t, dt || 0);
+    if (!prefsAnim.fondo) { if (!cieloLimpio) { cx.clearRect(0, 0, cvW, cvH); cieloLimpio = true; } return; }   // fondo apagado: el lienzo queda limpio
+    // El fondo cambia muy despacio (nubes de menos de 1 px por cuadro) y repintarlo obliga al navegador a recomponer toda la página
+    // (los paneles translúcidos se apoyan en él): basta con repintarlo ~15 veces por segundo, salvo durante un relámpago.
+    if (!quieto) {
+      cAcum += dt || 0;
+      if (cAcum < 62 && !cieloLimpio && cClave === claveCielo() && destello <= 0.02 && cDestello <= 0.02) return;
+      dt = cAcum; cAcum = 0;
+    }
+    cDestello = destello;
+    cieloLimpio = false;
+    if (cClave !== claveCielo()) armarParticulas();
     if (!vEsc.Ph) avanzarVisual(0, true);
     const A = amb, kEstr = vEsc.esc[1], kLuna = vEsc.esc[4], luz = vEsc.esc[6], ast = arcoAstros();
     cx.clearRect(0, 0, cvW, cvH);
@@ -1477,16 +1741,21 @@
       const r = Math.max(cvW, cvH) * 0.34, brillar = (x, y, col, a) => {
         const g = cx.createRadialGradient(x, y, 0, x, y, r);
         g.addColorStop(0, `rgba(${col},${a})`); g.addColorStop(1, `rgba(${col},0)`);
-        cx.fillStyle = g; cx.fillRect(0, 0, cvW, cvH);
+        cx.fillStyle = g; cx.fillRect(x - r, y - r, r * 2, r * 2);   // solo el cuadrado del resplandor: fuera de él no hay nada que pintar
       };
       const S = ast && ast.sol, L = ast && ast.luna, pulso = 1 + 0.05 * Math.sin(t / 2600), cub = A.tipo === 'nublado' ? 0.45 : 1;
-      if (!ast) brillar(cvW * 0.8, cvH * 0.13, '255,228,150', 0.36 * cub * pulso);
+      if (!ast && A.fase !== 'noche') brillar(cvW * 0.8, cvH * 0.13, '255,228,150', 0.36 * cub * pulso);
       if (S && S.f > 0.02) { const k = limitar(S.alt / 0.45, 0, 1); brillar(cvW * S.x, cvH * (0.5 - 0.4 * S.alt), `255,${Math.round(150 + 78 * k)},${Math.round(80 + 70 * k)}`, 0.36 * cub * S.f * pulso); }
-      if (L && L.f > 0.02 && kLuna > 0.01) brillar(cvW * L.x, cvH * (0.5 - 0.4 * L.alt), '190,205,255', 0.16 * cub * kLuna * L.f * pulso);
+      if (efectoActivo('estrellas') && L && L.f > 0.02 && kLuna > 0.01) {
+        const il = (1 - Math.cos(2 * Math.PI * edadLuna())) / 2;   // con luna llena el resplandor es mayor que con luna nueva
+        brillar(cvW * L.x, cvH * (0.5 - 0.4 * L.alt), '190,205,255', 0.16 * cub * kLuna * L.f * pulso * (0.3 + 0.7 * il));
+      }
     }
-    cx.fillStyle = '#fff';
-    estrellas.forEach(s => { cx.globalAlpha = kEstr * (0.35 + 0.45 * Math.sin(t / 900 + s.f) ** 2); cx.beginPath(); cx.arc(s.x, s.y, s.r, 0, 6.283); cx.fill(); });
-    cx.globalAlpha = 1;
+    if (estrellas.length && kEstr > 0.01) {                        // estrellas en 4 grupos que titilan a destiempo
+      cx.fillStyle = '#fff';
+      for (let k = 0; k < 4; k++) { cx.globalAlpha = kEstr * (0.35 + 0.45 * Math.sin(t / 900 + k * 1.7) ** 2); cx.beginPath(); for (let i = k; i < estrellas.length; i += 4) { const s = estrellas[i]; cx.moveTo(s.x + s.r, s.y); cx.arc(s.x, s.y, s.r, 0, 6.283); } cx.fill(); }
+      cx.globalAlpha = 1;
+    }
     const oscuras = A.tipo === 'lluvia' || A.tipo === 'tormenta';
     const ca = A.tipo === 'tormenta' ? 0.34 : A.tipo === 'niebla' ? 0.24 : 0.12 + 0.05 * luz;
     const cc = oscuras ? '40,50,70' : `${Math.round(150 + 105 * luz)},${Math.round(165 + 90 * luz)},${Math.round(200 + 55 * luz)}`;
@@ -1495,36 +1764,84 @@
       const g = cx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
       g.addColorStop(0, `rgba(${cc},${ca})`); g.addColorStop(1, `rgba(${cc},0)`);
       cx.save(); cx.translate(n.x, n.y); cx.scale(1.8, 0.55); cx.translate(-n.x, -n.y);
-      cx.fillStyle = g; cx.beginPath(); cx.arc(n.x, n.y, n.r, 0, 6.283); cx.fill(); cx.restore();
+      cx.fillStyle = g; cx.fillRect(n.x - n.r, n.y - n.r, n.r * 2, n.r * 2); cx.restore();   // el recuadro de la nube, no un círculo trazado
     });
     if (quieto) return;
-    if (gotas.length) {                                           // lluvia inclinada por el viento
-      const r = limitar(A.viento / 60, 0, 0.5);
-      cx.strokeStyle = `rgba(200,222,255,${0.26 + 0.04 * luz})`; cx.lineWidth = 1.1; cx.beginPath();
-      for (const g of gotas) {
-        g.y += 0.75 * g.v * dt; g.x += 0.75 * g.v * dt * r;
-        if (g.y > cvH) { g.y = -g.l; g.x = Math.random() * cvW; }
-        if (g.x > cvW) g.x -= cvW;
-        cx.moveTo(g.x, g.y); cx.lineTo(g.x - g.l * r, g.y - g.l);
-      }
-      cx.stroke();
+    if (A.tipo === 'tormenta' && destello > 0.02 && efectoActivo('rayos')) { cx.fillStyle = `rgba(220,230,255,${destello * 0.16})`; cx.fillRect(0, 0, cvW, cvH); }   // relámpago: se aclara todo el cielo
+  }
+  // ---- Bucle de animación y calidad ----
+  // Un solo requestAnimationFrame pinta el cielo de fondo y el paisaje. prefsAnim.calidad decide cuántos cuadros por segundo y cuántas partículas:
+  //   'alta' → ~30 cuadros/s y nivelCalidad 1 · 'ahorro' → ~20 cuadros/s y nivelCalidad 0.5
+  //   'auto' → empieza en el escalón 0 y mide, en ventanas de ~2 s, (a) cada cuánto llama el navegador a requestAnimationFrame
+  //            comparado con lo mejor que logró antes en este equipo (si el hilo principal no da abasto, los rAF se espacian) y
+  //            (b) cuánto tarda de verdad pintar un cuadro. Si va lento ~4 s seguidos baja un escalón; si va holgado un buen rato sube uno.
+  //            Cada vez que vuelve a caer poco después de subir, espera el doble antes de reintentar (15 s, 30 s… hasta 4 min): no oscila.
+  // `ms` es el intervalo objetivo entre cuadros (con rAF cada ~16,7 ms, a 60 Hz: 33 → 30/s, 40 → ~25/s, 50 → 20/s, 66 → 15/s).
+  const ESCALONES_CAL = [{ nivel: 1, ms: 33 }, { nivel: 0.7, ms: 40 }, { nivel: 0.45, ms: 50 }, { nivel: 0.45, ms: 66 }];
+  const CAL_FIJA = { alta: { nivel: 1, ms: 33 }, ahorro: { nivel: 0.5, ms: 50 } };
+  const VENTANA_CAL = 2000;                                        // se juzga cada ~2 s de animación, no cuadro a cuadro
+  const autoCal = { escalon: 0, ini: 0, nRaf: 0, sumaRaf: 0, n: 0, costo: 0, base: 0, calentar: 0, lentas: 0, rapidas: 0, espera: 15000, desde: 0, subidaEn: -1e9, pref: prefsAnim.calidad };
+  let msCuadro = 33, ultRaf = 0;
+  function aplicarCalidad() {                                      // fija msCuadro y nivelCalidad según la preferencia; rearma el fondo si cambió el nivel
+    if (autoCal.pref !== prefsAnim.calidad) {                      // se eligió otra calidad: 'auto' vuelve a empezar desde arriba
+      autoCal.pref = prefsAnim.calidad;
+      Object.assign(autoCal, { escalon: 0, lentas: 0, rapidas: 0, espera: 15000, desde: performance.now(), subidaEn: -1e9 });
     }
-    if (A.tipo === 'tormenta') {                                  // relámpago suave de vez en cuando
-      if (t > proxRayo) { destello = 1; trueno(); proxRayo = t + 7000 + Math.random() * 9000; }
-      if (destello > 0.02) { cx.fillStyle = `rgba(220,230,255,${destello * 0.16})`; cx.fillRect(0, 0, cvW, cvH); destello *= 0.86; }
+    const c = CAL_FIJA[prefsAnim.calidad] || ESCALONES_CAL[autoCal.escalon];
+    msCuadro = c.ms;
+    if (c.nivel !== nivelCalidad) { nivelCalidad = c.nivel; armarParticulas(); }
+  }
+  function reiniciarMedicion(t) { Object.assign(autoCal, { ini: t, nRaf: 0, sumaRaf: 0, n: 0, costo: 0 }); }
+  function pausarMedicion() { autoCal.ini = 0; autoCal.calentar = 4; }   // tras una pausa o un rearmado se descartan los primeros rAF
+  function medirCalidad(t, raf, costo) {                           // se llama en CADA rAF; costo = ms de pintado, o null si este rAF no pintó
+    if (prefsAnim.calidad !== 'auto') return;
+    if (autoCal.calentar > 0) { autoCal.calentar--; return; }
+    if (!autoCal.ini) { reiniciarMedicion(t); return; }
+    autoCal.nRaf++; autoCal.sumaRaf += raf;
+    if (costo !== null) { autoCal.n++; autoCal.costo += costo; }
+    if (t - autoCal.ini < VENTANA_CAL || autoCal.n < 10) return;
+    const medio = autoCal.costo / autoCal.n, rafMedio = autoCal.sumaRaf / autoCal.nRaf;
+    // referencia: el mejor ritmo de rAF visto en este equipo; se relaja un 1 % por ventana por si cambia la pantalla (p. ej. de 120 a 60 Hz)
+    autoCal.base = autoCal.base ? Math.min(rafMedio, autoCal.base * 1.01) : rafMedio;
+    const ritmo = rafMedio / autoCal.base;                         // 1 = el navegador va tan fluido como en su mejor momento
+    // lento: los rAF llegan un 30 % más espaciados que lo normal en este equipo, o pintar se come el 40 % del presupuesto del cuadro
+    const lenta = ritmo > 1.3 || medio > msCuadro * 0.4;
+    // holgado: los rAF van a su ritmo normal y pintar usa poco del presupuesto
+    const rapida = ritmo < 1.12 && medio < msCuadro * 0.15;
+    autoCal.lentas = lenta ? autoCal.lentas + 1 : 0;
+    autoCal.rapidas = rapida ? autoCal.rapidas + 1 : 0;
+    if (autoCal.lentas >= 2 && autoCal.escalon < ESCALONES_CAL.length - 1) {   // ~4 s seguidos lento → un escalón más liviano
+      if (t - autoCal.subidaEn < 30000) autoCal.espera = Math.min(autoCal.espera * 2, 240000);   // volvió a caer poco después de subir: esperar más antes de reintentar
+      autoCal.escalon++; autoCal.lentas = autoCal.rapidas = 0; autoCal.desde = t; aplicarCalidad(); pausarMedicion(); return;
     }
+    if (autoCal.escalon > 0 && autoCal.rapidas * VENTANA_CAL >= autoCal.espera && t - autoCal.desde >= autoCal.espera) {   // mucho rato holgado → subir uno, despacio
+      autoCal.escalon--; autoCal.lentas = autoCal.rapidas = 0; autoCal.desde = autoCal.subidaEn = t; aplicarCalidad(); pausarMedicion(); return;
+    }
+    reiniciarMedicion(t);
   }
   function bucleCielo(t) {
     rafCielo = requestAnimationFrame(bucleCielo);
-    if (t - ultCielo < 33) return;                                // unos 30 cuadros por segundo bastan
-    const dt = Math.min(64, t - ultCielo); ultCielo = t;
+    const raf = t - ultRaf, intervalo = t - ultCielo; ultRaf = t;
+    if (intervalo < msCuadro - 4) { medirCalidad(t, raf, null); return; }   // margen de 4 ms por el temblor de los rAF
+    const dt = Math.min(64, intervalo); ultCielo = t;
+    const t0 = performance.now();
     avanzarVisual(dt, false);
-    pintarCielo(t, dt); pintarEscena(t, dt, false);
+    if (prefsAnim.fondo) pintarCielo(t, dt);
+    if (prefsAnim.paisaje) pintarEscena(t, dt, false);
+    medirCalidad(t, raf, performance.now() - t0);
   }
   function reanudarCielo() {
     cancelAnimationFrame(rafCielo);
-    if (!fx) { cx.clearRect(0, 0, cvW, cvH); avanzarVisual(0, true); pintarEscena(performance.now(), 0, true); return; }
-    if (REDUCIDO || document.hidden) { avanzarVisual(0, true); pintarCielo(performance.now(), 0, true); pintarEscena(performance.now(), 0, true); return; }   // sin movimiento: un solo dibujo fijo
+    aplicarCalidad();
+    const ahora = performance.now();
+    if (!fx) { cx.clearRect(0, 0, cvW, cvH); avanzarVisual(0, true); pintarEscena(ahora, 0, true); return; }
+    // Partes que no se animan: un solo dibujo fijo (el cielo de fondo apagado queda transparente: se ve el degradado de la página)
+    const animar = !REDUCIDO && !document.hidden, fondoVivo = animar && prefsAnim.fondo, paisajeVivo = animar && prefsAnim.paisaje;
+    if (!fondoVivo || !paisajeVivo) avanzarVisual(0, true);
+    if (!fondoVivo) { if (prefsAnim.fondo) pintarCielo(ahora, 0, true); else cx.clearRect(0, 0, cvW, cvH); }
+    if (!paisajeVivo) pintarEscena(ahora, 0, true);
+    if (!fondoVivo && !paisajeVivo) return;                        // nada que animar: el bucle queda detenido (cero CPU)
+    ultCielo = ahora - msCuadro; ultRaf = ahora; pausarMedicion();                // tras una pausa, la medición empieza de cero
     rafCielo = requestAnimationFrame(bucleCielo);
   }
 
@@ -1578,16 +1895,21 @@
   // Traduce el clima actual a un "tipo de cielo" y lo aplica (colores, partículas y sonido)
   function ambiente(a, d) {
     if (!a || a.weather_code === undefined) return;
+    ultimoAmbiente = [a, d];
     const cod = a.weather_code, p = a.precipitation || 0;
     const m = momentoDia(porNombre.get(seleccionada));                // momento del día calculado con el sol y la hora real
-    const tipo = [95, 96, 99].includes(cod) ? 'tormenta' : cod >= 51 && cod <= 86 ? 'lluvia' : cod === 45 || cod === 48 ? 'niebla'
+    let tipo = [95, 96, 99].includes(cod) ? 'tormenta' : cod >= 51 && cod <= 86 ? 'lluvia' : cod === 45 || cod === 48 ? 'niebla'
       : cod === 3 ? 'nublado' : cod === 2 ? 'parcial' : 'despejado';
-    const fase = m ? m.fase : (a.is_day !== 0 ? 'dia' : 'noche'), dia = fase !== 'noche';
+    let fase = m ? m.fase : (a.is_day !== 0 ? 'dia' : 'noche');
+    const vp = prefsAnim.vistaPrevia;                                 // vista previa elegida en los ajustes: reemplaza el clima y/o la hora reales
+    if (vp && TIPOS_CIELO.includes(vp.tipo)) tipo = vp.tipo;
+    if (vp && FASES_DIA.includes(vp.fase)) fase = vp.fase;
+    const dia = fase !== 'noche';
     const dorado = (fase === 'amanecer' || fase === 'atardecer') && (tipo === 'despejado' || tipo === 'parcial');   // colores de amanecer/atardecer (solo con cielo abierto)
     document.body.classList.toggle('noche', fase === 'noche');
     const lluvia = tipo === 'tormenta' ? 1 : tipo === 'lluvia' ? limitar(0.3 + p / 3, 0.3, 1) : 0;
     const clave = [tipo, Math.round(lluvia * 4)].join(), claveFase = [tipo, fase].join();
-    Object.assign(amb, { tipo, fase, dia, dorado, lluvia, sol: m ? m.sol : null, viento: a.wind_speed_10m || 0, temp: a.temperature_2m });
+    Object.assign(amb, { tipo, fase, dia, dorado, lluvia, sol: m ? m.sol : null, viento: a.wind_speed_10m || 0, temp: a.temperature_2m, previa: !!vp, granizo: tipo === 'tormenta' && (cod === 96 || cod === 99) });
     const nuevaEstructura = clave !== ambClave, nuevaFase = claveFase !== faseClave;
     if (nuevaEstructura) { ambClave = clave; armarParticulas(); proxRayo = performance.now() + 3000; }   // las nubes y aves solo se vuelven a sortear si cambia el clima, no por el paso del día
     if (nuevaFase) {
@@ -1603,11 +1925,24 @@
   }
 
   // ============ SONIDO DEL CLIMA ============
-  // Un paisaje sonoro que cambia con el clima de la ciudad elegida. Todo se fabrica aquí mismo con el navegador (no se descarga nada):
-  //  ☀️ día soleado: aves, brisa y, con calor, cigarras · 🌇 hora dorada: coro de aves · 🌙 noche: grillos y ranas
-  //  ☁️ nublado: brisa y aves lejanas · 🌫️ niebla: sonido amortiguado · 🌧️ lluvia: gotas y ranas · ⛈️ tormenta: lluvia fuerte, viento y truenos
+  // Un paisaje sonoro que cambia con el clima de la ciudad elegida (o con la vista previa). Todo se fabrica aquí mismo con el navegador
+  // (Web Audio: ruido y osciladores, no se descarga nada) y solo suena si la persona toca 🔈.
+  //  ☀️ día: aves y brisa; con calor de verano (≥ 28 °C, de noviembre a marzo) chicharras · 🌇 hora dorada: coro de aves
+  //  🌙 noche despejada o con pocas nubes: grillos (cantan más rápido cuanto más calor hace) y ranas · ☁️ nublado: brisa y aves lejanas
+  //  🌫️ niebla: sonido amortiguado · 🌧️ lluvia: siseo y gotas según la intensidad · ⛈️ tormenta: lluvia fuerte, truenos que llegan
+  //  con más o menos retraso según la distancia y, con granizo (códigos 96/99), golpeteo sobre el techo · 💨 viento: ráfagas según los km/h
+  // Volumen general = prefsAnim.volumen (ganancia maestra; cambiarlo es barato y suave). Las capas continuas se crean UNA vez;
+  // los sonidos sueltos (aves, gotas, granizo, truenos) se apagan y se liberan solos, con un tope de truenos simultáneos.
   let au = null, sonando = false;
   const azar = (a, b) => a + Math.random() * (b - a);
+  const gananciaVolumen = () => 1.5 * limitar(Number(prefsAnim.volumen) || 0, 0, 1);   // 0,6 (el valor de fábrica) → 0,9, como antes
+  // ¿Granizo? Solo con tormenta real con granizo (códigos 96/99); una vista previa que elige otro tipo de clima no lo hereda
+  const hayGranizo = () => amb.tipo === 'tormenta' && !!ultimoAmbiente && [96, 99].includes(ultimoAmbiente[0].weather_code) && !(prefsAnim.vistaPrevia && prefsAnim.vistaPrevia.tipo);
+  let mesCache = { t: -1e9, verano: false };
+  const mesVerano = () => {                                        // noviembre a marzo (en Asunción); se recalcula cada 10 min como mucho
+    if (performance.now() - mesCache.t > 600000) { const m = +horaAsuncion().slice(5, 7); mesCache = { t: performance.now(), verano: m >= 11 || m <= 3 }; }
+    return mesCache.verano;
+  };
 
   function crearAudio() {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -1616,7 +1951,7 @@
     master.gain.value = 0; suave.type = 'lowpass'; suave.frequency.value = 16000;
     master.connect(suave); suave.connect(comp); comp.connect(ctx.destination);
 
-    // Ruido rosa (más grave y natural que el blanco): es la materia prima del viento, la lluvia, las cigarras y los truenos
+    // Ruido rosa (más grave y natural que el blanco): es la materia prima del viento, la lluvia, las chicharras, el granizo y los truenos
     const N = ctx.sampleRate * 6, F = Math.round(ctx.sampleRate * 0.5), buf = ctx.createBuffer(1, N, ctx.sampleRate), ch = buf.getChannelData(0), x = new Float32Array(N + F);
     let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
     for (let i = 0; i < x.length; i++) {
@@ -1642,12 +1977,14 @@
       return { g, fl };
     };
     const lfo = (hz, prof, destino) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = hz; g.gain.value = prof; o.connect(g); g.connect(destino); o.start(); };
-    // Viento: el filtro y el volumen suben y bajan despacio, como las ráfagas
+    // Viento de fondo: el filtro y el volumen suben y bajan despacio
     const viento = capa('bandpass', 400, 0.6, 60);
     lfo(0.11, 140, viento.fl.frequency); lfo(0.043, 0.012, viento.g.gain);
+    // Ráfagas: otra banda de ruido cuyo volumen y tono se programan a saltos irregulares (ver programarRafaga); con viento fuerte, un silbido
+    const rafaga = capa('bandpass', 520, 0.9, 90), silbido = capa('bandpass', 1100, 14, 400);
     // Lluvia: un "siseo" parejo + un murmullo grave (más presente en las tormentas)
     const lluvia = capa('lowpass', 7500, 0.2, 1400), lluviaBajo = capa('lowpass', 700, 0.4, 120);
-    // Cigarras: ruido agudo que "vibra" ~60-80 veces por segundo y se hincha y se apaga despacio
+    // Chicharras: ruido agudo que "vibra" ~60-80 veces por segundo y se hincha y se apaga despacio
     const cigarra = (f, hz) => {
       const s = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), am = ctx.createGain(), sw = ctx.createGain(), nivel = ctx.createGain(), l = ctx.createOscillator(), lg = ctx.createGain();
       s.buffer = buf; s.loop = true; bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 5;
@@ -1657,29 +1994,35 @@
       return nivel;
     };
     const cig = [cigarra(4900, 62), cigarra(6200, 77)];
-    // Grillos: un tono agudo que "late" en pulsos rápidos agrupados en cantos cortos; tres grillos desfasados hacen un coro
+    // Grillos: un tono agudo que "late" en pulsos rápidos agrupados en cantos; tres grillos desfasados hacen un coro.
+    // El ritmo de los cantos (grupo) se ajusta con la temperatura en mezclar().
     const grillo = (f, pulso, grupo) => {
       const o = ctx.createOscillator(), am = ctx.createGain(), gate = ctx.createGain(), nivel = ctx.createGain();
-      const onda = (hz, corte) => { const p = ctx.createOscillator(), pf = ctx.createBiquadFilter(), pg = ctx.createGain(); p.type = 'square'; p.frequency.value = hz; pf.type = 'lowpass'; pf.frequency.value = corte; pg.gain.value = 0.5; p.connect(pf); pf.connect(pg); p.start(); return pg; };
+      const onda = (hz, corte) => { const p = ctx.createOscillator(), pf = ctx.createBiquadFilter(), pg = ctx.createGain(); p.type = 'square'; p.frequency.value = hz; pf.type = 'lowpass'; pf.frequency.value = corte; pg.gain.value = 0.5; p.connect(pf); pf.connect(pg); p.start(); return { pg, p }; };
       o.type = 'sine'; o.frequency.value = f; am.gain.value = 0.5; gate.gain.value = 0.5; nivel.gain.value = 0;
-      onda(pulso, 70).connect(am.gain); onda(grupo, 14).connect(gate.gain);
+      const pu = onda(pulso, 70), gr = onda(grupo, 14);
+      pu.pg.connect(am.gain); gr.pg.connect(gate.gain);
       o.connect(am); am.connect(gate); gate.connect(nivel); nivel.connect(master); o.start();
-      return nivel;
+      return { nivel, ritmo: gr.p.frequency, grupo };
     };
     const gri = [grillo(4300, 29, 1.9), grillo(4650, 33, 2.3), grillo(5050, 27, 1.6)];
 
-    // Cada 250 ms se decide al azar si suena un ave, una rana o una tanda de gotas, según el clima
+    // Cada 250 ms: aves, ranas, ráfagas y truenos sueltos; cada 100 ms: gotas y granizo (todo según el clima)
     const intervaloAves = setInterval(() => {
       if (!sonando || document.hidden) return;
       if (Math.random() < au.tasaAves * 0.07) llamadaAve();
       if (Math.random() < au.tasaRanas * 0.12) rana();
+      if (au.ctx.currentTime >= au.proxRafaga) programarRafaga();
+      // si el cielo no está dibujando relámpagos (fondo apagado, movimiento reducido…), los truenos llegan solos de vez en cuando
+      if (amb.tipo === 'tormenta' && performance.now() - au.ultTrueno > au.esperaTrueno) trueno();
     }, 250);
     const intervaloGotas = setInterval(() => {
-      if (!sonando || document.hidden || amb.lluvia <= 0) return;
-      const n = Math.round(amb.lluvia * (1 + Math.random() * 3));
-      for (let i = 0; i < n; i++) setTimeout(gota, Math.random() * 100);
+      if (!sonando || document.hidden) return;
+      if (amb.lluvia > 0) { const n = Math.round(amb.lluvia * (1 + Math.random() * 3)); for (let i = 0; i < n; i++) setTimeout(gota, Math.random() * 100); }
+      if (au.granizo) { const n = Math.round(azar(1, 4)); for (let i = 0; i < n; i++) setTimeout(piedra, Math.random() * 100); }
     }, 100);
-    return { ctx, master, suave, viento, lluvia, lluviaBajo, cig, gri, aves, rev, buf, intervaloAves, intervaloGotas, tasaAves: 0, tasaRanas: 0 };
+    return { ctx, master, suave, viento, rafaga, silbido, lluvia, lluviaBajo, cig, gri, aves, rev, buf, intervaloAves, intervaloGotas,
+      tasaAves: 0, tasaRanas: 0, granizo: false, proxRafaga: 0, ultTrueno: performance.now(), esperaTrueno: 15000, truenos: [], niveles: {} };
   }
 
   function salida(destino) {                                       // un punto al azar del estéreo
@@ -1729,46 +2072,101 @@
     g.gain.setValueAtTime(0, T); g.gain.linearRampToValueAtTime(0.15 + Math.random() * 0.25, T + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, T + 0.05 + Math.random() * 0.05);
     s.connect(f); f.connect(g); g.connect(salida(master)); s.start(T, Math.random() * 4, 0.12);
   }
-  // Trueno: llega con un pequeño retraso después del relámpago del cielo (cuanto más tarda, más lejos suena)
+  // Granizo: un golpe seco y agudo (piedra sobre chapa o tejas), a veces con un "toc" más grave
+  function piedra() {
+    const { ctx, master, buf } = au, T = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), d = azar(0.012, 0.03);
+    s.buffer = buf; f.type = Math.random() < 0.25 ? 'bandpass' : 'highpass'; f.frequency.value = f.type === 'bandpass' ? azar(700, 1300) : azar(3200, 6500); f.Q.value = 3;
+    g.gain.setValueAtTime(0, T); g.gain.linearRampToValueAtTime(azar(0.18, 0.45), T + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, T + d);
+    s.connect(f); f.connect(g); g.connect(salida(master)); s.start(T, Math.random() * 4, d + 0.02);
+  }
+  // Ráfagas de viento: cada pocos segundos el volumen y el tono de la capa de ráfagas suben y bajan; cuanto más viento, más seguidas y fuertes
+  function programarRafaga() {
+    const { ctx, rafaga, silbido } = au, T = ctx.currentTime, v = amb.viento || 0, k = limitar((v - 8) / 42, 0, 1);
+    au.proxRafaga = T + azar(2.5, 7) / (0.6 + k * 1.4);
+    if (k <= 0) return;                                            // con menos de ~8 km/h no hay ráfagas, solo la brisa de fondo
+    const sube = azar(0.5, 1.4), dura = azar(1.2, 3.5) * (1.2 - k * 0.4), pico = (0.08 + 0.45 * k) * azar(0.6, 1);
+    const sostener = p => { if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(T); else p.cancelScheduledValues(T); };
+    sostener(rafaga.g.gain); rafaga.g.gain.setTargetAtTime(pico, T, sube / 3); rafaga.g.gain.setTargetAtTime(0.02 * k, T + sube + dura * 0.4, dura / 3);
+    sostener(rafaga.fl.frequency); rafaga.fl.frequency.setTargetAtTime(380 + 600 * k * azar(0.7, 1.2), T, sube / 2); rafaga.fl.frequency.setTargetAtTime(380, T + sube + dura * 0.4, dura / 2);
+    if (v >= 35) {                                                 // viento fuerte: un silbido que sube y baja con la ráfaga
+      const ks = limitar((v - 35) / 30, 0.15, 1);
+      sostener(silbido.g.gain); silbido.g.gain.setTargetAtTime(0.05 * ks * azar(0.5, 1), T, sube / 2); silbido.g.gain.setTargetAtTime(0, T + sube + dura * 0.3, dura / 3);
+      sostener(silbido.fl.frequency); silbido.fl.frequency.setTargetAtTime(azar(900, 1500), T, sube);
+    }
+  }
+  // Trueno: llega después del relámpago con un retraso según la distancia (unos 0,4 s por km, comprimido: en la realidad son ~3 s por km).
+  // Cerca: chasquido seco y retumbo fuerte; lejos: solo un rumor grave, más largo y más bajo. Como mucho 3 truenos sonando a la vez.
   function trueno() {
     if (!au || !sonando || amb.tipo !== 'tormenta') return;
-    const { ctx, buf } = au, esp = azar(0.5, 3.5), T = ctx.currentTime + esp, cerca = 1 - esp / 3.5 * 0.6, sal = salida(au.master);
+    const { ctx, buf } = au, ahora = ctx.currentTime;
+    au.ultTrueno = performance.now(); au.esperaTrueno = azar(14000, 24000);
+    au.truenos = au.truenos.filter(f => f > ahora);
+    if (au.truenos.length >= 3) return;
+    const km = azar(0.6, 9), esp = 0.3 + km * 0.4, T = ahora + esp, cerca = limitar(1.15 - km / 10, 0.25, 1), sal = salida(au.master);
     const ruido = (t, tipo, f0, f1, vol, dur, ataque) => {
       const s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
       s.buffer = buf; s.loop = true; fl.type = tipo; fl.frequency.setValueAtTime(f0, t); fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + ataque); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       s.connect(fl); fl.connect(g); g.connect(sal); s.start(t, Math.random() * 3); s.stop(t + dur + 0.1);
+      return t + dur + 0.1;
     };
-    if (esp < 1.6) ruido(T, 'highpass', 1500, 900, 0.5 * cerca, 0.3, 0.01);                // el chasquido, solo si cayó cerca
-    ruido(T, 'lowpass', 260, 55, 1.6 * cerca, azar(3.5, 5.5), 0.25);                       // el retumbo largo
-    ruido(T + azar(0.8, 1.6), 'lowpass', 200, 50, 1 * cerca, azar(2.5, 4), 0.3);           // y su eco
+    let fin = T;
+    if (km < 2.5) fin = Math.max(fin, ruido(T, 'highpass', 1800, 900, 0.55 * cerca, 0.3, 0.008));           // el chasquido, solo si cayó cerca
+    const corte = 300 - km * 18;                                   // cuanto más lejos, más grave (el aire se come los agudos)
+    fin = Math.max(fin, ruido(T, 'lowpass', corte, 50, 1.6 * cerca, azar(3.5, 5.5) + km * 0.15, 0.12 + km * 0.05));   // el retumbo largo
+    const ecos = km < 4 ? 2 : 1;                                   // y sus ecos, que "ruedan" por el cielo
+    for (let i = 0; i < ecos; i++) fin = Math.max(fin, ruido(T + azar(0.7, 1.8) * (i + 1), 'lowpass', corte * 0.8, 45, cerca * azar(0.6, 1), azar(2.5, 4), 0.3));
+    au.truenos.push(fin);
   }
   function describirSonido() {
-    const { tipo, dia, dorado, temp } = amb;
-    if (tipo === 'tormenta') return 'Tormenta: lluvia fuerte, viento y truenos';
-    if (tipo === 'lluvia') return dia ? 'Lluvia: gotas sobre las hojas y aves lejanas' : 'Noche de lluvia: gotas y ranas';
+    const { tipo, dia, dorado, temp, viento: v } = amb;
+    const ventoso = (v || 0) >= 35 ? ' y ráfagas fuertes de viento' : (v || 0) >= 15 ? ' y ráfagas de viento' : '';
+    if (tipo === 'tormenta') return (hayGranizo() ? 'Tormenta con granizo: golpeteo de piedras, lluvia fuerte y truenos' : 'Tormenta: lluvia fuerte, viento y truenos que se acercan y se alejan');
+    if (tipo === 'lluvia') return (amb.lluvia >= 0.7 ? (dia ? 'Lluvia fuerte: aguacero sobre las hojas' : 'Noche de lluvia fuerte: aguacero y ranas') : dia ? 'Lluvia: gotas sobre las hojas y aves lejanas' : 'Noche de lluvia: gotas y ranas') + ventoso;
     if (tipo === 'niebla') return 'Niebla: sonido amortiguado y brisa suave';
-    if (!dia) return 'Noche tranquila: grillos y ranas';
-    if (dorado) return 'Hora dorada: coro de aves y brisa suave';
-    if (tipo === 'nublado') return 'Cielo nublado: brisa suave y aves lejanas';
-    return (temp || 0) >= 27 ? 'Día soleado: aves, brisa y cigarras' : 'Día tranquilo: aves y brisa suave';
+    if (!dia) return (tipo === 'despejado' || tipo === 'parcial' ? ((temp || 0) >= 12 ? 'Noche tranquila: grillos y ranas' : 'Noche fresca: ranas lejanas') : 'Noche nublada: ranas y grillos lejanos') + ventoso;
+    if (dorado) return 'Hora dorada: coro de aves y brisa suave' + ventoso;
+    if (tipo === 'nublado') return 'Cielo nublado: brisa suave y aves lejanas' + ventoso;
+    return ((temp || 0) >= 28 && mesVerano() ? 'Día caluroso de verano: chicharras, aves y brisa' : 'Día tranquilo: aves y brisa suave') + ventoso;
+  }
+  // Cambia el valor de un parámetro de audio suavemente (constante de tiempo s), sin acumular eventos viejos en su línea de tiempo
+  function irHacia(p, val, s) {
+    const T = au.ctx.currentTime;
+    if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(T); else p.cancelScheduledValues(T);
+    p.setTargetAtTime(val, T, s || 2);
   }
   function mezclar() {                                             // ajusta cada capa al clima actual (los cambios son suaves, de unos 2 segundos)
     if (!au) return;
-    const { ctx, viento, lluvia, lluviaBajo, cig, gri, suave } = au, T = ctx.currentTime, { tipo, dia, dorado, lluvia: ll, viento: v } = amb, temp = amb.temp || 25;
-    const seco = tipo !== 'lluvia' && tipo !== 'tormenta', objetivo = (p, val, s) => p.setTargetAtTime(val, T, s || 2);
-    objetivo(viento.g.gain, 0.085 + limitar(v / 40, 0, 1) * 0.35 + (tipo === 'tormenta' ? 0.12 : 0));
-    objetivo(viento.fl.frequency, 260 + v * 12);
-    objetivo(lluvia.g.gain, ll * 0.42); objetivo(lluviaBajo.g.gain, ll * ll * 0.7);
-    const calor = dia && !dorado && (tipo === 'despejado' || tipo === 'parcial') && temp >= 27 ? (tipo === 'despejado' ? 1 : 0.6) * limitar((temp - 26) / 8, 0.25, 1) : 0;
-    cig.forEach(n => objetivo(n.gain, calor * 1.3));
-    const noche = !dia && seco ? (tipo === 'niebla' ? 0.5 : 1) : 0;
-    gri.forEach(n => objetivo(n.gain, noche * 0.06));
-    au.tasaAves = dia && tipo !== 'tormenta' ? { despejado: 1, parcial: 0.8, nublado: 0.45, niebla: 0.3, lluvia: 0.12 }[tipo] * (dorado ? 2.2 : 1) : 0;
-    au.tasaRanas = !dia ? (ll > 0 ? 0.9 : tipo === 'despejado' || tipo === 'parcial' ? 0.35 : 0.15) : (ll > 0 && ll < 0.7 ? 0.08 : 0);
-    objetivo(suave.frequency, tipo === 'niebla' ? 2600 : tipo === 'lluvia' || tipo === 'tormenta' ? 9000 : 16000, 1.5);
     $('btnSonido').title = describirSonido();
+    irHacia(au.master.gain, sonando ? gananciaVolumen() : 0, sonando ? 0.25 : 0.8);   // volumen general: barato (un solo nodo)
+    const { viento, lluvia, lluviaBajo, cig, gri, suave } = au, { tipo, fase, dia, dorado, lluvia: ll, viento: v } = amb, temp = amb.temp === undefined || amb.temp === null ? 25 : amb.temp;
+    const abierto = tipo === 'despejado' || tipo === 'parcial';
+    const nv = {};
+    nv.viento = 0.085 + limitar(v / 40, 0, 1) * 0.3 + (tipo === 'tormenta' ? 0.12 : 0);
+    irHacia(viento.g.gain, nv.viento); irHacia(viento.fl.frequency, 260 + v * 12);
+    nv.rafagas = limitar((v - 8) / 42, 0, 1);                      // la capa de ráfagas se maneja en programarRafaga(); aquí solo se anota
+    if (nv.rafagas <= 0) irHacia(au.rafaga.g.gain, 0, 1.5);
+    if (v < 35) irHacia(au.silbido.g.gain, 0, 1.5);
+    nv.lluvia = ll * 0.42; nv.lluviaBajo = ll * ll * 0.7;
+    irHacia(lluvia.g.gain, nv.lluvia); irHacia(lluviaBajo.g.gain, nv.lluviaBajo); irHacia(lluvia.fl.frequency, 4500 + ll * 4000);
+    // chicharras: de día (no en la hora dorada), con 28 °C o más, de noviembre a marzo; con nubes, más bajas
+    nv.chicharras = fase === 'dia' && temp >= 28 && mesVerano() && (abierto || tipo === 'nublado') ? (tipo === 'despejado' ? 1 : tipo === 'parcial' ? 0.7 : 0.35) * limitar((temp - 27) / 7, 0.3, 1) : 0;
+    cig.forEach(n => irHacia(n.gain, nv.chicharras * 1.3));
+    // grillos: noches despejadas o con pocas nubes (más bajitos con cielo cubierto y al atardecer); con frío (< 12 °C) se callan
+    nv.grillos = temp < 12 ? 0 : !dia ? (abierto ? 1 : tipo === 'nublado' ? 0.3 : 0) : fase === 'atardecer' && abierto ? 0.35 : 0;
+    // ritmo de los cantos según la temperatura (ley de Dolbear: con calor cantan más rápido); 1 = el ritmo de base a ~24 °C
+    const ritmo = limitar((4 * ((temp * 9 / 5 + 32) - 50) + 40) / 147, 0.5, 1.35);
+    gri.forEach(g => { irHacia(g.nivel.gain, nv.grillos * 0.06); irHacia(g.ritmo, g.grupo * ritmo, 1); });
+    au.granizo = nv.granizo = hayGranizo();
+    au.tasaAves = nv.aves = dia && tipo !== 'tormenta' ? { despejado: 1, parcial: 0.8, nublado: 0.45, niebla: 0.3, lluvia: 0.12 }[tipo] * (dorado ? 2.2 : 1) : 0;
+    au.tasaRanas = nv.ranas = !dia ? (ll > 0 ? 0.9 : abierto ? 0.35 : 0.15) : (ll > 0 && ll < 0.7 ? 0.08 : 0);
+    irHacia(suave.frequency, tipo === 'niebla' ? 2600 : tipo === 'lluvia' || tipo === 'tormenta' ? 9000 : 16000, 1.5);
+    au.niveles = nv;
   }
+  // Para pruebas automáticas y la consola: lo que el sonido está haciendo ahora (null si nunca se activó)
+  window.climaSonido = Object.freeze({
+    estado: () => au ? { sonando, volumen: sonando ? gananciaVolumen() : 0, capas: { ...au.niveles }, truenos: au.truenos.filter(f => f > au.ctx.currentTime).length, contexto: au.ctx.state, descripcion: describirSonido() } : null
+  });
   function visibilidadSonido() { if (au && sonando) { if (document.hidden) au.ctx.suspend(); else au.ctx.resume(); } }
   window.addEventListener('pagehide', () => {
     sonando = false;
@@ -1778,8 +2176,7 @@
     if (!au) { au = crearAudio(); if (!au) { aviso('Tu navegador no permite reproducir sonido.'); return; } }
     sonando = !sonando;
     if (sonando) await au.ctx.resume();
-    au.master.gain.setTargetAtTime(sonando ? 0.9 : 0, au.ctx.currentTime, 0.8);
-    if (!sonando) setTimeout(() => { if (!sonando) au.ctx.suspend(); }, 3500);
+    if (!sonando) setTimeout(() => { if (!sonando && au) au.ctx.suspend(); }, 3500);
     const b = $('btnSonido');
     b.textContent = sonando ? '🔊' : '🔈'; b.classList.toggle('on', sonando); b.setAttribute('aria-pressed', sonando);
     b.setAttribute('aria-label', sonando ? 'Silenciar el sonido del clima' : 'Activar el sonido del clima');
@@ -1804,6 +2201,121 @@
     tAjuste = setTimeout(() => { if (Math.abs(innerWidth - cvW) > 1 || Math.abs(innerHeight - cvH) > 150) { ajustarCielo(); reanudarCielo(); } }, 200);
   });
   ajustarCielo();
+
+  // ============ 6f) AJUSTES DE ANIMACIÓN ============
+  // Panel (botón ⚙️) para que cada persona elija cómo se anima el clima. Solo LEE prefsAnim y la CAMBIA con fijarPrefAnim({...}).
+  // El interruptor «Animación» es el mismo que el botón ✨ (`fx`): se mantienen sincronizados.
+  const dlgAnim = $('dlgAnim'), $$a = sel => dlgAnim.querySelectorAll(sel);
+  const NOMBRE_TIPO = { despejado: 'Despejado', parcial: 'Parcialmente nublado', nublado: 'Nublado', lluvia: 'Lluvia', tormenta: 'Tormenta', niebla: 'Niebla' };
+  const NOMBRE_FASE = { amanecer: 'Amanecer', dia: 'Día', atardecer: 'Atardecer', noche: 'Noche' };
+  const AYUDA_CALIDAD = {
+    auto: 'Usa todo el detalle y lo baja sola si tu equipo va lento.',
+    alta: 'Siempre con todo el detalle, aunque gaste más batería.',
+    ahorro: 'Menos partículas y movimiento más pausado para cuidar la batería.'
+  };
+  function marcarRadio(nombre, valor) { $$a(`input[name="${nombre}"]`).forEach(r => { r.checked = valor != null && r.value === String(valor); }); }
+  function sincronizarPrevia() {                                   // aviso sobre el paisaje y estado de la vista previa en el panel
+    const vp = prefsAnim.vistaPrevia, caja = $('escenaPrevia');
+    if (vp) {
+      const t = TIPOS_CIELO.includes(vp.tipo) ? vp.tipo : amb.tipo, f = FASES_DIA.includes(vp.fase) ? vp.fase : amb.fase;
+      $('epTipo').textContent = NOMBRE_TIPO[t] || ''; $('epFase').textContent = NOMBRE_FASE[f] || '';
+      $('daPreviaEstado').textContent = `Vista previa activa: ${NOMBRE_TIPO[t] || ''} · ${NOMBRE_FASE[f] || ''}.`;
+      marcarRadio('daTipo', t); marcarRadio('daFase', f);
+    } else {
+      $('daPreviaEstado').textContent = 'Mostrando el clima real.';
+      marcarRadio('daTipo', null); marcarRadio('daFase', null);
+    }
+    caja.hidden = !vp; $('escena').classList.toggle('en-previa', !!vp);
+    $('daPreviaVolver').disabled = !vp;
+  }
+  function sincronizarPanel() {                                    // los controles muestran siempre lo guardado
+    const p = prefsAnim;
+    $('daFx').checked = fx; $('daFondo').checked = p.fondo; $('daPaisaje').checked = p.paisaje;
+    marcarRadio('daIntensidad', p.intensidad); marcarRadio('daCalidad', p.calidad);
+    $('daCalidadAyuda').textContent = AYUDA_CALIDAD[p.calidad] || '';
+    $$a('[data-efecto]').forEach(c => { c.checked = p.efectos[c.dataset.efecto] !== false; });
+    const v = Math.round(p.volumen * 100);
+    $('daVolumen').value = v; $('daVolumenVal').textContent = v + '%'; $('daVolumen').setAttribute('aria-valuetext', v + '%');
+    dlgAnim.classList.toggle('apagada', !fx);
+    sincronizarPrevia();
+  }
+  function cambiarAnim(cambios) { fijarPrefAnim(cambios); sincronizarPanel(); }
+  function salirPrevia() { if (prefsAnim.vistaPrevia) { cambiarAnim({ vistaPrevia: null }); anunciar('Volviste al clima real.'); } }
+
+  $('daReducido').hidden = !REDUCIDO;
+  $('btnAjustesAnim').addEventListener('click', () => {
+    sincronizarPanel();
+    if (typeof dlgAnim.showModal === 'function') dlgAnim.showModal(); else dlgAnim.setAttribute('open', '');
+  });
+  dlgAnim.addEventListener('close', () => { $('btnAjustesAnim').focus(); });
+  dlgAnim.addEventListener('click', e => { if (e.target === dlgAnim) dlgAnim.close(); });   // tocar fuera de la hoja la cierra
+  $('daFx').addEventListener('change', e => { if (e.target.checked !== fx) $('btnFx').click(); });
+  $('btnFx').addEventListener('click', sincronizarPanel);          // corre después del manejador de ✨, que ya cambió `fx`
+  $('daFondo').addEventListener('change', e => cambiarAnim({ fondo: e.target.checked }));
+  $('daPaisaje').addEventListener('change', e => cambiarAnim({ paisaje: e.target.checked }));
+  $$a('input[name="daIntensidad"]').forEach(r => r.addEventListener('change', () => { if (r.checked) cambiarAnim({ intensidad: Number(r.value) }); }));
+  $$a('input[name="daCalidad"]').forEach(r => r.addEventListener('change', () => { if (r.checked) cambiarAnim({ calidad: r.value }); }));
+  $$a('[data-efecto]').forEach(c => c.addEventListener('change', () => cambiarAnim({ efectos: { [c.dataset.efecto]: c.checked } })));
+  $('daVolumen').addEventListener('input', e => {
+    const v = Math.round(Number(e.target.value)) || 0;
+    $('daVolumenVal').textContent = v + '%'; e.target.setAttribute('aria-valuetext', v + '%');
+    fijarPrefAnim({ volumen: limitar(v / 100, 0, 1) });
+  });
+  function elegirPrevia() {
+    const t = dlgAnim.querySelector('input[name="daTipo"]:checked'), f = dlgAnim.querySelector('input[name="daFase"]:checked');
+    cambiarAnim({ vistaPrevia: { tipo: t ? t.value : amb.tipo, fase: f ? f.value : amb.fase } });
+  }
+  $$a('input[name="daTipo"], input[name="daFase"]').forEach(r => r.addEventListener('change', () => { if (r.checked) elegirPrevia(); }));
+  $('daPreviaVolver').addEventListener('click', salirPrevia);
+  $('epVolver').addEventListener('click', salirPrevia);
+  $('daRestablecer').addEventListener('click', () => {
+    const base = JSON.parse(JSON.stringify(PREFS_ANIM_BASE));
+    cambiarAnim({ ...base, vistaPrevia: null });
+    if (!fx) $('btnFx').click();                                   // los valores predeterminados incluyen la animación encendida
+    aviso('Ajustes de animación restablecidos');
+  });
+  // El paisaje reescribe sus etiquetas cada vez que se aplica el clima: sirve de aviso para refrescar la vista previa
+  // también si se cambió desde otro lado (p. ej. climaAnim.fijar en la consola).
+  if ('MutationObserver' in window) new MutationObserver(sincronizarPrevia).observe($('escenaEtq'), { childList: true });
+  sincronizarPanel();
+
+  // ============ 6g) DECORACIÓN NAVIDEÑA ============
+  // Del 1 de diciembre al 6 de enero (Reyes), con la fecha de Paraguay. En Paraguay la Navidad es en verano: luces y estrella, sin nieve.
+  // Se elige en el panel de ajustes («Automática / Siempre / Nunca») y se guarda aparte de prefsAnim, en 'clima-py-navidad'.
+  const MODOS_NAVIDAD = ['auto', 'si', 'no'];
+  let modoNavidad = MODOS_NAVIDAD.includes(leer('clima-py-navidad', 'auto')) ? leer('clima-py-navidad', 'auto') : 'auto';
+  function fechaPY() {                                             // { a, m, d } de hoy en Paraguay, sin importar la zona horaria del equipo
+    try {
+      const pt = {}; new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Asuncion', year: 'numeric', month: 'numeric', day: 'numeric' })
+        .formatToParts(new Date()).forEach(x => { pt[x.type] = Number(x.value); });
+      if (pt.year && pt.month && pt.day) return { a: pt.year, m: pt.month, d: pt.day };
+    } catch (_) {}
+    const f = new Date(); return { a: f.getFullYear(), m: f.getMonth() + 1, d: f.getDate() };
+  }
+  const enNavidad = ({ m, d } = fechaPY()) => m === 12 || (m === 1 && d <= 6);
+  const LOGO_NORMAL = 'icono-192.png', LOGO_NAVIDAD = 'icono-navidad.svg';
+  function aplicarNavidad() {
+    const hoy = fechaPY(), activa = modoNavidad === 'si' || (modoNavidad === 'auto' && enNavidad(hoy));
+    document.documentElement.classList.toggle('navidad', activa);
+    const logo = document.querySelector('header .logo'), ico = document.querySelector('link[rel="icon"]');
+    if (logo && !logo.getAttribute('src').endsWith(activa ? LOGO_NAVIDAD : LOGO_NORMAL)) logo.src = activa ? LOGO_NAVIDAD : LOGO_NORMAL;
+    if (ico && !ico.getAttribute('href').endsWith(activa ? LOGO_NAVIDAD : LOGO_NORMAL)) { ico.type = activa ? 'image/svg+xml' : 'image/png'; ico.href = activa ? LOGO_NAVIDAD : LOGO_NORMAL; }
+    const clave = `${hoy.a}-${hoy.m}-${hoy.d}`;
+    $('saludoNavidad').hidden = !activa || leer('clima-py-navidad-saludo', '') === clave;
+    marcarRadio('daNavidad', modoNavidad);
+  }
+  $('saludoCerrar').addEventListener('click', () => {
+    const h = fechaPY(); guardar('clima-py-navidad-saludo', `${h.a}-${h.m}-${h.d}`);   // no vuelve a aparecer hasta mañana
+    $('saludoNavidad').hidden = true;
+  });
+  $$a('input[name="daNavidad"]').forEach(r => r.addEventListener('change', () => {
+    if (!r.checked || !MODOS_NAVIDAD.includes(r.value)) return;
+    modoNavidad = r.value; guardar('clima-py-navidad', modoNavidad); aplicarNavidad();
+  }));
+  $('btnAjustesAnim').addEventListener('click', () => marcarRadio('daNavidad', modoNavidad));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) aplicarNavidad(); });   // por si la página quedó abierta de un día para otro
+  setInterval(aplicarNavidad, 30 * 60e3);
+  aplicarNavidad();
 
   // ============ 7) RESUMEN, LISTA Y DETALLE ============
   function dibujarStats() {
@@ -2522,6 +3034,8 @@
     "Hoy": "Ko árape", "Mañana": "Ko'ẽrõ", "— ninguna —": "— mba'eve —",
     // --- momentos del día ---
     "🌅 Amanecer": "🌅 Ko'ẽmbota", "☀️ Día": "☀️ Ára", "🌇 Atardecer": "🌇 Ka'aru", "🌙 Noche": "🌙 Pyhare",
+    // --- ajustes de animación (lo demás del panel queda en español) ---
+    "Día": "Ára", "Noche": "Pyhare", "Nubes": "Arai", "Estrellas y luna": "Mbyja ha jasy", "Lluvia y granizo": "Ama ha ama itá", "Aves y luciérnagas": "Guyra ha mua",
     // --- estado del cielo ---
     "Despejado": "Yvága hesakã", "Mayormente despejado": "Yvága hesakã heta", "Parcialmente nublado": "Arai sa'i", "Nublado": "Arai hetáva",
     "Niebla": "Arai yvýpe", "Niebla con escarcha": "Arai yvýpe ro'ysã reheve",
