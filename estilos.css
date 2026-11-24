@@ -511,3 +511,79 @@
   .ciudad-fila { flex-wrap: wrap; gap: 6px 8px; margin-bottom: 6px; }
   .ciudad-nombre { overflow-wrap: break-word; }
   .ciudad-fila .btn { white-space: nowrap; }
+
+  /* ============ AJUSTES DE ANIMACIÓN (botón ⚙️, hoja de ajustes y aviso de vista previa) ============ */
+  .hoja-anim { --da-fondo: #0d1729; --da-linea: rgba(255, 255, 255, 0.12); --da-campo: rgba(255, 255, 255, 0.05); --da-marca: #38bdf8; --da-marca-txt: #04202f;
+    position: fixed; margin: auto; width: min(560px, calc(100vw - 32px)); max-height: min(86vh, 860px); padding: 0; border: 1px solid var(--da-linea); border-radius: 18px;
+    background: var(--da-fondo); color: var(--texto); box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.75); overflow: hidden; overscroll-behavior: contain; }
+  :root[data-tema=claro] .hoja-anim { --da-fondo: #ffffff; --da-linea: rgba(15, 40, 80, 0.16); --da-campo: rgba(15, 60, 120, 0.05); --da-marca: #0a639f; --da-marca-txt: #ffffff; box-shadow: 0 30px 70px -24px rgba(15, 40, 80, 0.5); }
+  .hoja-anim[open] { display: flex; flex-direction: column; }
+  .hoja-anim::backdrop { background: rgba(3, 8, 18, 0.55); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  .da-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 10px 10px 20px; border-bottom: 1px solid var(--da-linea); flex: none; }
+  .da-cab h2 { font-size: 1.05rem; text-transform: none; letter-spacing: -0.01em; color: var(--texto); font-weight: 700; }
+  .da-cerrar { min-width: 44px; min-height: 44px; padding: 0; display: grid; place-items: center; font-size: 1rem; }
+  .da-cuerpo { overflow-y: auto; padding: 6px 20px 18px; display: grid; gap: 4px; }
+  .da-grupo { border: 0; border-top: 1px solid var(--da-linea); padding: 14px 0 12px; min-width: 0; display: grid; gap: 8px; }
+  .da-grupo:first-of-type { border-top: 0; }
+  .da-grupo legend { float: left; width: 100%; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--suave); margin-bottom: 4px; }
+  .da-grupo legend + * { clear: both; }
+  .da-ayuda { color: var(--suave); font-size: 0.84rem; line-height: 1.4; }
+  .da-sub { font-size: 0.86rem; font-weight: 600; margin-top: 4px; }
+  .da-reducido { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(251, 191, 36, 0.12); border: 1px solid rgba(251, 191, 36, 0.45); font-size: 0.86rem; line-height: 1.4; }
+  :root[data-tema=claro] .da-reducido { background: #fef3c7; border-color: #f59e0b; color: #78350f; }
+  .hoja-anim input[type=checkbox], .hoja-anim input[type=radio], .hoja-anim input[type=range] { accent-color: var(--da-marca); }
+  /* Interruptores (casilla con apariencia de interruptor) */
+  .da-interr { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; font-weight: 600; cursor: pointer; }
+  .da-interr input { appearance: none; -webkit-appearance: none; flex: none; width: 48px; height: 28px; border-radius: 999px; background: var(--da-campo); border: 1px solid var(--da-linea); position: relative; cursor: pointer; transition: background 0.2s; }
+  .da-interr input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--suave); transition: transform 0.2s, background 0.2s; }
+  .da-interr input:checked { background: var(--da-marca); border-color: transparent; }
+  .da-interr input:checked::after { transform: translateX(20px); background: #fff; }
+  .hoja-anim.apagada .da-grupo:not(:first-of-type) { opacity: 0.6; }
+  /* Botones segmentados (intensidad y calidad) y fichas (vista previa) */
+  .da-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: var(--da-campo); border: 1px solid var(--da-linea); }
+  .da-seg label, .da-chips label { position: relative; cursor: pointer; }
+  .da-seg input, .da-chips input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .da-seg span { display: grid; place-items: center; min-height: 44px; padding: 4px 6px; border-radius: 9px; text-align: center; font-size: 0.86rem; font-weight: 600; line-height: 1.2; overflow-wrap: normal; }
+  .da-seg input:checked + span, .da-chips input:checked + span { background: var(--da-marca); color: var(--da-marca-txt); }
+  .da-seg input:focus-visible + span, .da-chips input:focus-visible + span { outline: 2px solid var(--amarillo); outline-offset: 1px; }
+  :root[data-tema=claro] .da-seg input:focus-visible + span, :root[data-tema=claro] .da-chips input:focus-visible + span { outline-color: #b45309; }
+  .da-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .da-chips span { display: inline-flex; align-items: center; min-height: 44px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--da-linea); background: var(--da-campo); font-size: 0.86rem; font-weight: 600; overflow-wrap: normal; }
+  /* Casillas de efectos */
+  .da-efectos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .da-efectos label { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--da-linea); background: var(--da-campo); cursor: pointer; font-size: 0.88rem; font-weight: 600; line-height: 1.25; overflow-wrap: normal; }
+  .da-efectos label:has(input:focus-visible) { outline: 2px solid var(--amarillo); outline-offset: 1px; }
+  .da-efectos input { width: 20px; height: 20px; flex: none; margin: 0; }
+  .da-efectos small { display: block; color: var(--suave); font-weight: 500; font-size: 0.76rem; }
+  .da-efectos .da-ancho { grid-column: 1 / -1; }
+  /* Volumen */
+  .da-vol { display: flex; align-items: center; gap: 12px; min-height: 44px; font-weight: 600; }
+  .da-vol input { flex: 1; min-width: 0; min-height: 44px; }
+  .da-vol output { min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
+  .da-previa-pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+  .da-pie { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; border-top: 1px solid var(--da-linea); padding-top: 14px; }
+  .hoja-anim .btn { min-height: 44px; }
+  .da-pie form { margin-left: auto; }
+  .da-listo { background: var(--da-marca); color: var(--da-marca-txt); border-color: transparent; padding-inline: 22px; }
+  /* Celular: hoja a lo ancho que sube desde abajo */
+  @media (max-width: 600px) {
+    .hoja-anim { width: 100%; max-width: 100%; max-height: 90vh; max-height: 90dvh; margin: auto 0 0; border-radius: 18px 18px 0 0; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+    .da-cuerpo { padding: 4px 16px 16px; }
+    .da-cab { padding-left: 16px; }
+  }
+  @media (max-width: 380px) { .da-efectos { grid-template-columns: 1fr; } .da-seg span { font-size: 0.8rem; } }
+  @media (prefers-reduced-motion: no-preference) {
+    .hoja-anim[open] { animation: daSube 0.22s ease-out; }
+    @keyframes daSube { from { transform: translateY(16px); opacity: 0; } }
+  }
+  /* Aviso de vista previa sobre el paisaje: siempre visible para que nadie lo confunda con el clima real */
+  .escena-previa { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px;
+    padding: 6px 6px 6px 14px; border-radius: 12px; background: rgba(120, 53, 15, 0.86); color: #fff; border: 1px solid #fbbf24; font-size: 0.86rem; font-weight: 600; box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.6); }
+  .escena-previa[hidden] { display: none; }
+  .escena-previa .btn { background: #fff; color: #78350f; border: 0; min-height: 36px; padding: 6px 14px; font-size: 0.82rem; }
+  .escena.en-previa { outline: 2px dashed #fbbf24; outline-offset: -2px; }
+  /* Durante la vista previa las etiquetas de clima y hora del paisaje no corresponden a lo que se ve: queda solo la ciudad y el aviso */
+  .escena.en-previa .escena-etq span:not(:first-child) { display: none; }
+  @media (max-width: 820px), (pointer: coarse) { .escena-previa .btn { min-height: 44px; } }
+  /* La barra de preferencias pasa a dos líneas si no entra (pantallas muy angostas) */
+  @media (max-width: 420px) { .pref { flex-wrap: wrap; max-width: 100%; } }
