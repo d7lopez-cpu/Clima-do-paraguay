@@ -12,6 +12,8 @@ Se puede instalar en el celular como una app (desde el menú del navegador: *Agr
 - **Pronóstico de cada ciudad** por horas y para 6 días, con índice UV, amanecer, atardecer y luna.
 - **Datos medidos, no solo calculados:** cerca de un aeropuerto (≤ 25 km) se usan las observaciones reales (METAR); en el resto del país se muestra cuánto difiere el modelo de lo medido.
 - **Probabilidad de lluvia con ensambles** de 4 modelos (ECMWF, GFS, ICON y GEM) y rango probable de temperatura.
+- **Compartir** el clima de una ciudad (menú del celular, copiar enlace o WhatsApp), con enlace directo a esa ciudad.
+- **Avisos** en el detalle: calor extremo (sensación ≥ 38 °C), frío intenso (≤ 5 °C) y viento fuerte (≥ 50 km/h), además de UV, lluvia y tormenta.
 - Radar de lluvia, comparación de ciudades, favoritas, "cerca de mí", tema claro/oscuro y °C/°F.
 
 ## Cómo funciona
@@ -35,7 +37,9 @@ En vez de que cada visitante consulte cientos de ciudades a Open-Meteo, un proce
 | `estilos.css` | El diseño |
 | `app.js` | El código de la app |
 | `geo.js` | Datos geográficos: departamentos, distritos, países vecinos y ciudades (`GEO`) |
-| `sw.js` | Service worker: permite abrir la app sin internet |
+| `sw.js` | Service worker: permite abrir la app sin internet (`geo.js` sale primero del caché y se renueva en segundo plano) |
+| `fonts/` | Fuente Inter propia (licencia OFL): subconjunto latino y las letras del guaraní ĩ ũ ẽ ỹ |
+| `scripts/simplificar-geo.mjs` | Aligera los mapas de `geo.js` sin deformar los bordes compartidos (ver abajo) |
 | `manifest.webmanifest` | Nombre e íconos para instalar la app |
 | `scripts/actualizar_clima.py` | Descarga el clima de todas las ciudades (solo usa Python estándar) |
 | `.github/workflows/clima.yml` | Ejecuta el script cada 30 minutos y publica en la rama `datos` |
@@ -44,7 +48,8 @@ En vez de que cada visitante consulte cientos de ciudades a Open-Meteo, un proce
 ## Tareas comunes
 
 - **Agregar o mover una ciudad:** edita la lista `ciudades` dentro de `geo.js` (`n` nombre, `lat`, `lon`, `dep` departamento, `g` tamaño de 1 a 4). El script lee la misma lista, no hay que cambiarla en otro lugar.
-- **Publicar una versión nueva:** después de cambiar `index.html`, `app.js`, `estilos.css` o `geo.js`, sube el número de `VERSION` en `sw.js` para que los celulares renueven su copia guardada.
+- **Publicar una versión nueva:** después de cambiar `index.html`, `app.js`, `estilos.css` o `geo.js`, sube el número de `VERSION` en `sw.js` para que los celulares renueven su copia guardada. **Con `geo.js` es imprescindible:** se sirve primero desde el caché, así que sin subir `VERSION` cada persona vería el cambio recién en su segunda visita.
+- **Aligerar los mapas:** `geo.js` ya está simplificado (−40 % de peso). Si se vuelve a generar, hay que partir del archivo original (no de uno ya simplificado): `git show 17b6f36:geo.js > /tmp/original.js` y luego `node scripts/simplificar-geo.mjs --entrada /tmp/original.js --eps-dep 0.007 --eps-vec 0.01`. Con `--eps-dep 0.005` se conserva más detalle (−34 %).
 - **Actualizar el clima a mano:** pestaña *Actions* → *Actualizar clima* → *Run workflow*.
 - **Revisar que nada esté roto:** GitHub lo hace solo en cada cambio (✅ o ❌ junto al commit). A mano: `node scripts/revisar.mjs`.
 - **Probar en tu computadora:** desde la carpeta del proyecto, ejecuta `python3 -m http.server` y abre http://localhost:8000.

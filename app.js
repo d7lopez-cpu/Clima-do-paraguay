@@ -1229,7 +1229,7 @@
     refrescarVistas();                                             // los colores de texto cambian según el tema
     if (detalleActual && detalleActual.c.n === seleccionada) pintarDetalle();
   });
-  const pintarUnidad = () => { $('btnUnidad').textContent = usaF ? '°F' : '°C'; };
+  const pintarUnidad = () => { $('btnUnidad').textContent = usaF ? '°F' : '°C'; $('btnUnidad').setAttribute('aria-label', usaF ? 'Cambiar a grados Celsius' : 'Cambiar a grados Fahrenheit'); };
   $('btnUnidad').addEventListener('click', () => {
     usaF = !usaF; guardar('clima-py-f', usaF ? '1' : '0');
     pintarUnidad(); pintarCapas(); refrescarVistas();
@@ -1945,6 +1945,8 @@
           <div class="ciudad-fila">
             <span class="ciudad-nombre">${c.n}</span>
             <button class="estrella${fav ? ' on' : ''}" data-fav="${c.n}" aria-label="Favorita">${fav ? '★' : '☆'}</button>
+            ${d ? `<button class="btn" data-compartir="1" aria-label="Compartir el clima de esta ciudad">📤 Compartir</button>` : ''}
+            ${d && !navigator.share ? `<button class="btn" data-compartir="wa" aria-label="Enviar el clima por WhatsApp">WhatsApp</button>` : ''}
           </div>
           <div class="dep-nombre">${c.dep === 'Asunción' ? 'Capital del país' : 'Departamento ' + c.dep}</div>
           <div class="temp-fila">
@@ -1992,11 +1994,20 @@
   }
   const NIVEL_UV = u => u >= 11 ? 'extremo' : u >= 8 ? 'muy alto' : u >= 6 ? 'alto' : 'moderado';
 
+  // Umbrales de los avisos nuevos del detalle
+  const UMBRAL_CALOR_EXTREMO = 38;   // °C de sensación térmica (apparent_temperature) desde el que se avisa "Calor extremo"
+  const UMBRAL_FRIO_INTENSO = 5;     // °C de temperatura del aire (temperature_2m) hasta el que se avisa "Frío intenso"
+  const UMBRAL_VIENTO_FUERTE = 50;   // km/h de viento (wind_speed_10m) desde el que se avisa "Viento fuerte" con la velocidad
+
   // Avisos útiles según las condiciones de ahora
   function alertas(a, d) {
     const r = [];
-    if (esNumero(a.apparent_temperature) && a.apparent_temperature >= 35) r.push('🥵 Sensación térmica muy alta: hidrátate y evita el sol del mediodía');
-    if (esNumero(a.apparent_temperature) && a.apparent_temperature <= 5) r.push('🥶 Sensación de frío intenso: abrígate bien');
+    const calorExtremo = esNumero(a.apparent_temperature) && a.apparent_temperature >= UMBRAL_CALOR_EXTREMO;
+    const frioIntenso = esNumero(a.temperature_2m) && a.temperature_2m <= UMBRAL_FRIO_INTENSO;
+    if (calorExtremo) r.push('🔥 Calor extremo: hidrátate y evita el sol en las horas centrales del día');
+    else if (esNumero(a.apparent_temperature) && a.apparent_temperature >= 35) r.push('🥵 Sensación térmica muy alta: hidrátate y evita el sol del mediodía');
+    if (frioIntenso) r.push('🥶 Frío intenso: abrígate bien');
+    else if (esNumero(a.apparent_temperature) && a.apparent_temperature <= 5) r.push('🥶 Sensación de frío intenso: abrígate bien');
     const px = d.proxh;
     if (px && Date.now() - px.t < 20 * 60000) {                    // solo si el dato es reciente (20 min)
       if (px.k === 0) r.push(`🌧️ Está lloviendo ahora (unos ${px.mm} mm en la próxima hora)`);
@@ -2013,7 +2024,8 @@
       r.push(`☀️ UV ${NIVEL_UV(uvMax)} hoy (${Math.round(uvMax)}): usa protector solar${tramo}${uvMax >= 8 ? ', gorra y busca sombra' : ''}`);
     }
     if ([95, 96, 99].includes(a.weather_code)) r.push('⛈️ Tormenta eléctrica en la zona ahora');
-    if (esNumero(a.wind_speed_10m) && a.wind_speed_10m >= 40) r.push('💨 Viento fuerte');
+    if (esNumero(a.wind_speed_10m) && a.wind_speed_10m >= UMBRAL_VIENTO_FUERTE) r.push(`💨 Viento fuerte: ${Math.round(a.wind_speed_10m)} km/h`);
+    else if (esNumero(a.wind_speed_10m) && a.wind_speed_10m >= 40) r.push('💨 Viento fuerte');
     const i = horaInicio(d);
     const prox = d.hourly.precipitation_probability.slice(i, i + 4).filter(esNumero);
     if (prox.length && Math.max(...prox) >= 70) r.push('🌧️ Alta probabilidad de lluvia en las próximas horas');
@@ -2062,7 +2074,7 @@
   function pintarDetalle() {
     const { c, d } = detalleActual;
     $('detalle').innerHTML = htmlCabecera(c, d.current, d) + `
-      <div class="pestanas" role="tablist">
+      <div class="pestanas" role="tablist" aria-label="Vista del pronóstico">
         <button class="pestana${pestana === 'horas' ? ' on' : ''}" data-tab="horas" role="tab" aria-selected="${pestana === 'horas'}">Próximas horas</button>
         <button class="pestana${pestana === 'grafico' ? ' on' : ''}" data-tab="grafico" role="tab" aria-selected="${pestana === 'grafico'}">Gráfico 24 h</button>
         <button class="pestana${pestana === 'dias' ? ' on' : ''}" data-tab="dias" role="tab" aria-selected="${pestana === 'dias'}">Próximos días</button>
@@ -2070,7 +2082,37 @@
       <div id="pronostico">${htmlPronostico(d)}</div>`;
     llenarAire(c);
   }
+  // ---- Compartir el clima de la ciudad (Web Share; si no existe: copiar enlace y WhatsApp) ----
+  function datosCompartir() {
+    const { c, d } = detalleActual, a = d.current;
+    const w = clima(a.weather_code, a.is_day);
+    const t = esNumero(a.temperature_2m) ? `${Math.round(aU(a.temperature_2m))}°${UT()}` : '--';
+    const url = location.origin + location.pathname + '#c=' + encodeURIComponent(c.n);
+    const texto = `Clima en ${c.n}: ${t}, ${w.texto}. Máx ${grados(d.daily.temperature_2m_max[0])} / Mín ${grados(d.daily.temperature_2m_min[0])}.`;
+    return { texto, url };
+  }
+  async function copiarTexto(txt) {
+    try { await navigator.clipboard.writeText(txt); return true; } catch (_) {}
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = txt; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy'); ta.remove(); return ok;
+    } catch (_) { return false; }
+  }
+  async function compartir(modo) {
+    if (!detalleActual) return;
+    const { texto, url } = datosCompartir();
+    if (modo === 'wa') { window.open('https://wa.me/?text=' + encodeURIComponent(texto + ' ' + url), '_blank', 'noopener'); return; }
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Clima PY', text: texto, url }); return; }
+      catch (e) { if (e && e.name === 'AbortError') return; }   // si la persona cancela no se hace nada; otro error: se copia el enlace
+    }
+    aviso(await copiarTexto(texto + ' ' + url) ? 'Enlace copiado' : 'No se pudo copiar el enlace');
+  }
   $('detalle').addEventListener('click', e => {
+    const comp = e.target.closest('[data-compartir]');
+    if (comp) { compartir(comp.dataset.compartir); return; }
     const fav = e.target.closest('[data-fav]');
     if (fav) { alternarFav(fav.dataset.fav); return; }
     const tab = e.target.closest('[data-tab]');
@@ -2504,6 +2546,10 @@
     "Probabilidad básica de Open-Meteo (no se pudo consultar el ensamble de modelos).": "Ama ikatuha Open-Meteo-gua (ndaikatúi ojehecha modelo ensamble).",
     // --- avisos del clima ---
     "🥵 Sensación térmica muy alta: hidrátate y evita el sol del mediodía": "🥵 Ñandu hakuha ijyvate: eñemboy ha ekañy kuarahy mbytépe guive",
+    "🔥 Calor extremo: hidrátate y evita el sol en las horas centrales del día": "🔥 Hakuha tuichaiterei: eñemboy ha ekañy kuarahy mbytépe guive",
+    "🥶 Frío intenso: abrígate bien": "🥶 Ro'y hatã: eñemoĩ porã ao",
+    "📤 Compartir": "📤 Compartir", "Compartir el clima de esta ciudad": "Compartir el clima de esta ciudad", "WhatsApp": "WhatsApp", "Enviar el clima por WhatsApp": "Enviar el clima por WhatsApp",
+    "Enlace copiado": "Enlace copiado", "No se pudo copiar el enlace": "No se pudo copiar el enlace",
     "🥶 Sensación de frío intenso: abrígate bien": "🥶 Ñandu ro'y hatã: eñemoĩ porã ao", "💨 Viento fuerte": "💨 Yvytu hatã",
     "🌧️ Alta probabilidad de lluvia en las próximas horas": "🌧️ Ikatupyry ama aravo oúvape", "⛈️ Tormenta eléctrica en la zona ahora": "⛈️ Aratiri oĩ ko'ág̃a ko henda",
     // --- sonido ---
@@ -2551,6 +2597,7 @@
       m => `☀️ UV ${NIVEL_UV_GN[m[1]]} ko árape (${m[2]}): eipuru protector solar${m[3] ? ` ${m[3]}:00 guive ${m[4]}:00 peve` : ''}${m[5] ? ', gorra ha eheka sombra' : ''}`],
     [/^🌧️ Está lloviendo ahora \(unos (.+?) mm en la próxima hora\)$/, m => `🌧️ Oky ko'ág̃a (${m[1]} mm jerére peteĩ aravo oúvape)`],
     [/^🌦️ Lluvia en unos (\d+) min \(unos (.+?) mm en la próxima hora\)$/, m => `🌦️ Ama oúta ${m[1]} min jerére (${m[2]} mm jerére peteĩ aravo oúvape)`],
+    [/^💨 Viento fuerte: (\d+) km\/h$/, m => `💨 Yvytu hatã: ${m[1]} km/h`],
     [/^⛈️ Tormenta en (.+)$/, m => `⛈️ Aratiri ${m[1]}-pe`],
     [/^Radar observado · (.*?) · fotograma (\d+)\/(\d+)$/, m => `Radar ojehecháva · ${SUB(m[1])} · ra'ãnga ${m[2]}/${m[3]}`],
     [/^La ciudad más cercana es (.+), a (\d+) km\.$/, m => `Pe táva ag̃uĩvéva ha'e ${m[1]}, ${m[2]} km-pe.`],

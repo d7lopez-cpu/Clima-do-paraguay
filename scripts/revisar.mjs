@@ -15,6 +15,25 @@ for (const f of ['app.js', 'geo.js', 'sw.js']) {
   catch (e) { error(`${f}: error de sintaxis\n${String(e.stderr).trim()}`); }
 }
 
+// 1b) app.js: sin restos de depuración y sin claves repetidas en el diccionario guaraní (GN)
+const codigoApp = leer('app.js');
+codigoApp.split('\n').forEach((linea, i) => {
+  if (/^\s*(console\.(log|debug)\(|debugger\b)/.test(linea)) error(`app.js:${i + 1}: resto de depuración (${linea.trim().slice(0, 40)})`);
+});
+{
+  const ini = codigoApp.indexOf('const GN = {'), fin = codigoApp.indexOf('\n  };', ini);
+  if (ini < 0 || fin < 0) error('app.js: no se encontró el diccionario GN');
+  else {
+    const bloque = codigoApp.slice(ini, fin), vistas = new Set();
+    for (const m of bloque.matchAll(/"((?:[^"\\\n]|\\.)*)"(\s*:)?/g)) {   // cada cadena entre comillas; es clave si le sigue ":"
+      if (!m[2]) continue;
+      if (vistas.has(m[1])) error(`app.js: clave repetida en el diccionario guaraní: "${m[1]}"`);
+      vistas.add(m[1]);
+    }
+    console.log(`app.js: ${vistas.size} claves en el diccionario guaraní`);
+  }
+}
+
 // 2) Datos geográficos (geo.js)
 let GEO = null;
 try {
