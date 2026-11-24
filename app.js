@@ -1927,15 +1927,19 @@
   // ============ SONIDO DEL CLIMA ============
   // Un paisaje sonoro que cambia con el clima de la ciudad elegida (o con la vista previa). Todo se fabrica aquí mismo con el navegador
   // (Web Audio: ruido y osciladores, no se descarga nada) y solo suena si la persona toca 🔈.
-  //  ☀️ día: aves y brisa; con calor de verano (≥ 28 °C, de noviembre a marzo) chicharras · 🌇 hora dorada: coro de aves
-  //  🌙 noche despejada o con pocas nubes: grillos (cantan más rápido cuanto más calor hace) y ranas · ☁️ nublado: brisa y aves lejanas
-  //  🌫️ niebla: sonido amortiguado · 🌧️ lluvia: siseo y gotas según la intensidad · ⛈️ tormenta: lluvia fuerte, truenos que llegan
-  //  con más o menos retraso según la distancia y, con granizo (códigos 96/99), golpeteo sobre el techo · 💨 viento: ráfagas según los km/h
-  // Volumen general = prefsAnim.volumen (ganancia maestra; cambiarlo es barato y suave). Las capas continuas se crean UNA vez;
-  // los sonidos sueltos (aves, gotas, granizo, truenos) se apagan y se liberan solos, con un tope de truenos simultáneos.
+  // MEZCLA LIMPIA: en cada estado suena UNA cama (el fondo: brisa, lluvia o grillos de noche) y como mucho DOS acentos
+  // (aves, chicharras, ranas, ráfagas, granizo, truenos), elegidos por prioridad en escena(); el resto calla del todo.
+  //  ☀️ día: brisa y aves; con calor de verano (≥ 28 °C, de noviembre a marzo) chicharras · 🌇 hora dorada: coro de aves
+  //  🌙 noche (≥ 12 °C): grillos (más rápidos cuanto más calor) y ranas · ☁️ nublado: brisa y aves lejanas · 🌫️ niebla: todo amortiguado
+  //  🌧️ lluvia: siseo y gotas según la intensidad; la lluvia fuerte saca a las aves y los insectos · ⛈️ tormenta: lluvia fuerte y truenos
+  //  (con granizo, códigos 96/99, golpeteo sobre el techo) · 💨 viento: brisa desde 3 km/h, ráfagas desde 15 km/h, silbido desde 35 km/h
+  // Niveles: cada capa tiene un nivel de referencia (REF) con el que, sola, suena a la misma sonoridad; la escena reparte dB RELATIVOS
+  // a esa referencia, así la tormenta no suena el triple que una noche tranquila. Los cambios de estado son fundidos de 2,5 a 3,5 s.
+  // Un trueno «agacha» (ducking) la cama y, más, los acentos mientras retumba. Cadena final: volumen (≤ 1) → filtro → limitador → salida.
+  // Las capas continuas se crean UNA vez; los sonidos sueltos (aves, ranas, gotas, granizo, truenos) se liberan solos y tienen un tope.
   let au = null, sonando = false;
   const azar = (a, b) => a + Math.random() * (b - a);
-  const gananciaVolumen = () => 1.5 * limitar(Number(prefsAnim.volumen) || 0, 0, 1);   // 0,6 (el valor de fábrica) → 0,9, como antes
+  const gananciaVolumen = () => limitar(Number(prefsAnim.volumen) || 0, 0, 1);   // la ganancia maestra nunca pasa de 1
   // ¿Granizo? Solo con tormenta real con granizo (códigos 96/99); una vista previa que elige otro tipo de clima no lo hereda
   const hayGranizo = () => amb.tipo === 'tormenta' && !!ultimoAmbiente && [96, 99].includes(ultimoAmbiente[0].weather_code) && !(prefsAnim.vistaPrevia && prefsAnim.vistaPrevia.tipo);
   let mesCache = { t: -1e9, verano: false };
@@ -1943,13 +1947,23 @@
     if (performance.now() - mesCache.t > 600000) { const m = +horaAsuncion().slice(5, 7); mesCache = { t: performance.now(), verano: m >= 11 || m <= 3 }; }
     return mesCache.verano;
   };
+  // Ganancia con la que cada capa SOLA suena a la sonoridad de referencia (≈ −15 LUFS con volumen 1, medida con
+  // herramientas/audio/medir-mezcla.js --solo). Aves y ranas: con su tasa de referencia (1 y 0,5); la lluvia: siseo + murmullo + gotas a pleno.
+  const REF = { viento: 0.6, rafagas: 1.3, silbido: 0.1, lluvia: 0.32, lluviaBajo: 0.43, gotas: 0.65, granizo: 2, chicharras: 3.2, grillos: 0.076, aves: 1.6, ranas: 5, truenos: 1.8 };
+  const TOPE_FUENTES = 150;                                        // sonidos sueltos vivos a la vez, como mucho (nada crece sin límite)
+  const TRUENO_SEPARACION = 6;                                     // s mínimos entre el comienzo de dos truenos (y nunca dos encimados)
 
   function crearAudio() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
-    const ctx = new AC(), master = ctx.createGain(), suave = ctx.createBiquadFilter(), comp = ctx.createDynamicsCompressor();
+    const ctx = new AC(), master = ctx.createGain(), suave = ctx.createBiquadFilter(), lim = ctx.createDynamicsCompressor();
     master.gain.value = 0; suave.type = 'lowpass'; suave.frequency.value = 16000;
-    master.connect(suave); suave.connect(comp); comp.connect(ctx.destination);
+    // Limitador: casi no actúa en la mezcla normal; solo frena los picos (truenos cercanos) para que nunca sature
+    lim.threshold.value = -6; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.003; lim.release.value = 0.25;
+    master.connect(suave); suave.connect(lim); lim.connect(ctx.destination);
+    // Tres grupos: la cama, los acentos y los truenos. Los dos primeros pasan por un "agachador" que mueve el trueno (ducking).
+    const duckCama = ctx.createGain(), duckAcentos = ctx.createGain(), busTruenos = ctx.createGain();
+    busTruenos.gain.value = 0; duckCama.connect(master); duckAcentos.connect(master); busTruenos.connect(master);
 
     // Ruido rosa (más grave y natural que el blanco): es la materia prima del viento, la lluvia, las chicharras, el granizo y los truenos
     const N = ctx.sampleRate * 6, F = Math.round(ctx.sampleRate * 0.5), buf = ctx.createBuffer(1, N, ctx.sampleRate), ch = buf.getChannelData(0), x = new Float32Array(N + F);
@@ -1962,27 +1976,29 @@
     }
     for (let i = 0; i < N; i++) ch[i] = i < F ? x[i] * (i / F) + x[N + i] * (1 - i / F) : x[i];
 
-    // Un poco de eco de espacio abierto para las aves y las ranas
+    // Un poco de eco de espacio abierto para las aves y las ranas (vuelve por el grupo de acentos: el trueno también lo agacha)
     const rev = ctx.createConvolver(), irN = Math.round(ctx.sampleRate * 1.8), ir = ctx.createBuffer(2, irN, ctx.sampleRate), revG = ctx.createGain();
     for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < irN; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irN, 2.6); }
-    rev.buffer = ir; revG.gain.value = 0.6; rev.connect(revG); revG.connect(master);
-    const aves = ctx.createGain(), avesRev = ctx.createGain();
-    avesRev.gain.value = 0.5; aves.connect(master); aves.connect(avesRev); avesRev.connect(rev);
+    rev.buffer = ir; revG.gain.value = 0.6; rev.connect(revG); revG.connect(duckAcentos);
+    const bus = (destino, eco) => { const g = ctx.createGain(); g.gain.value = 0; g.connect(destino); if (eco) { const e = ctx.createGain(); e.gain.value = eco; g.connect(e); e.connect(rev); } return g; };
+    const aves = bus(duckAcentos, 0.5), ranas = bus(duckAcentos, 1), gotas = bus(duckCama), busGranizo = bus(duckCama);
 
-    // Una capa de ruido filtrado (con volumen propio)
+    // Una capa de ruido filtrado: fuente → filtros → env (envolvente propia: brisa que respira, ráfagas) → g (nivel de la escena)
+    // Como el nivel va DESPUÉS de la envolvente, con nivel 0 la capa queda en silencio real.
     const capa = (tipo, f, q, alto) => {
-      const s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), hp = ctx.createBiquadFilter(), g = ctx.createGain();
+      const s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), hp = ctx.createBiquadFilter(), env = ctx.createGain(), g = ctx.createGain();
       s.buffer = buf; s.loop = true; fl.type = tipo; fl.frequency.value = f; fl.Q.value = q; hp.type = 'highpass'; hp.frequency.value = alto || 20; g.gain.value = 0;
-      s.connect(fl); fl.connect(hp); hp.connect(g); g.connect(master); s.start(0, Math.random() * 3);
-      return { g, fl };
+      s.connect(fl); fl.connect(hp); hp.connect(env); env.connect(g); g.connect(duckCama); s.start(0, Math.random() * 3);
+      return { g, fl, env };
     };
     const lfo = (hz, prof, destino) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = hz; g.gain.value = prof; o.connect(g); g.connect(destino); o.start(); };
-    // Viento de fondo: el filtro y el volumen suben y bajan despacio
+    // Brisa: el filtro y la envolvente suben y bajan despacio (la envolvente oscila alrededor de 1; el nivel la multiplica)
     const viento = capa('bandpass', 400, 0.6, 60);
-    lfo(0.11, 140, viento.fl.frequency); lfo(0.043, 0.012, viento.g.gain);
-    // Ráfagas: otra banda de ruido cuyo volumen y tono se programan a saltos irregulares (ver programarRafaga); con viento fuerte, un silbido
+    lfo(0.11, 140, viento.fl.frequency); lfo(0.043, 0.3, viento.env.gain);
+    // Ráfagas: su envolvente se programa a saltos irregulares (programarRafaga); con viento fuerte, además un silbido
     const rafaga = capa('bandpass', 520, 0.9, 90), silbido = capa('bandpass', 1100, 14, 400);
-    // Lluvia: un "siseo" parejo + un murmullo grave (más presente en las tormentas)
+    rafaga.env.gain.value = 0.15; silbido.env.gain.value = 0;
+    // Lluvia: un "siseo" parejo + un murmullo grave (más presente cuanto más llueve)
     const lluvia = capa('lowpass', 7500, 0.2, 1400), lluviaBajo = capa('lowpass', 700, 0.4, 120);
     // Chicharras: ruido agudo que "vibra" ~60-80 veces por segundo y se hincha y se apaga despacio
     const cigarra = (f, hz) => {
@@ -1990,7 +2006,7 @@
       s.buffer = buf; s.loop = true; bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 5;
       am.gain.value = 0.5; l.type = 'sawtooth'; l.frequency.value = hz; lg.gain.value = 0.5; l.connect(lg); lg.connect(am.gain);
       sw.gain.value = 0.65; lfo(azar(0.05, 0.12), 0.35, sw.gain);
-      nivel.gain.value = 0; s.connect(bp); bp.connect(am); am.connect(sw); sw.connect(nivel); nivel.connect(master); s.start(0, Math.random() * 3); l.start();
+      nivel.gain.value = 0; s.connect(bp); bp.connect(am); am.connect(sw); sw.connect(nivel); nivel.connect(duckAcentos); s.start(0, Math.random() * 3); l.start();
       return nivel;
     };
     const cig = [cigarra(4900, 62), cigarra(6200, 77)];
@@ -2002,29 +2018,35 @@
       o.type = 'sine'; o.frequency.value = f; am.gain.value = 0.5; gate.gain.value = 0.5; nivel.gain.value = 0;
       const pu = onda(pulso, 70), gr = onda(grupo, 14);
       pu.pg.connect(am.gain); gr.pg.connect(gate.gain);
-      o.connect(am); am.connect(gate); gate.connect(nivel); nivel.connect(master); o.start();
+      o.connect(am); am.connect(gate); gate.connect(nivel); nivel.connect(duckAcentos); o.start();
       return { nivel, ritmo: gr.p.frequency, grupo };
     };
     const gri = [grillo(4300, 29, 1.9), grillo(4650, 33, 2.3), grillo(5050, 27, 1.6)];
 
-    // Cada 250 ms: aves, ranas, ráfagas y truenos sueltos; cada 100 ms: gotas y granizo (todo según el clima)
+    // Cada 250 ms: aves, ranas, ráfagas y el trueno de reserva; cada 100 ms: gotas y granizo. Nada se crea si el contexto
+    // no está corriendo (suspendido o interrumpido): sus sonidos no terminarían nunca y se acumularían.
+    const listo = () => sonando && !document.hidden && ctx.state === 'running' && au && au.ctx === ctx;
     const intervaloAves = setInterval(() => {
-      if (!sonando || document.hidden) return;
+      if (!listo()) return;
       if (Math.random() < au.tasaAves * 0.07) llamadaAve();
       if (Math.random() < au.tasaRanas * 0.12) rana();
-      if (au.ctx.currentTime >= au.proxRafaga) programarRafaga();
+      if (ctx.currentTime >= au.proxRafaga) programarRafaga();
       // si el cielo no está dibujando relámpagos (fondo apagado, movimiento reducido…), los truenos llegan solos de vez en cuando
       if (amb.tipo === 'tormenta' && performance.now() - au.ultTrueno > au.esperaTrueno) trueno();
     }, 250);
     const intervaloGotas = setInterval(() => {
-      if (!sonando || document.hidden) return;
-      if (amb.lluvia > 0) { const n = Math.round(amb.lluvia * (1 + Math.random() * 3)); for (let i = 0; i < n; i++) setTimeout(gota, Math.random() * 100); }
-      if (au.granizo) { const n = Math.round(azar(1, 4)); for (let i = 0; i < n; i++) setTimeout(piedra, Math.random() * 100); }
+      if (!listo()) return;
+      if (au.tasaGotas > 0) { const n = Math.round(au.tasaGotas * (1 + Math.random() * 3)); for (let i = 0; i < n; i++) setTimeout(gota, Math.random() * 100); }
+      if (au.hayPiedras) { const n = Math.round(azar(1, 4)); for (let i = 0; i < n; i++) setTimeout(piedra, Math.random() * 100); }
     }, 100);
-    return { ctx, master, suave, viento, rafaga, silbido, lluvia, lluviaBajo, cig, gri, aves, rev, buf, intervaloAves, intervaloGotas,
-      tasaAves: 0, tasaRanas: 0, granizo: false, proxRafaga: 0, ultTrueno: performance.now(), esperaTrueno: 15000, truenos: [], niveles: {} };
+    return { ctx, master, suave, lim, duckCama, duckAcentos, busTruenos, viento, rafaga, silbido, lluvia, lluviaBajo, cig, gri, aves, ranas, gotas, busGranizo, rev, buf,
+      intervaloAves, intervaloGotas, tasaAves: 0, tasaRanas: 0, tasaGotas: 0, hayPiedras: false, proxRafaga: 0, ultTrueno: performance.now(), esperaTrueno: 15000,
+      truenoLibre: 0, truenos: [], truenosTotal: 0, truenosDescartados: 0, fuentes: 0, objetivo: new WeakMap(), escena: null, niveles: {}, solo: null };
   }
 
+  // Cuenta los sonidos sueltos vivos (para el tope) y los descuenta cuando terminan
+  function vigilar(src) { au.fuentes++; const a = au; src.onended = () => { a.fuentes--; }; return src; }
+  const hayLugar = (n) => au && au.fuentes + (n || 1) <= TOPE_FUENTES;
   function salida(destino) {                                       // un punto al azar del estéreo
     const { ctx } = au; if (!ctx.createStereoPanner) return destino;
     const p = ctx.createStereoPanner(); p.pan.value = azar(-0.9, 0.9); p.connect(destino); return p;
@@ -2035,151 +2057,236 @@
     o.type = 'sine'; o.frequency.setValueAtTime(f0, T); o.frequency.exponentialRampToValueAtTime(f1, T + dur);
     if (vib) { const l = ctx.createOscillator(), lg = ctx.createGain(); l.frequency.value = vib.hz; lg.gain.value = vib.prof; l.connect(lg); lg.connect(o.frequency); l.start(T); l.stop(T + dur + 0.05); }
     g.gain.setValueAtTime(0.0001, T); g.gain.exponentialRampToValueAtTime(vol, T + Math.min(0.02, dur / 3)); g.gain.exponentialRampToValueAtTime(0.0001, T + dur);
-    o.connect(g); g.connect(dest); o.start(T); o.stop(T + dur + 0.05);
+    o.connect(g); g.connect(dest); vigilar(o).start(T); o.stop(T + dur + 0.05);
   }
   function llamadaAve() {
+    if (!hayLugar(16)) return;
     const sal = salida(au.aves), v = azar(0.4, 1), r = Math.random();
     if (r < 0.38) {                                                // silbido de 2 a 5 notas
       const n = Math.round(azar(2, 5)), base = azar(2200, 3800), dir = Math.random() < 0.5 ? 1 : -1; let t = 0;
-      for (let i = 0; i < n; i++) { const f0 = base * (1 + dir * i * 0.06), d = azar(0.07, 0.16); tono(sal, f0, f0 * azar(1.15, 1.5), t, d, 0.05 * v * 1.5); t += d + azar(0.05, 0.11); }
+      for (let i = 0; i < n; i++) { const f0 = base * (1 + dir * i * 0.06), d = azar(0.07, 0.16); tono(sal, f0, f0 * azar(1.15, 1.5), t, d, 0.075 * v); t += d + azar(0.05, 0.11); }
     } else if (r < 0.58) {                                         // trino rápido
       const n = Math.round(azar(8, 16)), f = azar(3000, 5200);
-      for (let i = 0; i < n; i++) tono(sal, i % 2 ? f * 1.1 : f, i % 2 ? f : f * 1.1, i * 0.05, 0.04, 0.03 * v * 1.5);
+      for (let i = 0; i < n; i++) tono(sal, i % 2 ? f * 1.1 : f, i % 2 ? f : f * 1.1, i * 0.05, 0.04, 0.045 * v);
     } else if (r < 0.82) {                                         // arrullo de paloma: cu-CU-cu-cuuu
       const f = azar(380, 470); let t = 0;
-      [[0.35, 1], [0.16, 1.08], [0.16, 1.08], [0.42, 0.98]].forEach(([d, k]) => { tono(sal, f * k, f * k * 0.93, t, d, 0.1 * v * 1.5, { hz: 5.5, prof: 6 }); t += d + 0.07; });
+      [[0.35, 1], [0.16, 1.08], [0.16, 1.08], [0.42, 0.98]].forEach(([d, k]) => { tono(sal, f * k, f * k * 0.93, t, d, 0.15 * v, { hz: 5.5, prof: 6 }); t += d + 0.07; });
     } else {                                                       // dos "píos" que suben
-      tono(sal, azar(1600, 2400), azar(3800, 5200), 0, azar(0.1, 0.17), 0.05 * v * 1.5);
-      tono(sal, azar(1700, 2500), azar(4000, 5400), 0.22, azar(0.1, 0.17), 0.045 * v * 1.5);
+      tono(sal, azar(1600, 2400), azar(3800, 5200), 0, azar(0.1, 0.17), 0.075 * v);
+      tono(sal, azar(1700, 2500), azar(4000, 5400), 0.22, azar(0.1, 0.17), 0.068 * v);
     }
   }
   function rana() {                                                // 2 a 5 croares graves, "pulsados" como una rana de verdad
-    const { ctx, rev } = au, sal = salida(au.master), n = Math.round(azar(2, 5)), f = azar(150, 240); let t = 0;
+    if (!hayLugar(10)) return;
+    const { ctx } = au, sal = salida(au.ranas), n = Math.round(azar(2, 5)), f = azar(150, 240); let t = 0;
     for (let i = 0; i < n; i++) {
       const T = ctx.currentTime + t, d = azar(0.1, 0.2), o = ctx.createOscillator(), bp = ctx.createBiquadFilter(), g = ctx.createGain(), mod = ctx.createGain(), am = ctx.createOscillator(), ag = ctx.createGain();
       o.type = 'sawtooth'; o.frequency.setValueAtTime(f * 1.1, T); o.frequency.exponentialRampToValueAtTime(f * 0.8, T + d);
       bp.type = 'bandpass'; bp.frequency.value = f * 3.2; bp.Q.value = 2.5;
       mod.gain.value = 0.5; am.frequency.value = azar(28, 40); ag.gain.value = 0.5; am.connect(ag); ag.connect(mod.gain);
       g.gain.setValueAtTime(0.0001, T); g.gain.exponentialRampToValueAtTime(0.1, T + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, T + d);
-      o.connect(bp); bp.connect(mod); mod.connect(g); g.connect(sal); g.connect(rev);
-      o.start(T); am.start(T); o.stop(T + d + 0.05); am.stop(T + d + 0.05);
+      o.connect(bp); bp.connect(mod); mod.connect(g); g.connect(sal);
+      vigilar(o).start(T); am.start(T); o.stop(T + d + 0.05); am.stop(T + d + 0.05);
       t += azar(0.17, 0.25);
     }
   }
   function gota() {                                                // una gota: un toque corto y apagado
-    const { ctx, master, buf } = au, T = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    if (!au || !hayLugar()) return;
+    const { ctx, buf } = au, T = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     s.buffer = buf; f.type = 'bandpass'; f.frequency.value = 1800 + Math.random() * 3200; f.Q.value = 6;
     g.gain.setValueAtTime(0, T); g.gain.linearRampToValueAtTime(0.15 + Math.random() * 0.25, T + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, T + 0.05 + Math.random() * 0.05);
-    s.connect(f); f.connect(g); g.connect(salida(master)); s.start(T, Math.random() * 4, 0.12);
+    s.connect(f); f.connect(g); g.connect(salida(au.gotas)); vigilar(s).start(T, Math.random() * 4, 0.12);
   }
   // Granizo: un golpe seco y agudo (piedra sobre chapa o tejas), a veces con un "toc" más grave
   function piedra() {
-    const { ctx, master, buf } = au, T = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), d = azar(0.012, 0.03);
+    if (!au || !hayLugar()) return;
+    const { ctx, buf } = au, T = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), d = azar(0.012, 0.03);
     s.buffer = buf; f.type = Math.random() < 0.25 ? 'bandpass' : 'highpass'; f.frequency.value = f.type === 'bandpass' ? azar(700, 1300) : azar(3200, 6500); f.Q.value = 3;
     g.gain.setValueAtTime(0, T); g.gain.linearRampToValueAtTime(azar(0.18, 0.45), T + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, T + d);
-    s.connect(f); f.connect(g); g.connect(salida(master)); s.start(T, Math.random() * 4, d + 0.02);
+    s.connect(f); f.connect(g); g.connect(salida(au.busGranizo)); vigilar(s).start(T, Math.random() * 4, d + 0.02);
   }
-  // Ráfagas de viento: cada pocos segundos el volumen y el tono de la capa de ráfagas suben y bajan; cuanto más viento, más seguidas y fuertes
+  // Ráfagas de viento: cada pocos segundos la envolvente y el tono de la capa de ráfagas suben y bajan; cuanto más viento, más seguidas
+  // y marcadas. El nivel general de las ráfagas lo fija la escena (au.rafaga.g): si no hay ráfagas, la capa calla aunque la envolvente se mueva.
   function programarRafaga() {
-    const { ctx, rafaga, silbido } = au, T = ctx.currentTime, v = amb.viento || 0, k = limitar((v - 8) / 42, 0, 1);
+    const { ctx, rafaga, silbido } = au, T = ctx.currentTime, v = amb.viento || 0, k = limitar((v - 15) / 35, 0, 1);
     au.proxRafaga = T + azar(2.5, 7) / (0.6 + k * 1.4);
-    if (k <= 0) return;                                            // con menos de ~8 km/h no hay ráfagas, solo la brisa de fondo
-    const sube = azar(0.5, 1.4), dura = azar(1.2, 3.5) * (1.2 - k * 0.4), pico = (0.08 + 0.45 * k) * azar(0.6, 1);
-    const sostener = p => { if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(T); else p.cancelScheduledValues(T); };
-    sostener(rafaga.g.gain); rafaga.g.gain.setTargetAtTime(pico, T, sube / 3); rafaga.g.gain.setTargetAtTime(0.02 * k, T + sube + dura * 0.4, dura / 3);
-    sostener(rafaga.fl.frequency); rafaga.fl.frequency.setTargetAtTime(380 + 600 * k * azar(0.7, 1.2), T, sube / 2); rafaga.fl.frequency.setTargetAtTime(380, T + sube + dura * 0.4, dura / 2);
+    if (!((au.niveles.rafagas || 0) > 0)) return;                 // sin ráfagas en la escena no se programa nada
+    const sube = azar(0.5, 1.4), dura = azar(1.2, 3.5) * (1.2 - k * 0.4), pico = azar(0.6, 1);
+    const sostener = p => { if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(T); else { p.cancelScheduledValues(T); p.setValueAtTime(p.value, T); } };
+    sostener(rafaga.env.gain); rafaga.env.gain.setTargetAtTime(pico, T, sube / 3); rafaga.env.gain.setTargetAtTime(0.15, T + sube + dura * 0.4, dura / 3);
+    sostener(rafaga.fl.frequency); rafaga.fl.frequency.setTargetAtTime(380 + 600 * Math.max(k, 0.3) * azar(0.7, 1.2), T, sube / 2); rafaga.fl.frequency.setTargetAtTime(380, T + sube + dura * 0.4, dura / 2);
     if (v >= 35) {                                                 // viento fuerte: un silbido que sube y baja con la ráfaga
-      const ks = limitar((v - 35) / 30, 0.15, 1);
-      sostener(silbido.g.gain); silbido.g.gain.setTargetAtTime(0.05 * ks * azar(0.5, 1), T, sube / 2); silbido.g.gain.setTargetAtTime(0, T + sube + dura * 0.3, dura / 3);
+      sostener(silbido.env.gain); silbido.env.gain.setTargetAtTime(azar(0.5, 1), T, sube / 2); silbido.env.gain.setTargetAtTime(0, T + sube + dura * 0.3, dura / 3);
       sostener(silbido.fl.frequency); silbido.fl.frequency.setTargetAtTime(azar(900, 1500), T, sube);
     }
   }
-  // Trueno: llega después del relámpago con un retraso según la distancia (unos 0,4 s por km, comprimido: en la realidad son ~3 s por km).
-  // Cerca: chasquido seco y retumbo fuerte; lejos: solo un rumor grave, más largo y más bajo. Como mucho 3 truenos sonando a la vez.
+  // Agacha la cama y los acentos mientras retumba un trueno (ducking) y los devuelve despacio
+  function agachar(T, largo) {
+    for (const [g, hondo] of [[au.duckCama, 0.5], [au.duckAcentos, 0.25]]) {
+      const p = g.gain, ahora = au.ctx.currentTime;
+      if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(ahora); else { p.cancelScheduledValues(ahora); p.setValueAtTime(p.value, ahora); }
+      p.linearRampToValueAtTime(1, Math.max(ahora + 0.02, T - 0.05));
+      p.linearRampToValueAtTime(hondo, T + 0.15);
+      p.setValueAtTime(hondo, T + 0.15 + largo);
+      p.linearRampToValueAtTime(1, T + 0.15 + largo + 2.5);
+    }
+  }
+  function soltarAgachado() {                                      // al salir de la tormenta, la cama y los acentos vuelven a su nivel
+    for (const g of [au.duckCama, au.duckAcentos]) { const p = g.gain, T = au.ctx.currentTime; if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(T); else { p.cancelScheduledValues(T); p.setValueAtTime(p.value, T); } p.linearRampToValueAtTime(1, T + 1); }
+  }
+  // Trueno: ÚNICO punto de entrada (lo llaman el relámpago del paisaje y la reserva de crearAudio). Anti-rebote: nunca dos encimados
+  // y al menos TRUENO_SEPARACION s entre comienzos; si llega otro pedido antes, se descarta (un relámpago lejano sin trueno audible).
+  // Llega después del relámpago con un retraso según la distancia (unos 0,3 s por km, comprimido: en la realidad son ~3 s por km).
+  // Cerca: chasquido seco y retumbo fuerte; lejos: solo un rumor grave, más largo y más bajo.
   function trueno() {
-    if (!au || !sonando || amb.tipo !== 'tormenta') return;
+    if (!au || !sonando || amb.tipo !== 'tormenta' || au.ctx.state !== 'running') return false;
     const { ctx, buf } = au, ahora = ctx.currentTime;
-    au.ultTrueno = performance.now(); au.esperaTrueno = azar(14000, 24000);
     au.truenos = au.truenos.filter(f => f > ahora);
-    if (au.truenos.length >= 3) return;
-    const km = azar(0.6, 9), esp = 0.3 + km * 0.4, T = ahora + esp, cerca = limitar(1.15 - km / 10, 0.25, 1), sal = salida(au.master);
+    if (ahora < au.truenoLibre || au.truenos.length || !hayLugar(4)) { au.truenosDescartados++; return false; }
+    au.ultTrueno = performance.now(); au.esperaTrueno = azar(14000, 24000);
+    const km = azar(0.6, 8), T = ahora + 0.2 + km * 0.3, cerca = limitar(1.15 - km / 10, 0.3, 1), sal = salida(au.busTruenos), R = REF.truenos;
     const ruido = (t, tipo, f0, f1, vol, dur, ataque) => {
       const s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
       s.buffer = buf; s.loop = true; fl.type = tipo; fl.frequency.setValueAtTime(f0, t); fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + ataque); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      s.connect(fl); fl.connect(g); g.connect(sal); s.start(t, Math.random() * 3); s.stop(t + dur + 0.1);
+      s.connect(fl); fl.connect(g); g.connect(sal); vigilar(s).start(t, Math.random() * 3); s.stop(t + dur + 0.1);
       return t + dur + 0.1;
     };
     let fin = T;
-    if (km < 2.5) fin = Math.max(fin, ruido(T, 'highpass', 1800, 900, 0.55 * cerca, 0.3, 0.008));           // el chasquido, solo si cayó cerca
-    const corte = 300 - km * 18;                                   // cuanto más lejos, más grave (el aire se come los agudos)
-    fin = Math.max(fin, ruido(T, 'lowpass', corte, 50, 1.6 * cerca, azar(3.5, 5.5) + km * 0.15, 0.12 + km * 0.05));   // el retumbo largo
-    const ecos = km < 4 ? 2 : 1;                                   // y sus ecos, que "ruedan" por el cielo
-    for (let i = 0; i < ecos; i++) fin = Math.max(fin, ruido(T + azar(0.7, 1.8) * (i + 1), 'lowpass', corte * 0.8, 45, cerca * azar(0.6, 1), azar(2.5, 4), 0.3));
-    au.truenos.push(fin);
+    if (km < 2.5) fin = Math.max(fin, ruido(T, 'highpass', 1800, 900, 0.35 * cerca * R, 0.3, 0.008));      // el chasquido, solo si cayó cerca
+    const corte = 300 - km * 18, largo = azar(2.8, 4) + km * 0.12;                                          // cuanto más lejos, más grave
+    fin = Math.max(fin, ruido(T, 'lowpass', corte, 50, cerca * R, largo, 0.12 + km * 0.05));               // el retumbo largo
+    fin = Math.max(fin, ruido(T + azar(0.7, 1.4), 'lowpass', corte * 0.8, 45, 0.6 * cerca * R * azar(0.6, 1), azar(2, 2.8), 0.3));   // y su eco
+    au.truenos.push(fin); au.truenosTotal++;
+    au.truenoLibre = Math.max(fin, ahora + TRUENO_SEPARACION);
+    agachar(T, Math.min(largo * 0.5, 2.5));
+    return true;
   }
+
+  // ---- La escena: qué suena en cada estado ----
+  // Devuelve { cama, acentos, db } donde db = dB relativos a REF de cada capa que suena (las que no están, callan).
+  // cama: 'lluvia' | 'grillos' | 'viento' | 'calma' (sin viento ni lluvia: no hay fondo). Acentos: los 2 de mayor prioridad.
+  function escena() {
+    const { tipo, fase, dia, dorado } = amb, ll = amb.lluvia || 0, v = amb.viento || 0, temp = amb.temp === undefined || amb.temp === null ? 25 : amb.temp;
+    const abierto = tipo === 'despejado' || tipo === 'parcial', fuerte = ll >= 0.6, tormenta = tipo === 'tormenta';
+    const kv = limitar((v - 2) / 28, 0, 1), kr = limitar((v - 15) / 35, 0, 1);
+    const db = {}, cand = [];
+    const tasaAves = { despejado: 1, parcial: 0.8, nublado: 0.45, niebla: 0.3, lluvia: 0.15 }[tipo] || 0;
+    let cama = 'calma';
+    if (ll > 0) { cama = 'lluvia'; db.lluvia = tormenta ? 0 : -1 + limitar((ll - 0.3) / 0.7, 0, 1); }
+    else if (!dia && temp >= 12 && tipo !== 'niebla') { cama = 'grillos'; db.grillos = abierto ? 0 : -3; }
+    else if (kv > 0) { cama = 'viento'; db.viento = -3 + 3 * Math.sqrt(kv) + (tipo === 'niebla' ? 2 : 0); }   // la brisa floja suena algo más baja; en la niebla se compensa el filtro
+    // Acentos posibles: [capa, prioridad, dB]
+    if (tormenta) cand.push(['truenos', 100, 0]);
+    if (hayGranizo()) cand.push(['granizo', 90, -5]);
+    if (kr > 0) cand.push(['rafagas', 50 + 40 * kr, -8 + 6 * kr]);
+    if (dia && !fuerte && !tormenta && tasaAves) cand.push(['aves', dorado ? 80 : 40 + 25 * tasaAves, dorado ? -5 : { despejado: -2, parcial: -3, nublado: -4, niebla: -6, lluvia: -4 }[tipo]]);
+    if (fase === 'dia' && !ll && temp >= 28 && mesVerano() && (abierto || tipo === 'nublado'))
+      cand.push(['chicharras', 70, (tipo === 'despejado' ? -3 : tipo === 'parcial' ? -5 : -9) + 4 * (limitar((temp - 27) / 7, 0.3, 1) - 1)]);
+    if (fase === 'atardecer' && abierto && temp >= 12) cand.push(['grillos', 35, -9]);
+    if (!dia && !fuerte) cand.push(['ranas', ll > 0 ? 65 : 55, ll > 0 ? -4 : abierto && temp >= 12 ? -6 : -10]);
+    if (cama !== 'viento' && kv > 0 && v >= 18) cand.push(['viento', 30, -10 + 6 * kv]);
+    cand.sort((a, b) => b[1] - a[1]);
+    const acentos = [];
+    for (const [c, , d] of cand) { if (acentos.length >= 2 || acentos.includes(c) || c === cama) continue; acentos.push(c); db[c] = d + (cama === 'calma' ? 3 : 0); }
+    return { cama, acentos, db, tasaAves: db.aves !== undefined ? tasaAves * (dorado ? 2.2 : 1) : 0, tasaRanas: db.ranas !== undefined ? (ll > 0 ? 0.9 : abierto ? 0.4 : 0.2) : 0 };
+  }
+  // Une palabras a la española: «a», «a y b», «a, b y c»
+  const unirY = l => l.length < 2 ? (l[0] || '') : l.slice(0, -1).join(', ') + ' y ' + l[l.length - 1];
+  // Texto de lo que suena: se arma con la MISMA escena que manda el sonido, así nunca promete algo que no suena
   function describirSonido() {
-    const { tipo, dia, dorado, temp, viento: v } = amb;
-    const ventoso = (v || 0) >= 35 ? ' y ráfagas fuertes de viento' : (v || 0) >= 15 ? ' y ráfagas de viento' : '';
-    if (tipo === 'tormenta') return (hayGranizo() ? 'Tormenta con granizo: golpeteo de piedras, lluvia fuerte y truenos' : 'Tormenta: lluvia fuerte, viento y truenos que se acercan y se alejan');
-    if (tipo === 'lluvia') return (amb.lluvia >= 0.7 ? (dia ? 'Lluvia fuerte: aguacero sobre las hojas' : 'Noche de lluvia fuerte: aguacero y ranas') : dia ? 'Lluvia: gotas sobre las hojas y aves lejanas' : 'Noche de lluvia: gotas y ranas') + ventoso;
-    if (tipo === 'niebla') return 'Niebla: sonido amortiguado y brisa suave';
-    if (!dia) return (tipo === 'despejado' || tipo === 'parcial' ? ((temp || 0) >= 12 ? 'Noche tranquila: grillos y ranas' : 'Noche fresca: ranas lejanas') : 'Noche nublada: ranas y grillos lejanos') + ventoso;
-    if (dorado) return 'Hora dorada: coro de aves y brisa suave' + ventoso;
-    if (tipo === 'nublado') return 'Cielo nublado: brisa suave y aves lejanas' + ventoso;
-    return ((temp || 0) >= 28 && mesVerano() ? 'Día caluroso de verano: chicharras, aves y brisa' : 'Día tranquilo: aves y brisa suave') + ventoso;
+    const e = escena(), { tipo, dia, dorado } = amb, v = amb.viento || 0, ll = amb.lluvia || 0, temp = amb.temp == null ? 25 : amb.temp;
+    const abierto = tipo === 'despejado' || tipo === 'parcial', ventoso = v >= 32;
+    const titulo = tipo === 'tormenta' ? (hayGranizo() ? 'Tormenta con granizo' : 'Tormenta')
+      : tipo === 'lluvia' ? (dia ? (ll >= 0.7 ? 'Lluvia fuerte' : 'Lluvia') : (ll >= 0.7 ? 'Noche de lluvia fuerte' : 'Noche de lluvia'))
+      : tipo === 'niebla' ? 'Niebla'
+      : !dia ? (ventoso ? 'Noche ventosa' : abierto ? (temp >= 12 ? 'Noche tranquila' : 'Noche fresca') : 'Noche nublada')
+      : dorado ? 'Hora dorada' : tipo === 'nublado' ? 'Cielo nublado' : ventoso ? 'Día ventoso' : e.acentos.includes('chicharras') ? 'Día caluroso de verano' : 'Día tranquilo';
+    const nombre = c => ({
+      viento: v >= 35 ? 'viento fuerte' : v >= 18 ? 'viento' : 'brisa suave',
+      lluvia: tipo === 'tormenta' ? 'lluvia fuerte' : ll >= 0.7 ? 'aguacero' : 'gotas sobre las hojas',
+      grillos: e.db.grillos !== undefined && e.db.grillos < -2 ? 'grillos lejanos' : 'grillos',
+      aves: dorado ? 'coro de aves' : e.tasaAves < 0.5 ? 'aves lejanas' : 'aves',
+      ranas: e.db.ranas !== undefined && e.db.ranas <= -9 ? 'ranas lejanas' : 'ranas',
+      rafagas: v >= 35 ? 'ráfagas fuertes de viento' : 'ráfagas de viento',
+      chicharras: 'chicharras', granizo: 'golpeteo de granizo', truenos: 'truenos'
+    })[c];
+    const partes = (e.cama === 'calma' ? [] : [nombre(e.cama)]).concat(e.acentos.map(nombre));
+    if (tipo === 'niebla') partes.unshift('sonido amortiguado');
+    return titulo + ': ' + (partes.length ? unirY(partes) : 'calma');
   }
-  // Cambia el valor de un parámetro de audio suavemente (constante de tiempo s), sin acumular eventos viejos en su línea de tiempo
-  function irHacia(p, val, s) {
+  // Lleva un parámetro a un valor con un fundido lineal de `dur` s, sin acumular eventos (sostiene el valor actual y borra lo que había
+  // por delante). Si el objetivo no cambió, no toca nada: mezclar() puede llamarse a menudo sin reiniciar los fundidos.
+  function fundir(p, val, dur) {
+    const ant = au.objetivo.get(p);
+    if (ant !== undefined && Math.abs(ant - val) < 1e-5) return;
+    au.objetivo.set(p, val);
     const T = au.ctx.currentTime;
-    if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(T); else p.cancelScheduledValues(T);
-    p.setTargetAtTime(val, T, s || 2);
+    if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(T); else { p.cancelScheduledValues(T); p.setValueAtTime(p.value, T); }
+    p.linearRampToValueAtTime(val, T + Math.max(0.02, dur));
   }
-  function mezclar() {                                             // ajusta cada capa al clima actual (los cambios son suaves, de unos 2 segundos)
+  function mezclar() {                                             // ajusta cada capa a la escena actual con fundidos cruzados
     if (!au) return;
     $('btnSonido').title = describirSonido();
-    irHacia(au.master.gain, sonando ? gananciaVolumen() : 0, sonando ? 0.25 : 0.8);   // volumen general: barato (un solo nodo)
-    const { viento, lluvia, lluviaBajo, cig, gri, suave } = au, { tipo, fase, dia, dorado, lluvia: ll, viento: v } = amb, temp = amb.temp === undefined || amb.temp === null ? 25 : amb.temp;
-    const abierto = tipo === 'despejado' || tipo === 'parcial';
+    fundir(au.master.gain, sonando ? gananciaVolumen() : 0, sonando ? 0.25 : 0.8);   // volumen general: barato (un solo nodo)
+    const e = au.solo ? { cama: au.solo, acentos: [], db: { [au.solo]: 0 }, tasaAves: au.solo === 'aves' ? 1 : 0, tasaRanas: au.solo === 'ranas' ? 0.5 : 0 } : escena();
+    const { tipo, lluvia: ll } = amb, v = amb.viento || 0, temp = amb.temp === undefined || amb.temp === null ? 25 : amb.temp;
+    const lin = c => e.db[c] === undefined ? 0 : Math.pow(10, e.db[c] / 20);   // nivel relativo (1 = referencia, 0 = calla)
     const nv = {};
-    nv.viento = 0.085 + limitar(v / 40, 0, 1) * 0.3 + (tipo === 'tormenta' ? 0.12 : 0);
-    irHacia(viento.g.gain, nv.viento); irHacia(viento.fl.frequency, 260 + v * 12);
-    nv.rafagas = limitar((v - 8) / 42, 0, 1);                      // la capa de ráfagas se maneja en programarRafaga(); aquí solo se anota
-    if (nv.rafagas <= 0) irHacia(au.rafaga.g.gain, 0, 1.5);
-    if (v < 35) irHacia(au.silbido.g.gain, 0, 1.5);
-    nv.lluvia = ll * 0.42; nv.lluviaBajo = ll * ll * 0.7;
-    irHacia(lluvia.g.gain, nv.lluvia); irHacia(lluviaBajo.g.gain, nv.lluviaBajo); irHacia(lluvia.fl.frequency, 4500 + ll * 4000);
-    // chicharras: de día (no en la hora dorada), con 28 °C o más, de noviembre a marzo; con nubes, más bajas
-    nv.chicharras = fase === 'dia' && temp >= 28 && mesVerano() && (abierto || tipo === 'nublado') ? (tipo === 'despejado' ? 1 : tipo === 'parcial' ? 0.7 : 0.35) * limitar((temp - 27) / 7, 0.3, 1) : 0;
-    cig.forEach(n => irHacia(n.gain, nv.chicharras * 1.3));
-    // grillos: noches despejadas o con pocas nubes (más bajitos con cielo cubierto y al atardecer); con frío (< 12 °C) se callan
-    nv.grillos = temp < 12 ? 0 : !dia ? (abierto ? 1 : tipo === 'nublado' ? 0.3 : 0) : fase === 'atardecer' && abierto ? 0.35 : 0;
+    // Fundido cruzado: lo que entra sube en 3,5 s y lo que sale baja en 2,5 s (así la escena nueva no se suma de golpe a la vieja)
+    const ir = (p, val) => fundir(p, val, val > (au.objetivo.get(p) || 0) ? 3.5 : 2.5);
+    nv.viento = lin('viento'); ir(au.viento.g.gain, nv.viento * REF.viento); fundir(au.viento.fl.frequency, 260 + v * 12, 3);
+    nv.rafagas = lin('rafagas'); ir(au.rafaga.g.gain, nv.rafagas * REF.rafagas); ir(au.silbido.g.gain, v >= 35 ? nv.rafagas * REF.silbido : 0);
+    const lluviaPlena = au.solo === 'lluvia' ? 1 : ll;
+    nv.lluvia = lin('lluvia'); nv.lluviaBajo = nv.lluvia * lluviaPlena * lluviaPlena;
+    ir(au.lluvia.g.gain, nv.lluvia * REF.lluvia); ir(au.lluviaBajo.g.gain, nv.lluviaBajo * REF.lluviaBajo); fundir(au.lluvia.fl.frequency, 4500 + lluviaPlena * 4000, 3);
+    ir(au.gotas.gain, nv.lluvia * REF.gotas); au.tasaGotas = nv.lluvia > 0 ? Math.max(lluviaPlena, 0.3) : 0;
+    nv.chicharras = lin('chicharras'); au.cig.forEach(n => ir(n.gain, nv.chicharras * REF.chicharras));
+    nv.grillos = lin('grillos');
     // ritmo de los cantos según la temperatura (ley de Dolbear: con calor cantan más rápido); 1 = el ritmo de base a ~24 °C
     const ritmo = limitar((4 * ((temp * 9 / 5 + 32) - 50) + 40) / 147, 0.5, 1.35);
-    gri.forEach(g => { irHacia(g.nivel.gain, nv.grillos * 0.06); irHacia(g.ritmo, g.grupo * ritmo, 1); });
-    au.granizo = nv.granizo = hayGranizo();
-    au.tasaAves = nv.aves = dia && tipo !== 'tormenta' ? { despejado: 1, parcial: 0.8, nublado: 0.45, niebla: 0.3, lluvia: 0.12 }[tipo] * (dorado ? 2.2 : 1) : 0;
-    au.tasaRanas = nv.ranas = !dia ? (ll > 0 ? 0.9 : abierto ? 0.35 : 0.15) : (ll > 0 && ll < 0.7 ? 0.08 : 0);
-    irHacia(suave.frequency, tipo === 'niebla' ? 2600 : tipo === 'lluvia' || tipo === 'tormenta' ? 9000 : 16000, 1.5);
-    au.niveles = nv;
+    au.gri.forEach(g => { ir(g.nivel.gain, nv.grillos * REF.grillos); fundir(g.ritmo, g.grupo * ritmo, 1); });
+    nv.granizo = e.db.granizo !== undefined; au.hayPiedras = nv.granizo; ir(au.busGranizo.gain, lin('granizo') * REF.granizo);
+    nv.aves = e.tasaAves; au.tasaAves = e.tasaAves; ir(au.aves.gain, lin('aves') * REF.aves);
+    nv.ranas = e.tasaRanas; au.tasaRanas = e.tasaRanas; ir(au.ranas.gain, lin('ranas') * REF.ranas);
+    nv.truenos = e.db.truenos !== undefined ? 1 : 0;
+    fundir(au.busTruenos.gain, nv.truenos, nv.truenos ? 0.3 : 2.5);   // al salir de la tormenta, el trueno que quedaba rodando se apaga
+    if (!nv.truenos && au.escena && au.escena.db.truenos !== undefined) soltarAgachado();
+    fundir(au.suave.frequency, tipo === 'niebla' ? 2600 : tipo === 'lluvia' || tipo === 'tormenta' ? 9000 : 16000, 2);
+    au.escena = e; au.niveles = nv;
   }
   // Para pruebas automáticas y la consola: lo que el sonido está haciendo ahora (null si nunca se activó)
   window.climaSonido = Object.freeze({
-    estado: () => au ? { sonando, volumen: sonando ? gananciaVolumen() : 0, capas: { ...au.niveles }, truenos: au.truenos.filter(f => f > au.ctx.currentTime).length, contexto: au.ctx.state, descripcion: describirSonido() } : null
+    estado: () => {
+      if (!au) return null;
+      const ahora = au.ctx.currentTime, e = au.escena || { cama: 'calma', acentos: [] };
+      return { sonando, volumen: sonando ? gananciaVolumen() : 0, cama: e.cama, acentos: e.acentos.slice(), audibles: (e.cama === 'calma' ? [] : [e.cama]).concat(e.acentos),
+        capas: { ...au.niveles }, ducking: { cama: +au.duckCama.gain.value.toFixed(3), acentos: +au.duckAcentos.gain.value.toFixed(3) },
+        truenos: au.truenos.filter(f => f > ahora).length, truenosTotal: au.truenosTotal, truenosDescartados: au.truenosDescartados, fuentesSueltas: au.fuentes,
+        limitador: { umbral: au.lim.threshold.value, ratio: au.lim.ratio.value, reduccion: au.lim.reduction }, contexto: au.ctx.state, descripcion: describirSonido() };
+    },
+    // Solo para medir: deja sonar UNA capa a su nivel de referencia (null vuelve a la escena del clima)
+    solo: nombre => { if (au) { au.solo = nombre || null; mezclar(); } }
   });
-  function visibilidadSonido() { if (au && sonando) { if (document.hidden) au.ctx.suspend(); else au.ctx.resume(); } }
-  window.addEventListener('pagehide', () => {
-    sonando = false;
-    if (au) { clearInterval(au.intervaloAves); clearInterval(au.intervaloGotas); try { au.ctx.close(); } catch (_) {} au = null; }
-  }, { once: true });
-  $('btnSonido').addEventListener('click', async () => {
-    if (!au) { au = crearAudio(); if (!au) { aviso('Tu navegador no permite reproducir sonido.'); return; } }
-    sonando = !sonando;
-    if (sonando) await au.ctx.resume();
-    if (!sonando) setTimeout(() => { if (!sonando && au) au.ctx.suspend(); }, 3500);
+  function visibilidadSonido() { if (au && sonando) { if (document.hidden) au.ctx.suspend(); else au.ctx.resume().catch(() => {}); } }
+  function pintarBotonSonido() {
     const b = $('btnSonido');
     b.textContent = sonando ? '🔊' : '🔈'; b.classList.toggle('on', sonando); b.setAttribute('aria-pressed', sonando);
     b.setAttribute('aria-label', sonando ? 'Silenciar el sonido del clima' : 'Activar el sonido del clima');
+  }
+  // Al salir de la página se libera el audio. Si la página vuelve desde la caché del navegador (atrás/adelante), el botón
+  // queda apagado y coherente (antes seguía en 🔊 sin sonar, y una segunda salida ya no liberaba nada).
+  window.addEventListener('pagehide', () => {
+    sonando = false;
+    if (au) { clearInterval(au.intervaloAves); clearInterval(au.intervaloGotas); try { au.ctx.close(); } catch (_) {} au = null; }
+    pintarBotonSonido();
+  });
+  $('btnSonido').addEventListener('click', async () => {
+    if (!au) { au = crearAudio(); if (!au) { aviso('Tu navegador no permite reproducir sonido.'); return; } }
+    sonando = !sonando;
+    pintarBotonSonido();
+    if (sonando) { try { await au.ctx.resume(); } catch (_) {} }
+    if (!sonando) setTimeout(() => { if (!sonando && au) au.ctx.suspend(); }, 3500);
     mezclar();
     if (sonando) aviso('🔊 ' + describirSonido());
   });
