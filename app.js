@@ -1950,7 +1950,13 @@
       if (!eSprGuir) eSprGuir = spritesGuirnalda();
       guirnalda(pd, pc, 0.66, 0.52, t + 700, noche, cab, 2, fija, kLuz, true);                       // orilla derecha: guirnalda con ñandutí
       lucesEspiral(pa, t, fija, noche, eH * 0.024);                                                  // palmera alta de la izquierda: luces en espiral
-      const P = pinoNavidad(eW * 0.205, eH * 0.885, kP, t, fija, kLuz, noche), ap = P(57, 70);       // pino decorado en la orilla izquierda
+      // en pantallas angostas el pino se achica y se corre a la derecha de la palmera chica, para no tapar su tronco ni asomar sobre el río
+      const angosta = eW < eH * 3.2, kPino = angosta ? eH / 240 : kP;
+      if (angosta) {                                              // un montículo de la misma tierra de la orilla bajo el pino (no queda sobre el agua)
+        const xP = eW * 0.285, yP = eH * 0.93;
+        ex.fillStyle = T[2]; ex.beginPath(); ex.moveTo(xP - 80 * kPino, eH + 2); ex.quadraticCurveTo(xP - 6 * kPino, yP - 74 * kPino, xP + 84 * kPino, eH + 2); ex.fill();
+      }
+      const P = pinoNavidad(angosta ? eW * 0.285 : eW * 0.205, angosta ? eH * 0.93 : eH * 0.885, kPino, t, fija, kLuz, noche), ap = P(57, 70);   // pino decorado en la orilla izquierda
       guirnalda(() => ap, pa, 0, 0.5, t + 300, noche, cab, 5, fija, kLuz, false);                    // guirnalda del pino a la palmera
     }
     ex.translate(-dxO, 0);
