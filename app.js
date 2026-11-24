@@ -1305,6 +1305,28 @@
   const ec = $('escenaCv'), ex = ec.getContext('2d');
   let eW = 0, eH = 0, eD = 1, eClave = '', eFirma = '', eNubes = [], eAves = [], eLuci = [], eEstr = [], eGotas = [], eGranizo = [], eHojas = [], ePetalos = [], eOndas = [], eNiebla = [], eRayo = null, eFugaz = null;
   let eTexNiebla = null, eSprLuci = null, eSombra = null, ultRayoT = -1, reGolpe = 0;
+  let eFuegos = [], eSprGuir = null, eNuevo = { t: -1e9, si: false }, eLuces = [], eViaL = null, eCharcos = [], eMoj = -1, eFoto = null, eFundido = 0, eEtq = [], eEtqSucio = true;        // fundido entre escenas · zonas ocupadas por las etiquetas
+  const vAst = { ok: false, sx: 0, sy: 0, so: 0, mx: 0, my: 0, mf: 0 };   // sol y luna suavizados (no saltan al cambiar de momento del día)
+  // Paralaje: el puntero sobre el cuadro (o la inclinación del celular, donde el navegador la da sin pedir permiso) corre un poco
+  // cada capa según su distancia: lo lejano casi nada, las palmeras y la orilla lo que más. Nunca con movimiento reducido.
+  const par = { x: 0, y: 0, tx: 0, ty: 0, b0: null, g0: null };
+  if (!REDUCIDO) {
+    const sec = $('escena');
+    if (sec) {
+      sec.addEventListener('pointermove', e => { if (e.pointerType !== 'mouse') return; const r = sec.getBoundingClientRect(); if (!r.width) return; par.tx = limitar((e.clientX - r.left) / r.width * 2 - 1, -1, 1); par.ty = limitar((e.clientY - r.top) / r.height * 2 - 1, -1, 1); }, { passive: true });
+      sec.addEventListener('pointerleave', () => { par.tx = par.ty = 0; }, { passive: true });
+    }
+    // deviceorientation: Android lo da sin pedir nada; iOS exige pedir permiso y entonces simplemente no llega (no se pide).
+    // Se mide respecto de cómo se sostiene el celular (la referencia se acomoda despacio), así no queda torcido.
+    addEventListener('deviceorientation', e => {
+      if (e.beta == null || e.gamma == null) return;
+      const ang = (screen.orientation && screen.orientation.angle) || 0, de = ang % 180 ? [e.beta, e.gamma] : [e.gamma, e.beta];
+      const gx = ang === 90 || ang === 180 ? -de[0] : de[0], by = ang === 180 || ang === 270 ? -de[1] : de[1];
+      if (par.g0 === null) { par.g0 = gx; par.b0 = by; }
+      par.g0 += (gx - par.g0) * 0.01; par.b0 += (by - par.b0) * 0.01;
+      par.tx = limitar((gx - par.g0) / 18, -1, 1); par.ty = limitar((by - par.b0) / 18, -1, 1);
+    }, { passive: true });
+  }
   const hexA = s => [1, 3, 5].map(i => parseInt(s.slice(i, i + 2), 16));
   const mezcla = (a, b, k) => { const x = hexA(a), y = hexA(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
   // colores de la tierra: [colinas lejanas, colinas cercanas, orilla, palmeras]
@@ -1328,7 +1350,9 @@
   const multFx = () => (prefsAnim.intensidad || 1) * nivelR();
   const cant = n => Math.round(n * multFx());
   const claveFx = () => [fx ? 1 : 0, prefsAnim.intensidad, nivelR(), Object.keys(prefsAnim.efectos).map(k => prefsAnim.efectos[k] ? 1 : 0).join('')].join(',');
-  const vientoVis = () => (amb.viento || 0) + (amb.tipo === 'tormenta' ? 25 : 0);   // la tormenta siempre trae ráfagas
+  const vientoVis = () => (amb.viento || 0) + (amb.tipo === 'tormenta' ? 25 : 0);   // la tormenta siempre trae ráfagas (inclinan la lluvia y mecen las palmeras)
+  // las hojas, en cambio, siguen al viento real: con tormenta solo un poco más (antes una tormenta sin viento se llenaba de hojas)
+  const vientoHojas = () => (amb.viento || 0) + (amb.tipo === 'tormenta' ? 6 : 0);
   const mesLapacho = () => { const m = new Date().getMonth(); return m >= 6 && m <= 8; };   // julio a septiembre: lapachos en flor
   // Edad de la luna (0 = nueva, 0,5 = llena), con la misma fórmula que el dato «Luna» del detalle
   const edadLuna = () => { const P = 29.530588853; return ((((Date.now() - Date.UTC(2000, 0, 6, 18, 14)) / 86400000) % P + P) % P) / P; };
@@ -1346,7 +1370,8 @@
   }
 
   // ---- Transición suave entre momentos del día ----
-  // En vez de saltar de un color a otro, cada cuadro se acerca un poco al color objetivo (unos 3 s en total).
+  // En vez de saltar de un color a otro, cada cuadro se acerca un poco al color objetivo (unos 2 s en total).
+  // Lo que se vuelve a sortear (nubes, gotas, hojas…) no salta: se funde con el último cuadro de la escena anterior (fotoFundido).
   const vEsc = { Ph: null, Th: null, cc: '255,255,255', br: '255,255,255', esc: [0.85, 0, 1, 0, 0, 0, 1, 0, 0], crudo: null };
   const aHex = a => '#' + a.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
   const aRgb = x => String(x).split(',').map(Number);
@@ -1370,7 +1395,7 @@
   }
   function aRgbHex(h) { return hexA(h); }
   function avanzarVisual(dt, quieto) {
-    const o = objetivosVisuales(), c = vEsc.crudo, k = quieto || !c ? 1 : 1 - Math.exp(-dt / 1100);
+    const o = objetivosVisuales(), c = vEsc.crudo, k = quieto || !c ? 1 : 1 - Math.exp(-dt / 650);   // ~2 s hasta el color nuevo
     const mover = (cur, obj) => obj.map((v, i) => cur && k < 1 && cur[i] !== undefined ? (Array.isArray(v) ? mezA(cur[i], v, k) : cur[i] + (v - cur[i]) * k) : (Array.isArray(v) ? v.slice() : v));
     const n = { P: mover(c && c.P, o.P), T: mover(c && c.T, o.T), cc: mover(c && c.cc, o.cc), br: mover(c && c.br, o.br), esc: mover(c && c.esc, o.esc) };
     vEsc.crudo = n;
@@ -1440,21 +1465,83 @@
     return c;
   }
 
+  // Fundido entre escenas: se guarda el último cuadro y se lo dibuja encima, cada vez más transparente, durante ~1,4 s
+  function fotoFundido() {
+    if (!eFoto) eFoto = document.createElement('canvas');
+    if (eFoto.width !== ec.width || eFoto.height !== ec.height) { eFoto.width = ec.width; eFoto.height = ec.height; }
+    const g = eFoto.getContext('2d'); g.clearRect(0, 0, eFoto.width, eFoto.height); g.drawImage(ec, 0, 0); eFundido = 1;
+  }
+  // Rectángulos (en px del cuadro) que tapan las etiquetas: el sol, la luna y la estrella se corren hacia abajo para no quedar debajo.
+  // Se miden solo cuando cambian (texto nuevo, tamaño o fuente), nunca en cada cuadro.
+  const vigiaEtq = 'ResizeObserver' in window ? new ResizeObserver(() => { eEtqSucio = true; }) : null;
+  function zonasEtq() {
+    if (!eEtqSucio) return eEtq;
+    eEtqSucio = false; eEtq = [];
+    const r0 = ec.getBoundingClientRect(), caja = $('escenaEtq');
+    if (caja && r0.width) for (const e of caja.children) { const r = e.getBoundingClientRect(); if (r.width) eEtq.push([r.left - r0.left - 4, r.top - r0.top - 4, r.right - r0.left + 4, r.bottom - r0.top + 4]); }
+    return eEtq;
+  }
+  function libreDeEtq(x, y, r) {                                  // la altura más alta, desde y hacia abajo, en la que un disco de radio r no toca ninguna etiqueta
+    for (const [a, b, c, d] of zonasEtq()) if (x + r > a && x - r < c && y + r > b && y - r < d) y = d + r;
+    return y;
+  }
+  // Vía Láctea: un arco de luz lechosa con una franja de polvo oscuro, dibujado una vez por tamaño (a baja resolución y luego
+  // ampliado: así queda difuso) con estrellitas finas encima. Al pintar solo se copia.
+  function texturaViaLactea(w, h) {
+    const lw = Math.ceil(w / 4), lh = Math.ceil(h / 4), lo = document.createElement('canvas'); lo.width = lw; lo.height = lh;
+    const g = lo.getContext('2d'), pto = u => { const v = 1 - u; return [lw * (-0.05 * v * v + 2 * 0.5 * u * v + 1.05 * u * u), lh * (0.95 * v * v + 2 * 0.02 * u * v + 0.6 * u * u)]; };
+    for (let i = 0; i < 160; i++) {
+      const u = Math.random(), [x, y] = pto(u), d = (Math.random() + Math.random() - 1) * lh * 0.16, r = lh * (0.06 + Math.random() * 0.12);
+      const gr = g.createRadialGradient(x, y + d, 0, x, y + d, r); gr.addColorStop(0, `rgba(205,212,255,${0.05 + Math.random() * 0.06})`); gr.addColorStop(1, 'rgba(205,212,255,0)');
+      g.fillStyle = gr; g.fillRect(x - r, y + d - r, r * 2, r * 2);
+    }
+    g.globalCompositeOperation = 'destination-out';                 // la franja de polvo que parte la Vía Láctea
+    for (let i = 0; i < 50; i++) {
+      const u = 0.15 + Math.random() * 0.7, [x, y] = pto(u), r = lh * (0.03 + Math.random() * 0.05);
+      const gr = g.createRadialGradient(x, y + lh * 0.02, 0, x, y + lh * 0.02, r); gr.addColorStop(0, 'rgba(0,0,0,0.25)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(x - r, y + lh * 0.02 - r, r * 2, r * 2);
+    }
+    const c = document.createElement('canvas'); c.width = Math.ceil(w * eD); c.height = Math.ceil(h * eD);
+    const f = c.getContext('2d'); f.drawImage(lo, 0, 0, c.width, c.height);
+    f.fillStyle = 'rgba(235,240,255,0.55)';
+    for (let i = 0; i < 260; i++) { const [x, y] = pto(Math.random()), d = (Math.random() + Math.random() - 1) * lh * 0.13; f.fillRect(x * 4 * eD, (y + d) * 4 * eD, eD * 0.7, eD * 0.7); }
+    return c;
+  }
+  // ¿Llovió hace poco? 1 si llovió la hora anterior, 0,67 hace dos, 0,33 hace tres; 0 si no (con el pronóstico por horas del detalle)
+  function charcosRecientes(d) {
+    const h = d && d.hourly; if (!h || !Array.isArray(h.time) || !Array.isArray(h.weather_code)) return 0;
+    const ahora = horaAsuncion(), i = h.time.findIndex(x => String(x).startsWith(ahora)); if (i < 1) return 0;
+    for (let j = 1; j <= 3 && i - j >= 0; j++) { const c = h.weather_code[i - j]; if ((c >= 51 && c <= 82) || c >= 95) return 1 - (j - 1) / 3; }
+    return 0;
+  }
   function armarEscena() {
-    const A = amb, simple = !prefsAnim.paisaje || !fx, part = g => !simple && efectoActivo(g);
+    const A = amb, simple = !prefsAnim.paisaje || !fx, part = g => !simple && efectoActivo(g), yAgua = eH * 0.74;
     const grandes = A.tipo === 'nublado' || A.tipo === 'lluvia' || A.tipo === 'tormenta', abierto = A.tipo === 'despejado' || A.tipo === 'parcial';
     const nN = { despejado: 2, parcial: 4, nublado: 6, niebla: 0, lluvia: 7, tormenta: 7 }[A.tipo];
     // las nubes dicen qué clima hace: su cantidad varía menos que la de las demás partículas
-    eNubes = efectoActivo('nubes') ? Array.from({ length: Math.round(nN * limitar(multFx(), 0.7, 1.3)) }, () => ({
-      x: Math.random() * eW, y: eH * (grandes ? 0.07 + Math.random() * 0.2 : 0.08 + Math.random() * 0.3), r: eH * (0.06 + Math.random() * 0.06) * (grandes ? 1.6 : 1), v: 0.008 + Math.random() * 0.014 })) : [];
+    // en 3 capas (z): lejanas (chicas, bajas, lentas y desvaídas), medias y cercanas (grandes, altas y más rápidas)
+    eNubes = efectoActivo('nubes') ? Array.from({ length: Math.round(nN * limitar(multFx(), 0.7, 1.3)) }, (_, i) => {
+      const z = (i + 1) % 3, y = grandes ? [0.2, 0.08, 0.02][z] + Math.random() * [0.12, 0.18, 0.16][z] : [0.27, 0.1, 0.05][z] + Math.random() * [0.12, 0.25, 0.2][z];
+      return { x: Math.random() * eW, y: eH * y, r: eH * (0.06 + Math.random() * 0.06) * (grandes ? 1.6 : 1) * [0.6, 0.95, 1.2][z], v: (0.008 + Math.random() * 0.014) * [0.45, 1, 1.6][z], z };
+    }).sort((a, b) => a.z - b.z) : [];
     eAves = part('fauna') && A.tipo !== 'lluvia' && A.tipo !== 'tormenta' && A.tipo !== 'niebla' ? Array.from({ length: Math.max(1, cant(4)) }, () => ({ x: Math.random() * eW, y: eH * (0.12 + Math.random() * 0.25), v: 0.03 + Math.random() * 0.03, f: Math.random() * 6.28, s: eH * (0.025 + Math.random() * 0.02) })) : [];
     eLuci = part('fauna') && A.lluvia === 0 && A.tipo !== 'niebla' ? Array.from({ length: cant(16) }, () => ({ x: Math.random() * eW, y: eH * (0.55 + Math.random() * 0.4), f: Math.random() * 6.28, v: 0.0004 + Math.random() * 0.0006 })) : [];
+    eViaL = part('estrellas') && abierto ? texturaViaLactea(eW, eH * 0.62) : null;
+    // luces de una ciudad lejana sobre la colina, junto al agua (en 3 grupos), solo se ven al anochecer y de noche
+    eLuces = [];
+    for (let i = 0, n = Math.max(10, cant(28)); i < n; i++) {
+      const cx0 = [0.36, 0.5, 0.63][i % 3], x = eW * (cx0 + (Math.random() + Math.random() - 1) * 0.07), techo = altColina(x) + 2;
+      if (techo > yAgua - 3) continue;
+      eLuces.push({ x, y: Math.max(techo, yAgua - 2 - Math.random() * eH * 0.04), r: 0.6 + Math.random() * 0.7, c: Math.random() < 0.8 ? 0 : 1, k: i % 3 });
+    }
     eEstr = part('estrellas') && abierto ? Array.from({ length: cant(45) }, () => ({ x: Math.random() * eW, y: Math.random() * eH * 0.5, r: 0.4 + Math.random() * 1.1 })) : [];
-    eGotas = part('lluvia') ? Array.from({ length: cant(A.lluvia * 70 * (A.granizo ? 0.6 : 1)) }, () => ({ x: Math.random() * eW, y: Math.random() * eH, l: eH * (0.05 + Math.random() * 0.05), v: 0.6 + Math.random() * 0.5 })) : [];
-    const yAgua = eH * 0.74;
+    // gotas en dos planos: lejanas (cortas, lentas, tenues) y cercanas (largas y más claras)
+    eGotas = part('lluvia') ? Array.from({ length: cant(A.lluvia * 70 * (A.granizo ? 0.6 : 1)) }, () => { const z = Math.random() < 0.55 ? 0 : 1; return { x: Math.random() * eW, y: Math.random() * eH, l: eH * (0.05 + Math.random() * 0.05) * (z ? 1.15 : 0.6), v: (0.6 + Math.random() * 0.5) * (z ? 1.1 : 0.75), z }; }) : [];
+    // charcos en las orillas (durante la lluvia y un rato después): posiciones fijas dentro de la tierra
+    eCharcos = efectoActivo('lluvia') ? [[0.04, 0.9, 1], [0.12, 0.95, 0.8], [0.09, 0.84, 0.6], [0.95, 0.88, 0.9], [0.87, 0.95, 0.75]].map(([x, y, k]) => ({ x: eW * x, y: eH * y, rx: Math.min(eW * 0.035, eH * 0.28) * k, ry: eH * 0.017 * (0.7 + k * 0.4) })) : [];
     const nuevoGranizo = g => Object.assign(g, { x: Math.random() * eW, y: -Math.random() * eH * 0.4, vy: 0.3 + Math.random() * 0.2, vx: vientoVis() / 900, r: 1 + Math.random() * 1.3, suelo: yAgua + 3 + Math.random() * (eH - yAgua - 6), reb: 0 });
     eGranizo = part('lluvia') && A.granizo ? Array.from({ length: cant(34) }, () => { const g = nuevoGranizo({ nuevo: nuevoGranizo }); g.y = Math.random() * eH * 0.7; return g; }) : [];
-    eHojas = part('viento') ? Array.from({ length: cant(limitar((vientoVis() - 12) / 25, 0, 1) * 18) }, () => ({ x: Math.random() * eW, y: eH * (0.35 + Math.random() * 0.6), v: 0.6 + Math.random() * 0.7, f: Math.random() * 6.28, a: Math.random() * 6.28, g: (Math.random() - 0.5) * 0.02, l: 1.6 + Math.random() * 1.8 })) : [];
+    eHojas = part('viento') ? Array.from({ length: cant(limitar((vientoHojas() - 12) / 25, 0, 1) * 18) }, () => ({ x: Math.random() * eW, y: eH * (0.35 + Math.random() * 0.6), v: 0.6 + Math.random() * 0.7, f: Math.random() * 6.28, a: Math.random() * 6.28, g: (Math.random() - 0.5) * 0.02, l: 1.6 + Math.random() * 1.8 })) : [];
     ePetalos = part('especiales') && mesLapacho() ? Array.from({ length: cant(10) }, (_, i) => ({ i: i % 3, x: eW * LAPACHOS[i % 3][0], y: eH * (0.5 + Math.random() * 0.3), v: 0.5 + Math.random() * 0.5, f: Math.random() * 6.28 })) : [];
     if (!eTexNiebla) eTexNiebla = texturaNiebla();
     const tw = Math.max(eW * 0.7, eH * 3);
@@ -1468,15 +1555,14 @@
     if (!eSprLuci) eSprLuci = spriteLuci();
     eSombra = ex.createLinearGradient(0, 0, 0, eH * 0.4); eSombra.addColorStop(0, 'rgba(0,0,0,0.28)'); eSombra.addColorStop(1, 'rgba(0,0,0,0)');
   }
-  function nubeEsc(x, y, r) {                                      // una nube: varias bolitas que se funden en una sola forma
-    ex.beginPath();
-    [[0, 0, 1], [-0.9, 0.2, 0.7], [0.9, 0.15, 0.75], [-0.4, -0.45, 0.65], [0.45, -0.4, 0.6], [1.5, 0.3, 0.5], [-1.5, 0.3, 0.5]].forEach(([dx, dy, k]) => { ex.moveTo(x + dx * r + r * k, y + dy * r); ex.arc(x + dx * r, y + dy * r, r * k, 0, 6.283); });
-    ex.fill();
+  const BOLITAS = [[0, 0, 1], [-0.9, 0.2, 0.7], [0.9, 0.15, 0.75], [-0.4, -0.45, 0.65], [0.45, -0.4, 0.6], [1.5, 0.3, 0.5], [-1.5, 0.3, 0.5]];
+  function nubeRuta(x, y, r) {                                     // una nube: varias bolitas que se funden en una sola forma (se suma al trazo abierto)
+    for (const [dx, dy, k] of BOLITAS) { ex.moveTo(x + dx * r + r * k, y + dy * r); ex.arc(x + dx * r, y + dy * r, r * k, 0, 6.283); }
   }
-  function colinaEsc(y0, amp, f1, f2, ph, color) {
-    ex.fillStyle = color; ex.beginPath(); ex.moveTo(0, eH);
-    for (let x = 0; x <= eW + 8; x += 8) { const u = x / eW * 6.283; ex.lineTo(x, y0 - amp * (Math.sin(u * f1 + ph) * 0.6 + Math.sin(u * f2 + ph * 2.3) * 0.4)); }
-    ex.lineTo(eW, eH); ex.closePath(); ex.fill();
+  function colinaEsc(y0, amp, f1, f2, ph, color) {                 // se dibuja un poco más ancha que el cuadro, por el paralaje
+    ex.fillStyle = color; ex.beginPath(); ex.moveTo(-16, eH);
+    for (let x = -16; x <= eW + 16; x += 8) { const u = x / eW * 6.283; ex.lineTo(x, y0 - amp * (Math.sin(u * f1 + ph) * 0.6 + Math.sin(u * f2 + ph * 2.3) * 0.4)); }
+    ex.lineTo(eW + 16, eH); ex.closePath(); ex.fill();
   }
   function palmaEsc(x, y, s, t, color, v) {                        // palmera: tronco curvo y hojas que se mecen (y se inclinan) con el viento
     const raf = 0.6 + 0.4 * Math.sin(t / 2300 + x * 0.01), lean = Math.min(0.09, v / 700) * raf;
@@ -1490,15 +1576,133 @@
       ex.beginPath(); ex.moveTo(tx, ty);
       ex.quadraticCurveTo(tx + Math.cos(ang) * L * 0.55, ty + Math.sin(ang) * L * 0.75 - L * 0.12, tx + Math.cos(ang) * L, ty + Math.sin(ang) * L * 0.55 + L * 0.42); ex.stroke();
     }
+    return u => { const v = 1 - u; return [v * v * x + 2 * u * v * (x + s * 0.01) + u * u * tx, v * v * y + 2 * u * v * (y - s * 0.55) + u * u * ty]; };   // punto del tronco (u: 0 pie … 1 copa)
+  }
+  // ---- Temporada (grupo «especiales») ----
+  const COL_GUIR = ['239,68,68', '251,191,36', '34,197,94', '96,165,250'];   // rojo, dorado, verde y azul (#ef4444 #fbbf24 #22c55e #60a5fa)
+  // Parpadeo encadenado de las luces de Navidad: tres grupos que se atenúan por turno (~0,9 s cada uno, con transición suave);
+  // ninguna se apaga del todo ni destella. `fija` (navidad-quieta, movimiento reducido o escena quieta): todas encendidas.
+  function brilloFoco(j, t, fija) {
+    if (fija) return 1;
+    const ph = (t / 900) % 3, d = Math.abs(((ph - (j % 3) - 0.5) % 3 + 4.5) % 3 - 1.5), off = limitar(1 - d / 0.75, 0, 1);
+    return 1 - 0.68 * off * off * (3 - 2 * off);
+  }
+  function foco(x, y, rx, ry, j, br, noche) {                      // una luz: halo de su color y bombilla
+    const c = j % 4;
+    if (nivelR() >= 0.75) { const h = (rx + 3.5) * 2.2; ex.globalAlpha = br * (0.35 + 0.65 * noche) * Math.min(1.3, prefsAnim.intensidad); ex.drawImage(eSprGuir[c], x - h / 2, y - h / 2, h, h); }
+    ex.globalAlpha = 0.4 + 0.6 * br; ex.fillStyle = `rgb(${COL_GUIR[c]})`; ex.beginPath(); ex.ellipse(x, y, rx, ry, 0, 0, 6.283); ex.fill();
+  }
+  function spritesGuirnalda() { return COL_GUIR.map(c => { const k = document.createElement('canvas'); k.width = k.height = 24; const g = k.getContext('2d'), gr = g.createRadialGradient(12, 12, 0, 12, 12, 12); gr.addColorStop(0, `rgba(${c},0.9)`); gr.addColorStop(0.3, `rgba(${c},0.35)`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(0, 0, 24, 24); return k; }); }
+  // Guirnalda colgada entre dos puntos (a y b: funciones de palmaEsc o del pino), con luces de parpadeo encadenado (brilloFoco).
+  // Con `rosetas`, de ella cuelgan dos rosetas de ñandutí doradas que se mecen apenas (quietas si `fija`).
+  function guirnalda(a, b, ua, ub, t, noche, cable, i0, fija, kLuz, rosetas) {
+    const [x1, y1] = a(ua), [x2, y2] = b(ub), cx1 = (x1 + x2) / 2, cy1 = Math.max(y1, y2) + Math.abs(x2 - x1) * 0.28, n = 9;
+    const punto = u => { const v = 1 - u; return [v * v * x1 + 2 * u * v * cx1 + u * u * x2, v * v * y1 + 2 * u * v * cy1 + u * u * y2]; };
+    ex.strokeStyle = cable; ex.lineWidth = 0.8; ex.beginPath(); ex.moveTo(x1, y1); ex.quadraticCurveTo(cx1, cy1, x2, y2); ex.stroke();
+    // rosetas de ñandutí: un hilo, un aro con rayos y un centro
+    const rr = Math.max(2.6, eH * 0.02), oro = `rgba(232,196,110,${0.6 + 0.4 * kLuz})`;
+    ex.strokeStyle = oro; ex.lineWidth = 0.6;
+    if (rosetas) for (const [u, j] of [[0.3, 0], [0.7, 1]]) {
+      const [hx, hy] = punto(u), sw = fija ? 0 : Math.sin(t / 1700 + j * 2 + i0) * 0.12, hl = eH * 0.03, rx = hx + Math.sin(sw) * (hl + rr), ry = hy + Math.cos(sw) * (hl + rr);
+      ex.beginPath(); ex.moveTo(hx, hy); ex.lineTo(hx + Math.sin(sw) * hl, hy + Math.cos(sw) * hl);
+      ex.moveTo(rx + rr, ry); ex.arc(rx, ry, rr, 0, 6.283); ex.moveTo(rx + rr * 0.45, ry); ex.arc(rx, ry, rr * 0.45, 0, 6.283);
+      for (let k = 0; k < 10; k++) { const an = k * 0.6283 + sw; ex.moveTo(rx + Math.cos(an) * rr * 0.45, ry + Math.sin(an) * rr * 0.45); ex.lineTo(rx + Math.cos(an) * rr, ry + Math.sin(an) * rr); }
+      ex.stroke(); ex.fillStyle = oro; ex.fillRect(rx - 0.7, ry - 0.7, 1.4, 1.4);
+    }
+    if (!eSprGuir) eSprGuir = spritesGuirnalda();
+    for (let i = 1; i < n; i++) {
+      const [x, y0] = punto(i / n), y = y0 + 2.2;
+      ex.globalAlpha = 1; ex.fillStyle = cable; ex.fillRect(x - 0.7, y0, 1.4, 1.4);                    // portalámpara
+      foco(x, y + 0.4, Math.max(1.25, eH * 0.009), Math.max(1.75, eH * 0.012), i + i0, brilloFoco(i + i0, t, fija), noche);
+    }
+    ex.globalAlpha = 1;
+  }
+  // Pino de Navidad decorado (geometría de la referencia de diseño, escena de 350×150, con el pie del tronco en (80, 132)):
+  // tres pisos de follaje con degradado y luz lateral, tronco, guirnalda dorada de cuentas, 14 esferas de luz, estrella con brillo
+  // y dos regalos. De noche el follaje se oscurece un poco para no desentonar con el paisaje. Devuelve P(x, y): de la referencia a px.
+  const PINO_PISOS = [[34, 124, 80, 136, 126, 124, 95, 86, 80, 90, 65, 86], [44, 94, 80, 104, 116, 94, 91, 62, 80, 65, 69, 62], [55, 68, 80, 76, 105, 68, 80, 30, 80, 30, 80, 30]];
+  const PINO_FOCOS = [[80, 44], [73, 56], [88, 54], [64, 80], [80, 84], [97, 78], [56, 102], [72, 108], [90, 106], [106, 98], [48, 120], [64, 126], [96, 126], [112, 118]];
+  function pinoNavidad(X, Y, k, t, fija, kLuz, noche) {
+    const P = (x, y) => [X + (x - 80) * k, Y + (y - 132) * k], os = noche * 0.45;
+    const ruta = () => { ex.beginPath(); for (const p of PINO_PISOS) { const [a, b, c, d, e, f, g, h, i, j, l, m] = p; ex.moveTo(...P(a, b)); ex.quadraticCurveTo(...P(c, d), ...P(e, f)); ex.lineTo(...P(g, h)); ex.quadraticCurveTo(...P(i, j), ...P(l, m)); ex.closePath(); } };
+    ex.fillStyle = mezcla('#4a2f1c', '#1a120c', os); ex.fillRect(...P(76, 122), 8 * k, 10 * k);   // tronco
+    const [x0, y0] = P(34, 30), [x1, y1] = P(126, 136);
+    const gv = ex.createLinearGradient(x0, y0, x1, y1); gv.addColorStop(0, mezcla('#23854a', '#0c2a22', os)); gv.addColorStop(1, mezcla('#0b3a20', '#051510', os));
+    ruta(); ex.fillStyle = gv; ex.fill();
+    const gl = ex.createLinearGradient(x0, 0, x1, 0); gl.addColorStop(0, `rgba(63,174,102,${0.55 * (1 - os)})`); gl.addColorStop(0.5, 'rgba(63,174,102,0)');
+    ex.fillStyle = gl; ex.fill();                                                                    // luz lateral
+    ex.strokeStyle = '#fbbf24'; ex.lineWidth = 1.6 * k; ex.lineCap = 'round'; ex.setLineDash([0.1, 3.2 * k]); ex.beginPath();   // guirnalda dorada de cuentas
+    for (const [a, b, c, d, e, f] of [[60, 64, 80, 78, 100, 62], [52, 90, 80, 106, 110, 88], [42, 118, 80, 134, 120, 116]]) { ex.moveTo(...P(a, b)); ex.quadraticCurveTo(...P(c, d), ...P(e, f)); }
+    ex.stroke(); ex.setLineDash([]);
+    if (!eSprGuir) eSprGuir = spritesGuirnalda();
+    PINO_FOCOS.forEach(([x, y], j) => { const [px, py] = P(x, y); foco(px, py, 2.5 * k, 2.5 * k, j, brilloFoco(j, t, fija), noche); });
+    ex.globalAlpha = 1;
+    // regalos al pie
+    const regalo = (x, y, w, h, col, lazo) => { const [a, b] = P(x, y); ex.fillStyle = mezcla(col, '#000000', os * 0.6); ex.fillRect(a, b, w * k, h * k); ex.strokeStyle = '#fde68a'; ex.lineWidth = 1.2 * k; ex.beginPath(); ex.moveTo(a + w * k / 2, b); ex.lineTo(a + w * k / 2, b + h * k); ex.moveTo(a, b + h * k / 2); ex.lineTo(a + w * k, b + h * k / 2); if (lazo) { ex.moveTo(a + w * k / 2, b); ex.quadraticCurveTo(a + w * k / 2 - 5 * k, b - 4 * k, a + w * k / 2 - 6 * k, b - 1 * k); ex.moveTo(a + w * k / 2, b); ex.quadraticCurveTo(a + w * k / 2 + 5 * k, b - 4 * k, a + w * k / 2 + 6 * k, b - 1 * k); } ex.stroke(); };
+    regalo(90, 122, 15, 11, '#b91c1c', true); regalo(56, 125, 12, 8, '#1d4ed8', false);
+    // estrella dorada en la punta: brillo suave (más de noche) que late despacio salvo si `fija`
+    const [sx, sy] = P(80, 27.5), lat = fija ? 1 : 1 + 0.08 * Math.sin(t / 2200), rb = 15 * k * lat * (0.8 + 0.4 * noche);
+    const gs = ex.createRadialGradient(sx, sy, 0, sx, sy, rb); gs.addColorStop(0, `rgba(253,230,138,${0.5 + 0.35 * noche})`); gs.addColorStop(1, 'rgba(253,230,138,0)');
+    ex.fillStyle = gs; ex.fillRect(sx - rb, sy - rb, rb * 2, rb * 2);
+    ex.fillStyle = '#fbbf24'; ex.strokeStyle = '#fff3c4'; ex.lineWidth = 0.8 * k; ex.lineJoin = 'round'; ex.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = (i % 2 ? 3.3 : 8) * k; ex[i ? 'lineTo' : 'moveTo'](sx + Math.cos(a) * r, sy + 1.5 * k + Math.sin(a) * r); }
+    ex.closePath(); ex.fill(); ex.stroke();
+    return P;
+  }
+  // Luces en espiral alrededor de un tronco (tr: función de palmaEsc); las que quedan "detrás" del tronco se ven más tenues
+  function lucesEspiral(tr, t, fija, noche, ancho) {
+    for (let k = 0; k < 13; k++) {
+      const u = 0.06 + k * 0.054, [x, y] = tr(u), fase = u * Math.PI * 9, atras = Math.cos(fase) < 0;
+      if (libreDeEtq(x, y, ancho) !== y) continue;                  // no se dibujan debajo de las etiquetas
+      foco(x + Math.sin(fase) * ancho, y, Math.max(1.4, ancho * 0.42), Math.max(1.4, ancho * 0.42), k + 2, brilloFoco(k + 2, t, fija) * (atras ? 0.5 : 1), noche * (atras ? 0.5 : 1));
+    }
+    ex.globalAlpha = 1;
+  }
+  // ¿Es Año Nuevo en Paraguay? (31 de diciembre desde las 23:30 hasta la 1:00 del 1 de enero, hora de Asunción). Se consulta cada 15 s.
+  function esAnoNuevo() {
+    const ahora = Date.now(); if (Math.abs(ahora - eNuevo.t) < 15000) return eNuevo.si;
+    const p = {}; eNuevo.t = ahora;
+    try { new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Asuncion', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(ahora)).forEach(x => { p[x.type] = +x.value; }); } catch (e) { return eNuevo.si = false; }
+    return eNuevo.si = (p.month === 12 && p.day === 31 && p.hour * 60 + p.minute >= 23 * 60 + 30) || (p.month === 1 && p.day === 1 && p.hour < 1);
+  }
+  const COL_FUEGO = ['255,210,120', '255,150,175', '150,220,232', '255,238,212', '170,228,150'];
+  // Fuegos artificiales sobre el río: cohetes que suben por detrás de las colinas y estallan en chispas que caen despacio.
+  // Sin destellos: solo un halo tenue en el estallido y su reflejo en el agua.
+  function fuegos(t, dt, yAgua) {
+    if (eFuegos.filter(f => !f.chispas).length < 2 && Math.random() < dt / 1700 * prefsAnim.intensidad)
+      eFuegos.push({ x: eW * (0.3 + Math.random() * 0.42), y: yAgua - eH * 0.06, v: eH * (0.00055 + Math.random() * 0.0002), meta: eH * (0.12 + Math.random() * 0.2), c: COL_FUEGO[Math.floor(Math.random() * COL_FUEGO.length)], chispas: null, vida: 0 });
+    ex.lineCap = 'round';
+    eFuegos = eFuegos.filter(f => {
+      if (!f.chispas) {                                             // subiendo: un punto con una estela corta
+        f.y -= f.v * dt; f.v *= Math.exp(-dt / 2600);
+        ex.strokeStyle = `rgba(${f.c},0.55)`; ex.lineWidth = 1.2; ex.beginPath(); ex.moveTo(f.x, f.y); ex.lineTo(f.x, f.y + eH * 0.05); ex.stroke();
+        if (f.y <= f.meta) {
+          const n = Math.max(14, cant(34)), vel = eH * (0.0003 + Math.random() * 0.0001);
+          f.chispas = Array.from({ length: n }, (_, i) => { const a = i / n * 6.283 + Math.random() * 0.2, s = vel * (0.7 + Math.random() * 0.45); return { x: f.x, y: f.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s }; });
+          f.dur = 1500 + Math.random() * 600; f.cx = f.x; f.cy = f.y;
+        }
+        return true;
+      }
+      f.vida += dt; const u = f.vida / f.dur; if (u >= 1) return false;
+      const a = (1 - u) ** 1.6, ar = Math.exp(-dt / 900), g = eH * 1.3e-7 * dt;
+      if (u < 0.5) { const r = eH * 0.16, gl = ex.createRadialGradient(f.cx, f.cy, 0, f.cx, f.cy, r); gl.addColorStop(0, `rgba(${f.c},${0.1 * (1 - u * 2) ** 2})`); gl.addColorStop(1, `rgba(${f.c},0)`); ex.fillStyle = gl; ex.fillRect(f.cx - r, f.cy - r, r * 2, r * 2); }
+      ex.strokeStyle = `rgba(${f.c},${0.85 * a})`; ex.lineWidth = 1.3; ex.beginPath();
+      for (const c of f.chispas) { c.vx *= ar; c.vy = c.vy * ar + g; c.x += c.vx * dt; c.y += c.vy * dt; ex.moveTo(c.x, c.y); ex.lineTo(c.x - c.vx * 55, c.y - c.vy * 55); }
+      ex.stroke();
+      return true;
+    });
   }
   function pintarEscena(t, dt, quieto) {
     const w = ec.clientWidth, h = ec.clientHeight;
     if (!w || !h) return;
     if (!quieto) latidoRayo(t, dt || 0);
     const simple = !prefsAnim.paisaje || !fx, d = Math.min(window.devicePixelRatio || 1, nivelR() < 0.75 ? 1 : 2);   // con calidad baja, menos píxeles
-    if (w !== eW || h !== eH || d !== eD) { eW = w; eH = h; eD = d; ec.width = Math.round(w * d); ec.height = Math.round(h * d); ex.setTransform(d, 0, 0, d, 0, 0); eClave = ''; }
-    const clave = [ambClave, eW, eH, claveFx(), simple ? 1 : 0, amb.granizo ? 1 : 0, Math.round(vientoVis() / 8), mesLapacho() ? 1 : 0].join('|');
-    if (eClave !== clave) { eClave = clave; eFirma = ''; armarEscena(); }
+    if (w !== eW || h !== eH || d !== eD) { eW = w; eH = h; eD = d; ec.width = Math.round(w * d); ec.height = Math.round(h * d); ex.setTransform(d, 0, 0, d, 0, 0); eClave = ''; eEtqSucio = true; vAst.ok = false; eFundido = 0; }
+    const clave = [ambClave, eW, eH, claveFx(), simple ? 1 : 0, amb.granizo ? 1 : 0, Math.round(vientoVis() / 8), Math.round(vientoHojas() / 8), mesLapacho() ? 1 : 0].join('|');
+    if (eClave !== clave) {
+      if (eClave && !quieto && !simple && vEsc.Ph) fotoFundido();      // cambió el clima, la ciudad o las preferencias (no el tamaño): fundido
+      eClave = clave; eFirma = ''; armarEscena();
+    }
     if (!vEsc.Ph) avanzarVisual(0, true);
     if (simple && !quieto) {                                      // paisaje apagado: un cuadro quieto que se repinta solo si cambian los colores (o cada minuto, por el sol)
       const firma = vEsc.Ph.join() + vEsc.Th[0] + Math.floor(Date.now() / 60000);
@@ -1509,6 +1713,8 @@
     const anim = !quieto && !simple;
     const A = amb, P = vEsc.Ph, T = vEsc.Th, yAgua = eH * 0.74, vis = A.tipo === 'despejado' || A.tipo === 'parcial';
     const [kCca, kEstr, kAves, kLuci, kLuna, kNb, kLuz, kArco = 0, kCalor = 0] = vEsc.esc, ast = arcoAstros(), esp = efectoActivo('especiales');
+    if (anim) { const k = 1 - Math.exp(-dt / 380); par.x += (par.tx - par.x) * k; par.y += (par.ty - par.y) * k; } else par.x = par.y = 0;
+    const pA = Math.min(10, eW * 0.008), pX = z => par.x * pA * z, pY = z => par.y * pA * 0.4 * z;   // desplazamiento de una capa a la distancia z (0 lejos … 1 cerca)
     // cielo
     const g = ex.createLinearGradient(0, 0, 0, yAgua); g.addColorStop(0, P[0]); g.addColorStop(0.55, P[1]); g.addColorStop(1, P[2]);
     ex.fillStyle = g; ex.fillRect(0, 0, eW, eH);
@@ -1516,6 +1722,11 @@
       ex.fillStyle = '#fff';
       for (let k = 0; k < 4; k++) { ex.globalAlpha = kEstr * (0.3 + 0.55 * Math.sin(t / 900 + k * 1.7) ** 2); ex.beginPath(); for (let i = k; i < eEstr.length; i += 4) { const s = eEstr[i]; ex.moveTo(s.x + s.r, s.y); ex.arc(s.x, s.y, s.r, 0, 6.283); } ex.fill(); }
       ex.globalAlpha = 1;
+    }
+    if (eViaL && kEstr > 0.4) {                                     // Vía Láctea: noche despejada y sin luna (la luna llena la borra)
+      const il = (1 - Math.cos(2 * Math.PI * edadLuna())) / 2, luna = A.tipo === 'nublado' ? 0 : vAst.mf * kLuna * (0.15 + 0.85 * il);
+      const a = ((kEstr - 0.4) / 0.6) ** 2 * (A.tipo === 'despejado' ? 0.75 : 0.4) * limitar(1 - luna * 1.6, 0, 1);
+      if (a > 0.02) { ex.globalAlpha = a; ex.drawImage(eViaL, 0, 0, eW, eH * 0.62); ex.globalAlpha = 1; }
     }
     // estrella fugaz de vez en cuando, en noche despejada
     if (esp && anim && eEstr.length && kEstr > 0.6) {
@@ -1529,25 +1740,61 @@
     }
     // sol y luna: recorren un arco según la hora (el sol sale, sube, baja y se pone; la luna sale al caer la noche)
     const R = eH * 0.075, yHor = eH * 0.62, aMax = eH * 0.44, S = ast && ast.sol, L = ast && ast.luna;
-    const sx = S ? eW * S.x : eW * 0.72, sy = S ? yHor - S.alt * aMax : eH * 0.22, altSol = S ? S.alt : 1, sobre = S ? S.f : A.fase === 'noche' ? 0 : 1;
+    {                                                               // posición objetivo de sol y luna; se acercan a ella en ~1,5 s (al cambiar de hora en la vista previa no saltan)
+      const k = anim && vAst.ok ? 1 - Math.exp(-dt / 500) : 1, ir = (c, v) => { vAst[c] += (v - vAst[c]) * k; };
+      ir('sx', S ? S.x : 0.72); ir('sy', S ? (yHor - S.alt * aMax) / eH : 0.22); ir('so', S ? S.f : A.fase === 'noche' ? 0 : 1);
+      ir('mx', L ? L.x : 0.5); ir('my', L ? (yHor - L.alt * aMax) / eH : yHor / eH); ir('mf', L ? L.f : 0);
+      vAst.ok = true;
+    }
+    const sx = eW * vAst.sx, sy = libreDeEtq(sx, eH * vAst.sy, R), altSol = limitar((yHor - eH * vAst.sy) / aMax, 0, 1), sobre = vAst.so;
+    let refSol = null, refLuna = null, kDor = 0;                   // reflejos en el río y brillo de la hora dorada (se dibujan más abajo)
     if (sobre > 0.01 && (vis || A.tipo === 'nublado' || A.tipo === 'niebla')) {
       const k = limitar(altSol / 0.45, 0, 1);                     // sol bajo = naranja; sol alto = amarillo claro
       const al = (vis ? 1 : A.tipo === 'nublado' ? 0.45 : 0.3) * sobre, col = `255,${Math.round(150 + 86 * k)},${Math.round(80 + 90 * k)}`;
+      refSol = { x: sx, col, a: 0.5 * al, w: R * (1.3 + 1.4 * (1 - k)) };
+      // rayos de sol entre las nubes con el sol bajo (se dibujan antes que las nubes, que los tapan): abanico que gira muy despacio
+      const kr = esp && vis ? sobre * limitar((0.55 - altSol) / 0.3, 0, 1) * (A.tipo === 'parcial' ? 1 : 0.45) * Math.min(1.2, prefsAnim.intensidad) : 0;
+      kDor = esp && vis && A.dorado ? sobre * (1 - k * 0.6) : 0;
+      if (kr > 0.02) {
+        const Lr = Math.hypot(eW, eH) * 0.75, gr = ex.createRadialGradient(sx, sy, R, sx, sy, Lr);
+        gr.addColorStop(0, `rgba(255,${Math.round(190 + 40 * k)},140,${0.06 * kr})`); gr.addColorStop(0.5, `rgba(255,200,140,${0.02 * kr})`); gr.addColorStop(1, 'rgba(255,200,140,0)');
+        ex.save(); ex.globalCompositeOperation = 'lighter'; ex.fillStyle = gr;
+        for (const m of nivelR() < 1 ? [0.75] : [1, 0.45]) {        // dos pasadas (ancha y angosta): el borde de cada rayo queda difuso; con calidad baja, una
+          ex.beginPath();
+          for (let i = 0; i < 10; i++) {
+            const a = i / 10 * 6.283 + 0.18 * Math.sin(t / 9000 + i * 1.3), w = (0.05 + 0.03 * Math.sin(t / 3700 + i * 2.3)) * m;
+            ex.moveTo(sx, sy); ex.lineTo(sx + Math.cos(a - w) * Lr, sy + Math.sin(a - w) * Lr); ex.lineTo(sx + Math.cos(a + w) * Lr, sy + Math.sin(a + w) * Lr); ex.closePath();
+          }
+          ex.fill();
+        }
+        ex.restore();
+      }
       const gl = ex.createRadialGradient(sx, sy, 0, sx, sy, R * 5); gl.addColorStop(0, `rgba(${col},${0.55 * al})`); gl.addColorStop(1, `rgba(${col},0)`);
       ex.fillStyle = gl; ex.fillRect(sx - R * 5, sy - R * 5, R * 10, R * 10);
       if (vis && k > 0.7) { ex.save(); ex.globalAlpha = (k - 0.7) / 0.3 * sobre; ex.translate(sx, sy); ex.rotate(t / 9000); ex.fillStyle = 'rgba(255,240,190,0.07)'; for (let i = 0; i < 12; i++) { ex.rotate(0.5236); ex.beginPath(); ex.moveTo(0, 0); ex.lineTo(-R * 0.5, -R * 6.5); ex.lineTo(R * 0.5, -R * 6.5); ex.fill(); } ex.restore(); }
       ex.fillStyle = mezcla('#ffb982', '#fff6cf', k); ex.globalAlpha = al; ex.beginPath(); ex.arc(sx, sy, R, 0, 6.283); ex.fill(); ex.globalAlpha = 1;
     }
-    if (efectoActivo('estrellas') && L && L.f > 0.01 && kLuna > 0.01 && A.tipo !== 'lluvia' && A.tipo !== 'tormenta') {
-      const mx = eW * L.x, my = yHor - L.alt * aMax;
-      const il = (1 - Math.cos(2 * Math.PI * edadLuna())) / 2, al = (A.tipo === 'niebla' ? 0.4 : A.tipo === 'nublado' ? 0.6 : 1) * kLuna * L.f;
+    if (efectoActivo('estrellas') && L && vAst.mf > 0.01 && kLuna > 0.01 && A.tipo !== 'lluvia' && A.tipo !== 'tormenta') {
+      const mx = eW * vAst.mx, my = Math.min(yHor, libreDeEtq(mx, eH * vAst.my, R));
+      const il = (1 - Math.cos(2 * Math.PI * edadLuna())) / 2, al = (A.tipo === 'niebla' ? 0.4 : A.tipo === 'nublado' ? 0.6 : 1) * kLuna * vAst.mf;
       const gl = ex.createRadialGradient(mx, my, 0, mx, my, R * 4.5); gl.addColorStop(0, `rgba(190,208,255,${0.34 * al * il})`); gl.addColorStop(1, 'rgba(190,208,255,0)');
       ex.fillStyle = gl; ex.fillRect(mx - R * 4.5, my - R * 4.5, R * 9, R * 9);
       dibujarLuna(ex, mx, my, R * 0.85, al);
+      refLuna = { x: mx, col: '222,230,255', a: 0.42 * al * (0.3 + 0.7 * il), w: R * 1.1 };
     }
     // nubes y aves
-    ex.fillStyle = `rgba(${vEsc.cc},${kCca})`;
-    eNubes.forEach(n => { n.x += n.v * dt * (1 + A.viento / 20); if (n.x - n.r * 3 > eW) n.x = -n.r * 3; nubeEsc(n.x, n.y, n.r); });
+    if (eNubes.length) {                                          // por capas: las lejanas se tiñen del cielo; medias y cercanas llevan la panza en sombra
+      const cc = aRgb(vEsc.cc), cielo = hexA(P[2]), lejos = mezA(cc, cielo, 0.4).map(Math.round).join(','), panza = mezA(cc, [20, 28, 45], A.tipo === 'tormenta' ? 0.35 : 0.2).map(Math.round).join(',');
+      for (let z = 0; z < 3; z++) {
+        const dx = pX([0.2, 0.45, 0.8][z]), dy = pY([0.2, 0.45, 0.8][z]);
+        let hay = false;
+        for (const n of eNubes) if (n.z === z) { hay = true; n.x += n.v * dt * (1 + A.viento / 20); if (n.x - n.r * 3 > eW) n.x = -n.r * 3; }
+        if (!hay) continue;
+        if (z) { ex.fillStyle = `rgba(${panza},${kCca})`; ex.beginPath(); for (const n of eNubes) if (n.z === z) nubeRuta(n.x + dx, n.y + dy + n.r * 0.2, n.r * 0.93); ex.fill(); }
+        ex.fillStyle = z ? `rgba(${vEsc.cc},${kCca})` : `rgba(${lejos},${kCca * 0.8})`; ex.beginPath();
+        for (const n of eNubes) if (n.z === z) nubeRuta(n.x + dx, n.y + dy - (z ? n.r * 0.04 : 0), n.r); ex.fill();
+      }
+    }
     // arcoíris: lluvia débil con sol de día, del lado opuesto al sol
     if (esp && kArco > 0.01) {
       const ax = eW * limitar(1 - (S ? S.x : 0.72), 0.3, 0.7), ar = Math.min(eW * 0.42, eH * 0.62), ay = yHor + eH * 0.1, a = 0.26 * kArco * Math.min(1.2, prefsAnim.intensidad);
@@ -1561,9 +1808,30 @@
       const f = Math.sin(t / 140 + b.f) * b.s * 0.45, y = b.y + Math.sin(t / 1500 + b.f) * 4;
       ex.beginPath(); ex.moveTo(b.x - b.s, y - f); ex.quadraticCurveTo(b.x - b.s * 0.4, y - b.s * 0.3 - f * 0.4, b.x, y); ex.quadraticCurveTo(b.x + b.s * 0.4, y - b.s * 0.3 - f * 0.4, b.x + b.s, y - f); ex.stroke();
     });
+    // fuegos artificiales de Año Nuevo (nunca con la escena quieta, con movimiento reducido ni con <html class="sin-fuegos">)
+    if (esp && anim && esAnoNuevo() && !document.documentElement.classList.contains('sin-fuegos')) fuegos(t, dt, yAgua); else if (eFuegos.length) eFuegos = [];   // la clase sin-fuegos los apaga (panel)
     // colinas lejanas y cercanas
-    colinaEsc(eH * 0.56, eH * 0.07, 2, 5, 0.6, T[0]);
-    colinaEsc(eH * 0.65, eH * 0.07, 3, 7, 2.1, T[1]);
+    ex.translate(pX(0.25), 0); colinaEsc(eH * 0.56, eH * 0.07, 2, 5, 0.6, T[0]); ex.translate(-pX(0.25), 0);
+    // bruma atmosférica: lo lejano se funde con el color del horizonte (más de día, menos de noche)
+    const hz = hexA(P[2]).join(','), aBr = 0.22 + 0.16 * kLuz;
+    const gb = ex.createLinearGradient(0, eH * 0.46, 0, eH * 0.64); gb.addColorStop(0, `rgba(${hz},0)`); gb.addColorStop(1, `rgba(${hz},${aBr})`);
+    ex.fillStyle = gb; ex.fillRect(0, eH * 0.46, eW, eH * 0.18);
+    ex.translate(pX(0.45), 0); colinaEsc(eH * 0.65, eH * 0.07, 3, 7, 2.1, T[1]); ex.translate(-pX(0.45), 0);
+    const gb2 = ex.createLinearGradient(0, eH * 0.6, 0, yAgua); gb2.addColorStop(0, `rgba(${hz},0)`); gb2.addColorStop(1, `rgba(${hz},${aBr * 0.45})`);
+    ex.fillStyle = gb2; ex.fillRect(0, eH * 0.6, eW, yAgua - eH * 0.6);
+    const kCiu = eLuces.length ? (1 - kLuz) ** 1.5 * (A.tipo === 'niebla' ? 0.35 : A.lluvia ? 0.6 : 1) : 0;
+    if (kCiu > 0.02) {                                              // luces de la ciudad lejana: titilan muy despacio y tiñen apenas el cielo encima
+      const dxC = pX(0.45);
+      ex.save(); ex.translate(eW * 0.5 + dxC, yAgua); ex.scale(1, 0.22);
+      const gc = ex.createRadialGradient(0, 0, 0, 0, 0, eW * 0.22); gc.addColorStop(0, `rgba(255,190,120,${0.1 * kCiu})`); gc.addColorStop(1, 'rgba(255,190,120,0)');
+      ex.fillStyle = gc; ex.fillRect(-eW * 0.22, -eW * 0.22, eW * 0.44, eW * 0.22); ex.restore();
+      for (let c = 0; c < 2; c++) for (let k = 0; k < 3; k++) {
+        ex.fillStyle = c ? '#eaf0ff' : '#ffd08c'; ex.globalAlpha = kCiu * (0.7 + 0.3 * Math.sin(t / 1400 + k * 2.1)); ex.beginPath();
+        for (const l of eLuces) if (l.c === c && l.k === k) { ex.moveTo(l.x + dxC + l.r, l.y); ex.arc(l.x + dxC, l.y, l.r, 0, 6.283); }
+        ex.fill();
+      }
+      ex.globalAlpha = 1;
+    }
     // lapachos en flor sobre la colina (julio a septiembre): pequeños y apagados según la luz, para que sean un detalle
     if (esp && mesLapacho()) {
       const os = 1 - kLuz, s = eH * 0.05;
@@ -1594,9 +1862,32 @@
     ex.fillStyle = ga; ex.fillRect(0, yAgua, eW, eH - yAgua);
     const brillo = vEsc.br, hAg = eH - yAgua;
     for (let i = 0; i < 26; i++) {
-      const cerca = vis && sobre > 0.3 && altSol > 0 && i % 3 === 0, x = cerca ? sx + Math.sin(i * 7.1 + t / 1800) * eW * 0.04 : (i * 97 + t * 0.012 * (i % 3 + 1)) % eW, y = yAgua + ((i * 37) % 100) / 100 * hAg;
-      ex.fillStyle = `rgba(${brillo},${(cerca ? 0.2 : 0.06) + 0.06 * Math.sin(t / 700 + i)})`; ex.fillRect(x, y, 10 + (i * 13) % 26, 1.6);
+      const x = (i * 97 + t * 0.012 * (i % 3 + 1)) % eW, y = yAgua + ((i * 37) % 100) / 100 * hAg;
+      ex.fillStyle = `rgba(${brillo},${0.06 + 0.06 * Math.sin(t / 700 + i)})`; ex.fillRect(x, y, 10 + (i * 13) % 26, 1.6);
     }
+    // reflejo del sol y de la luna: una columna de destellos que ondula y se ensancha hacia la orilla (la lluvia lo rompe)
+    const reflejo = o => {
+      const a0 = o.a * (1 - A.lluvia * 0.75); if (a0 < 0.01) return;
+      ex.fillStyle = `rgb(${o.col})`;
+      for (let y = yAgua + 1.5, i = 0; y < eH; y += 2.6, i++) {
+        const u = (y - yAgua) / hAg, w = o.w * (0.5 + u * 1.3) * (0.55 + 0.45 * Math.sin(i * 1.9 + t / 520)), dx = Math.sin(i * 0.8 + t / 700) * (1.5 + u * 4);
+        ex.globalAlpha = a0 * (1 - u * 0.55) * (0.5 + 0.5 * Math.sin(i * 2.7 - t / 380)); ex.fillRect(o.x + dx - w / 2, y, w, 1.5);
+      }
+      ex.globalAlpha = 1;
+    };
+    if (kCiu > 0.02) {                                              // las luces de la ciudad se estiran en el agua
+      ex.fillStyle = '#ffcf8a'; ex.globalAlpha = kCiu * 0.32 * (1 - A.lluvia * 0.6); const dxC = pX(0.45);
+      for (const l of eLuces) { const L = 3 + l.r * 4 + Math.sin(t / 600 + l.x) * 1.5; ex.fillRect(l.x + dxC - 0.5 + Math.sin(t / 500 + l.y) * 0.6, yAgua + 1.5, 1, L); }
+      ex.globalAlpha = 1;
+    }
+    for (const f of eFuegos) if (f.chispas && f.vida < f.dur * 0.6) {   // el estallido se refleja apenas en el agua
+      const k = 1 - f.vida / (f.dur * 0.6), r = eH * 0.2;
+      ex.save(); ex.translate(f.cx, yAgua + hAg * 0.35); ex.scale(1, 0.3);
+      const gw = ex.createRadialGradient(0, 0, 0, 0, 0, r); gw.addColorStop(0, `rgba(${f.c},${0.16 * k * k})`); gw.addColorStop(1, `rgba(${f.c},0)`);
+      ex.fillStyle = gw; ex.fillRect(-r, -r, r * 2, r * 2); ex.restore();
+    }
+    if (refSol) reflejo(refSol);
+    if (refLuna) reflejo(refLuna);
     if (eGotas.length || eOndas.length) {                         // anillos y salpicaduras de la lluvia sobre el río
       if (anim && eGotas.length && Math.random() < A.lluvia * 0.55 * multFx() * dt / 16) eOndas.push({ x: Math.random() * eW, y: yAgua + 6 + Math.random() * (hAg - 10), r: 0, a: 0.5 });
       ex.lineWidth = 1; eOndas = eOndas.filter(o => o.a > 0.02);
@@ -1607,21 +1898,58 @@
       });
     }
     // orillas y palmeras
+    const dxO = pX(1); ex.translate(dxO, 0);
     ex.fillStyle = T[2];
-    ex.beginPath(); ex.moveTo(0, eH); ex.lineTo(0, yAgua - eH * 0.05); ex.quadraticCurveTo(eW * 0.2, yAgua - eH * 0.02, eW * 0.3, eH); ex.fill();
-    ex.beginPath(); ex.moveTo(eW, eH); ex.lineTo(eW, yAgua - eH * 0.04); ex.quadraticCurveTo(eW * 0.84, yAgua - eH * 0.01, eW * 0.72, eH); ex.fill();
+    ex.beginPath(); ex.moveTo(-12, eH); ex.lineTo(-12, yAgua - eH * 0.05); ex.lineTo(0, yAgua - eH * 0.05); ex.quadraticCurveTo(eW * 0.2, yAgua - eH * 0.02, eW * 0.3, eH); ex.fill();
+    ex.beginPath(); ex.moveTo(eW + 12, eH); ex.lineTo(eW + 12, yAgua - eH * 0.04); ex.lineTo(eW, yAgua - eH * 0.04); ex.quadraticCurveTo(eW * 0.84, yAgua - eH * 0.01, eW * 0.72, eH); ex.fill();
+    {                                                               // charcos: reflejan el cielo; con lluvia, anillos que se abren; después se secan
+      const obj = efectoActivo('lluvia') ? Math.max(A.lluvia ? 0.6 + 0.4 * A.lluvia : 0, A.mojado || 0) : 0;
+      eMoj = eMoj < 0 || !anim ? obj : eMoj + (obj - eMoj) * (1 - Math.exp(-dt / 2500));
+      if (eMoj > 0.02 && eCharcos.length) {
+        ex.fillStyle = 'rgba(10,20,15,0.22)'; ex.globalAlpha = eMoj; ex.beginPath();   // tierra mojada alrededor
+        for (const c of eCharcos) { ex.moveTo(c.x + c.rx * 1.35, c.y + c.ry * 0.2); ex.ellipse(c.x, c.y + c.ry * 0.2, c.rx * 1.35, c.ry * 1.6, 0, 0, 6.283); }
+        ex.fill();
+        ex.fillStyle = mezcla(P[2], '#ffffff', 0.12 * kLuz); ex.globalAlpha = 0.55 * eMoj; ex.beginPath();
+        for (const c of eCharcos) { ex.moveTo(c.x + c.rx, c.y); ex.ellipse(c.x, c.y, c.rx, c.ry, 0, 0, 6.283); }
+        ex.fill();
+        ex.strokeStyle = `rgba(${vEsc.br},0.5)`; ex.lineWidth = 1; ex.beginPath();   // brillo en el borde de cada charco
+        for (const c of eCharcos) { ex.moveTo(c.x - c.rx * 0.7, c.y - c.ry * 0.55); ex.ellipse(c.x, c.y, c.rx, c.ry, 0, 3.6, 5.8); }
+        ex.stroke();
+        if (anim && A.lluvia) {
+          ex.strokeStyle = 'rgba(220,235,255,0.6)'; ex.beginPath();
+          eCharcos.forEach((c, j) => { for (let m = 0; m < 2; m++) { const ph = t / 650 + j * 0.37 + m * 0.5, u = ph % 1, n = Math.floor(ph), ox = ((n * 37 + j * 11) % 10 / 10 - 0.5) * c.rx * 1.1, rr = u * c.rx * 0.45; ex.moveTo(c.x + ox + rr, c.y); ex.ellipse(c.x + ox, c.y, rr, rr * 0.35, 0, 0, 6.283); } });
+          ex.globalAlpha = 0.5 * eMoj * A.lluvia; ex.stroke();
+        }
+        ex.globalAlpha = 1;
+      }
+    }
     const vp = efectoActivo('viento') && !simple ? vientoVis() : 0;
-    palmaEsc(eW * 0.08, yAgua - eH * 0.04, eH * 0.7, t, T[3], vp); palmaEsc(eW * 0.17, yAgua - eH * 0.01, eH * 0.44, t + 900, T[3], vp);
-    palmaEsc(eW * 0.92, yAgua - eH * 0.035, eH * 0.62, t + 400, T[3], vp); palmaEsc(eW * 0.84, yAgua - eH * 0.005, eH * 0.4, t + 1600, T[3], vp);
+    const pa = palmaEsc(eW * 0.08, yAgua - eH * 0.04, eH * 0.7, t, T[3], vp), pb = palmaEsc(eW * 0.17, yAgua - eH * 0.01, eH * 0.44, t + 900, T[3], vp);
+    const pc = palmaEsc(eW * 0.92, yAgua - eH * 0.035, eH * 0.62, t + 400, T[3], vp), pd = palmaEsc(eW * 0.84, yAgua - eH * 0.005, eH * 0.4, t + 1600, T[3], vp);
+    const navidad = esp && document.documentElement.classList.contains('navidad');
+    if (navidad) {                                                // Navidad: pino decorado, luces en espiral, guirnaldas (todo bajo «especiales»)
+      const cab = mezcla(T[3], '#000000', 0.3), fija = !anim || document.documentElement.classList.contains('navidad-quieta');
+      const noche = 1 - kLuz, kP = eH / 200;
+      if (!eSprGuir) eSprGuir = spritesGuirnalda();
+      guirnalda(pd, pc, 0.66, 0.52, t + 700, noche, cab, 2, fija, kLuz, true);                       // orilla derecha: guirnalda con ñandutí
+      lucesEspiral(pa, t, fija, noche, eH * 0.024);                                                  // palmera alta de la izquierda: luces en espiral
+      const P = pinoNavidad(eW * 0.205, eH * 0.885, kP, t, fija, kLuz, noche), ap = P(57, 70);       // pino decorado en la orilla izquierda
+      guirnalda(() => ap, pa, 0, 0.5, t + 300, noche, cab, 5, fija, kLuz, false);                    // guirnalda del pino a la palmera
+    }
+    ex.translate(-dxO, 0);
     // luciérnagas
-    if (kLuci > 0.02 && eLuci.length) eLuci.forEach(l => {
-      l.x += Math.sin(t * l.v + l.f) * 0.35 * (dt / 16); l.y += Math.cos(t * l.v * 1.3 + l.f) * 0.25 * (dt / 16);
-      ex.globalAlpha = kLuci * (0.25 + 0.75 * Math.max(0, Math.sin(t / 700 + l.f * 3))); ex.drawImage(eSprLuci, l.x - 9, l.y - 9, 18, 18);
-    });
+    if (kLuci > 0.02 && eLuci.length) {                            // luciérnagas: con viento derivan hacia un lado y, si es fuerte, casi no se ven
+      const vl = efectoActivo('viento') ? limitar((A.viento || 0) / 30, 0, 1) : 0, ocultas = 1 - limitar(((A.viento || 0) - 25) / 20, 0, 0.8);
+      eLuci.forEach(l => {
+        l.x += (Math.sin(t * l.v + l.f) * 0.35 + vl * (0.5 + (l.f % 1)) * 0.9) * (dt / 16); l.y += Math.cos(t * l.v * 1.3 + l.f) * 0.25 * (dt / 16);
+        if (l.x > eW + 10) l.x = -10;
+        ex.globalAlpha = kLuci * ocultas * (0.25 + 0.75 * Math.max(0, Math.sin(t / 700 + l.f * 3))); ex.drawImage(eSprLuci, l.x - 9, l.y - 9, 18, 18);
+      });
+    }
     ex.globalAlpha = 1;
     // hojas y polvo que arrastra el viento
     if (eHojas.length) {
-      const vv = vientoVis(), vel = 0.03 + vv / 450;
+      const vv = vientoHojas(), vel = 0.03 + vv / 450;
       ex.strokeStyle = mezcla(T[2], '#a07c3c', 0.45); ex.lineWidth = 2.2; ex.lineCap = 'round'; ex.beginPath();
       eHojas.forEach(l => {
         if (dt) {
@@ -1645,11 +1973,25 @@
       });
       ex.globalAlpha = 1;
     }
-    // lluvia
+    // lluvia: la inclinación sigue al viento y va y viene en rachas; con lluvia fuerte pasan cortinas de agua más densas
     if (eGotas.length) {
-      const r = limitar(vientoVis() / 60, 0, 0.5); ex.strokeStyle = 'rgba(205,225,255,0.38)'; ex.lineWidth = 1; ex.beginPath();
-      eGotas.forEach(d => { d.y += d.v * dt * 0.7; d.x += d.v * dt * 0.7 * r; if (d.y > eH) { d.y = -d.l; d.x = Math.random() * eW; } if (d.x > eW) d.x -= eW; ex.moveTo(d.x, d.y); ex.lineTo(d.x - d.l * r, d.y - d.l); });
-      ex.stroke();
+      const rach = 0.5 + 0.5 * Math.sin(t / 2600) * Math.sin(t / 1700 + 1.3), r = limitar(vientoVis() / 60, 0, 0.5) * (0.7 + 0.6 * rach);
+      if (A.lluvia > 0.45) {
+        const ac = 0.07 * (A.lluvia - 0.3) * Math.min(1.3, prefsAnim.intensidad);
+        ex.save(); ex.transform(1, 0, -r, 1, 0, 0);
+        for (let i = 0; i < 2; i++) {
+          const w = eW * (0.16 + i * 0.08), x = ((t * (0.018 + i * 0.01) * (0.5 + r * 2) + i * eW * 0.7) % (eW * 1.5)) - eW * 0.25 + r * eH * 0.5;
+          const gc = ex.createLinearGradient(x, 0, x + w, 0); gc.addColorStop(0, 'rgba(200,214,235,0)'); gc.addColorStop(0.5, `rgba(200,214,235,${ac})`); gc.addColorStop(1, 'rgba(200,214,235,0)');
+          ex.fillStyle = gc; ex.fillRect(x, 0, w, eH);
+        }
+        ex.restore();
+      }
+      ex.lineWidth = 1;
+      for (let z = 0; z < 2; z++) {
+        ex.strokeStyle = z ? 'rgba(210,228,255,0.45)' : 'rgba(195,212,240,0.24)'; ex.beginPath();
+        for (const d of eGotas) if (d.z === z) { d.y += d.v * dt * 0.7; d.x += d.v * dt * 0.7 * r; if (d.y > eH) { d.y = -d.l; d.x = Math.random() * eW; } if (d.x > eW) d.x -= eW; ex.moveTo(d.x, d.y); ex.lineTo(d.x - d.l * r, d.y - d.l); }
+        ex.stroke();
+      }
     }
     // granizo (tormenta con granizo): cae rápido, rebota en las orillas y salpica en el río
     if (eGranizo.length) {
@@ -1685,14 +2027,29 @@
         }
       } else eRayo = null;
     }
+    if (kDor > 0.02 && nivelR() >= 0.75) {                                            // hora dorada: un resplandor cálido y suave que baña el cuadro desde el sol
+      const rg = Math.max(eW, eH) * 0.55, gd = ex.createRadialGradient(sx, sy, 0, sx, sy, rg);
+      gd.addColorStop(0, `rgba(255,178,105,${0.2 * kDor})`); gd.addColorStop(0.4, `rgba(255,150,90,${0.07 * kDor})`); gd.addColorStop(1, 'rgba(255,150,90,0)');
+      ex.save(); ex.globalCompositeOperation = 'lighter'; ex.fillStyle = gd; ex.fillRect(Math.max(0, sx - rg), 0, Math.min(eW, sx + rg) - Math.max(0, sx - rg), eH); ex.restore();
+    }
     ex.fillStyle = eSombra; ex.fillRect(0, 0, eW, eH * 0.4);   // sombra arriba para que se lean las etiquetas
+    if (eFundido > 0) {                                           // la escena anterior se desvanece encima de la nueva
+      eFundido = anim ? eFundido - dt / 1400 : 0;
+      if (eFundido > 0) { ex.save(); ex.setTransform(1, 0, 0, 1, 0, 0); ex.globalAlpha = eFundido * eFundido * (3 - 2 * eFundido); ex.drawImage(eFoto, 0, 0); ex.restore(); }
+    }
   }
   function etiquetaEscena(a) {                                     // las etiquetas sobre el cuadro: ciudad, clima y momento del día
     // en una vista previa se muestra el clima elegido (con el mismo texto que la app usa para un código típico de ese clima), no el real
-    const c0 = a.weather_code, real = [95, 96, 99].includes(c0) ? 'tormenta' : c0 >= 51 && c0 <= 86 ? 'lluvia' : c0 === 45 || c0 === 48 ? 'niebla' : c0 === 3 ? 'nublado' : c0 === 2 ? 'parcial' : 'despejado';
+    // Sin emojis: cada etiqueta lleva data-icono (minúsculas, sin tildes) para que la interfaz dibuje su propio ícono.
+    const tipoDe = c => [95, 96, 99].includes(c) ? 'tormenta' : c >= 51 && c <= 86 ? 'lluvia' : c === 45 || c === 48 ? 'niebla' : c === 3 ? 'nublado' : c === 2 ? 'parcial' : 'despejado';
+    const c0 = a.weather_code, real = tipoDe(c0);
     const cod = amb.previa && real !== amb.tipo ? { despejado: 0, parcial: 2, nublado: 3, lluvia: 63, tormenta: 95, niebla: 45 }[amb.tipo] : c0;   // si coincide con el real, se deja el texto real (p. ej. «Tormenta con granizo»)
-    const w = clima(cod, amb.previa ? (amb.fase === 'noche' ? 0 : 1) : a.is_day), tx = [`📍 ${seleccionada}`, `${w.emoji} ${w.texto}`, { amanecer: '🌅 Amanecer', dia: '☀️ Día', atardecer: '🌇 Atardecer', noche: '🌙 Noche' }[amb.fase] || '☀️ Día'], caja = $('escenaEtq');
-    caja.textContent = ''; tx.forEach(s => { const e = document.createElement('span'); e.textContent = s; caja.appendChild(e); });
+    const deNoche = amb.previa ? amb.fase === 'noche' : a.is_day === 0, w = clima(cod, deNoche ? 0 : 1), tc = tipoDe(cod), caja = $('escenaEtq');
+    const fase = { amanecer: 'Amanecer', dia: 'Día', atardecer: 'Atardecer', noche: 'Noche' }[amb.fase] ? amb.fase : 'dia';
+    const tx = [['ubicacion', seleccionada], [(tc === 'despejado' || tc === 'parcial') && deNoche ? tc + '-noche' : tc, w.texto], [fase, { amanecer: 'Amanecer', dia: 'Día', atardecer: 'Atardecer', noche: 'Noche' }[fase]]];
+    if (vigiaEtq) vigiaEtq.disconnect();
+    caja.textContent = ''; tx.forEach(([ic, s]) => { const e = document.createElement('span'); e.dataset.icono = ic; e.textContent = s; caja.appendChild(e); if (vigiaEtq) vigiaEtq.observe(e); });
+    eEtqSucio = true;
   }
   // Barra de navegación del celular
   document.querySelectorAll('.barra-nav [data-ir]').forEach(b => b.addEventListener('click', () => { const s = $(b.dataset.ir); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
@@ -1710,9 +2067,11 @@
     cieloLimpio = false;
     armarParticulas();
   }
-  let cClave = '', cieloLimpio = false, cAcum = 0, cDestello = 0;
+  let cClave = '', cieloLimpio = false, cAcum = 0, cDestello = 0, cViejo = null;   // cViejo: nubes y estrellas del clima anterior, que se desvanecen
   const claveCielo = () => [amb.tipo, cvW, cvH, claveFx()].join('|');
   function armarParticulas() {
+    const ant = cClave.split('|');                                 // si cambió el clima (no el tamaño), lo anterior se desvanece en ~1,5 s
+    cViejo = fx && cClave && ant[0] !== amb.tipo && +ant[1] === cvW && +ant[2] === cvH && (nubes.length || estrellas.length) ? { nubes, estrellas, k: 1, kE: vEsc.esc[1] } : null;
     cClave = claveCielo();
     const area = cvW * cvH, abierto = amb.tipo === 'despejado' || amb.tipo === 'parcial';
     gotas = [];                                                    // la lluvia se dibuja solo en el paisaje de arriba (no sobre los datos)
@@ -1751,21 +2110,28 @@
         brillar(cvW * L.x, cvH * (0.5 - 0.4 * L.alt), '190,205,255', 0.16 * cub * kLuna * L.f * pulso * (0.3 + 0.7 * il));
       }
     }
-    if (estrellas.length && kEstr > 0.01) {                        // estrellas en 4 grupos que titilan a destiempo
+    const V = cViejo;
+    if (V) { V.k = quieto ? 0 : V.k - dt / 1500; if (V.k <= 0) cViejo = null; }
+    const fv = cViejo ? V.k * V.k * (3 - 2 * V.k) : 0;             // cuánto queda de lo anterior (suavizado)
+    const pintarEstrellas = (lista, a) => {                         // estrellas en 4 grupos que titilan a destiempo
       cx.fillStyle = '#fff';
-      for (let k = 0; k < 4; k++) { cx.globalAlpha = kEstr * (0.35 + 0.45 * Math.sin(t / 900 + k * 1.7) ** 2); cx.beginPath(); for (let i = k; i < estrellas.length; i += 4) { const s = estrellas[i]; cx.moveTo(s.x + s.r, s.y); cx.arc(s.x, s.y, s.r, 0, 6.283); } cx.fill(); }
+      for (let k = 0; k < 4; k++) { cx.globalAlpha = a * (0.35 + 0.45 * Math.sin(t / 900 + k * 1.7) ** 2); cx.beginPath(); for (let i = k; i < lista.length; i += 4) { const s = lista[i]; cx.moveTo(s.x + s.r, s.y); cx.arc(s.x, s.y, s.r, 0, 6.283); } cx.fill(); }
       cx.globalAlpha = 1;
-    }
+    };
+    if (estrellas.length && kEstr > 0.01) pintarEstrellas(estrellas, kEstr);
+    if (fv && V.estrellas.length && V.kE > 0.01) pintarEstrellas(V.estrellas, V.kE * fv);
     const oscuras = A.tipo === 'lluvia' || A.tipo === 'tormenta';
     const ca = A.tipo === 'tormenta' ? 0.34 : A.tipo === 'niebla' ? 0.24 : 0.12 + 0.05 * luz;
     const cc = oscuras ? '40,50,70' : `${Math.round(150 + 105 * luz)},${Math.round(165 + 90 * luz)},${Math.round(200 + 55 * luz)}`;
-    nubes.forEach(n => {
+    const pintarNube = (n, a) => {
       if (!quieto) { n.x += n.v * dt * (1 + A.viento / 25); if (n.x - n.r * 1.8 > cvW) n.x = -n.r * 1.8; }
       const g = cx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
-      g.addColorStop(0, `rgba(${cc},${ca})`); g.addColorStop(1, `rgba(${cc},0)`);
+      g.addColorStop(0, `rgba(${cc},${a})`); g.addColorStop(1, `rgba(${cc},0)`);
       cx.save(); cx.translate(n.x, n.y); cx.scale(1.8, 0.55); cx.translate(-n.x, -n.y);
       cx.fillStyle = g; cx.fillRect(n.x - n.r, n.y - n.r, n.r * 2, n.r * 2); cx.restore();   // el recuadro de la nube, no un círculo trazado
-    });
+    };
+    if (fv) V.nubes.forEach(n => pintarNube(n, ca * fv));
+    nubes.forEach(n => pintarNube(n, ca * (1 - fv)));
     if (quieto) return;
     if (A.tipo === 'tormenta' && destello > 0.02 && efectoActivo('rayos')) { cx.fillStyle = `rgba(220,230,255,${destello * 0.16})`; cx.fillRect(0, 0, cvW, cvH); }   // relámpago: se aclara todo el cielo
   }
@@ -1909,7 +2275,7 @@
     document.body.classList.toggle('noche', fase === 'noche');
     const lluvia = tipo === 'tormenta' ? 1 : tipo === 'lluvia' ? limitar(0.3 + p / 3, 0.3, 1) : 0;
     const clave = [tipo, Math.round(lluvia * 4)].join(), claveFase = [tipo, fase].join();
-    Object.assign(amb, { tipo, fase, dia, dorado, lluvia, sol: m ? m.sol : null, viento: a.wind_speed_10m || 0, temp: a.temperature_2m, previa: !!vp, granizo: tipo === 'tormenta' && (cod === 96 || cod === 99) });
+    Object.assign(amb, { tipo, fase, dia, dorado, lluvia, sol: m ? m.sol : null, viento: a.wind_speed_10m || 0, temp: a.temperature_2m, previa: !!vp, granizo: tipo === 'tormenta' && (cod === 96 || cod === 99), mojado: vp ? 0 : d ? charcosRecientes(d) : (amb.mojado || 0) });
     const nuevaEstructura = clave !== ambClave, nuevaFase = claveFase !== faseClave;
     if (nuevaEstructura) { ambClave = clave; armarParticulas(); proxRayo = performance.now() + 3000; }   // las nubes y aves solo se vuelven a sortear si cambia el clima, no por el paso del día
     if (nuevaFase) {
