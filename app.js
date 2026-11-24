@@ -1252,6 +1252,51 @@
   const amb = { tipo: 'despejado', dia: true, dorado: false, lluvia: 0, viento: 0 };
   let ambClave = '', faseClave = '', cvW = 0, cvH = 0, gotas = [], estrellas = [], nubes = [], destello = 0, proxRayo = 0, rafCielo = 0, ultCielo = 0;
 
+  // ---- Preferencias de la animación ----
+  // Las elige cada persona (panel «Ajustes de animación») y se guardan solo en este navegador (clave 'clima-py-anim').
+  // CONTRATO entre las partes del código: el paisaje, el cielo y el sonido LEEN prefsAnim; el panel la CAMBIA solo con fijarPrefAnim({...}).
+  // `fx` (botón ✨) sigue siendo el interruptor general: si está apagado no se anima nada.
+  const TIPOS_CIELO = ['despejado', 'parcial', 'nublado', 'lluvia', 'tormenta', 'niebla'], FASES_DIA = ['amanecer', 'dia', 'atardecer', 'noche'];
+  const PREFS_ANIM_BASE = {
+    intensidad: 1,        // 0.5 suave · 1 normal · 1.5 intensa: multiplica la cantidad de partículas y el brillo de los efectos
+    calidad: 'auto',      // 'auto' (baja sola si el equipo va lento) · 'alta' · 'ahorro' (menos cuadros por segundo y menos partículas)
+    fondo: true,          // cielo animado detrás de toda la página (canvas #cielo)
+    paisaje: true,        // paisaje animado de arriba (canvas #escenaCv)
+    efectos: { lluvia: true, nubes: true, estrellas: true, rayos: true, niebla: true, fauna: true, viento: true, especiales: true },
+                          // fauna = aves, luciérnagas…; especiales = efectos de ocasión (arcoíris, estrellas fugaces, ondas de calor…)
+    volumen: 0.6          // 0 a 1: volumen del sonido del clima
+  };
+  function cargarPrefsAnim() {
+    const g = leerJSON('clima-py-anim', {}), p = JSON.parse(JSON.stringify(PREFS_ANIM_BASE));
+    if (!g || typeof g !== 'object' || Array.isArray(g)) return p;   // lo guardado se valida campo por campo: nunca se confía a ciegas
+    if ([0.5, 1, 1.5].includes(g.intensidad)) p.intensidad = g.intensidad;
+    if (['auto', 'alta', 'ahorro'].includes(g.calidad)) p.calidad = g.calidad;
+    for (const k of ['fondo', 'paisaje']) if (typeof g[k] === 'boolean') p[k] = g[k];
+    if (g.efectos && typeof g.efectos === 'object') for (const k of Object.keys(p.efectos)) if (typeof g.efectos[k] === 'boolean') p.efectos[k] = g.efectos[k];
+    if (typeof g.volumen === 'number' && g.volumen >= 0 && g.volumen <= 1) p.volumen = g.volumen;
+    return p;
+  }
+  const prefsAnim = cargarPrefsAnim();
+  prefsAnim.vistaPrevia = null;   // { tipo: TIPOS_CIELO, fase: FASES_DIA } para ver otro clima u hora sin esperar a que ocurra; NO se guarda
+  const efectoActivo = nombre => fx && prefsAnim.efectos[nombre] !== false;
+  let ultimoAmbiente = null;      // último clima recibido por ambiente(), para volver a aplicarlo al cambiar preferencias o vista previa
+  function fijarPrefAnim(cambios) {
+    for (const [k, v] of Object.entries(cambios || {})) {
+      if (k === 'efectos' && v && typeof v === 'object') Object.assign(prefsAnim.efectos, v);
+      else if (k in prefsAnim) prefsAnim[k] = v;
+    }
+    const { vistaPrevia, ...guardable } = prefsAnim;
+    guardar('clima-py-anim', JSON.stringify(guardable));
+    ambClave = ''; faseClave = '';                                  // obliga a rearmar partículas y colores con las preferencias nuevas
+    if (ultimoAmbiente) ambiente(...ultimoAmbiente); else { armarParticulas(); reanudarCielo(); mezclar(); }
+  }
+  // Factor de calidad que usan los efectos para decidir cuántas partículas dibujar (1 = completa, menor = más liviana).
+  // Lo mantiene el bucle de animación: con calidad 'auto' lo baja si el equipo va lento; con 'ahorro' es fijo y bajo.
+  let nivelCalidad = prefsAnim.calidad === 'ahorro' ? 0.5 : 1;
+  // Acceso para pruebas automáticas y para la consola del navegador, p. ej.:
+  //   climaAnim.fijar({ vistaPrevia: { tipo: 'tormenta', fase: 'noche' } })   ·   climaAnim.fijar({ vistaPrevia: null })
+  window.climaAnim = Object.freeze({ fijar: fijarPrefAnim, prefs: () => JSON.parse(JSON.stringify(prefsAnim)), estado: () => ({ ...amb, nivelCalidad }) });
+
   // ============ PAISAJE ANIMADO (el cuadro de arriba) ============
   // Un paisaje del río con colinas y palmeras que cambia con el clima de la ciudad elegida y con la hora. Todo se dibuja aquí mismo.
   const ec = $('escenaCv'), ex = ec.getContext('2d');
@@ -1578,16 +1623,21 @@
   // Traduce el clima actual a un "tipo de cielo" y lo aplica (colores, partículas y sonido)
   function ambiente(a, d) {
     if (!a || a.weather_code === undefined) return;
+    ultimoAmbiente = [a, d];
     const cod = a.weather_code, p = a.precipitation || 0;
     const m = momentoDia(porNombre.get(seleccionada));                // momento del día calculado con el sol y la hora real
-    const tipo = [95, 96, 99].includes(cod) ? 'tormenta' : cod >= 51 && cod <= 86 ? 'lluvia' : cod === 45 || cod === 48 ? 'niebla'
+    let tipo = [95, 96, 99].includes(cod) ? 'tormenta' : cod >= 51 && cod <= 86 ? 'lluvia' : cod === 45 || cod === 48 ? 'niebla'
       : cod === 3 ? 'nublado' : cod === 2 ? 'parcial' : 'despejado';
-    const fase = m ? m.fase : (a.is_day !== 0 ? 'dia' : 'noche'), dia = fase !== 'noche';
+    let fase = m ? m.fase : (a.is_day !== 0 ? 'dia' : 'noche');
+    const vp = prefsAnim.vistaPrevia;                                 // vista previa elegida en los ajustes: reemplaza el clima y/o la hora reales
+    if (vp && TIPOS_CIELO.includes(vp.tipo)) tipo = vp.tipo;
+    if (vp && FASES_DIA.includes(vp.fase)) fase = vp.fase;
+    const dia = fase !== 'noche';
     const dorado = (fase === 'amanecer' || fase === 'atardecer') && (tipo === 'despejado' || tipo === 'parcial');   // colores de amanecer/atardecer (solo con cielo abierto)
     document.body.classList.toggle('noche', fase === 'noche');
     const lluvia = tipo === 'tormenta' ? 1 : tipo === 'lluvia' ? limitar(0.3 + p / 3, 0.3, 1) : 0;
     const clave = [tipo, Math.round(lluvia * 4)].join(), claveFase = [tipo, fase].join();
-    Object.assign(amb, { tipo, fase, dia, dorado, lluvia, sol: m ? m.sol : null, viento: a.wind_speed_10m || 0, temp: a.temperature_2m });
+    Object.assign(amb, { tipo, fase, dia, dorado, lluvia, sol: m ? m.sol : null, viento: a.wind_speed_10m || 0, temp: a.temperature_2m, previa: !!vp });
     const nuevaEstructura = clave !== ambClave, nuevaFase = claveFase !== faseClave;
     if (nuevaEstructura) { ambClave = clave; armarParticulas(); proxRayo = performance.now() + 3000; }   // las nubes y aves solo se vuelven a sortear si cambia el clima, no por el paso del día
     if (nuevaFase) {
