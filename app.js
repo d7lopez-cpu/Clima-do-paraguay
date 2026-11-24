@@ -2649,6 +2649,8 @@
     "Hoy": "Ko árape", "Mañana": "Ko'ẽrõ", "— ninguna —": "— mba'eve —",
     // --- momentos del día ---
     "🌅 Amanecer": "🌅 Ko'ẽmbota", "☀️ Día": "☀️ Ára", "🌇 Atardecer": "🌇 Ka'aru", "🌙 Noche": "🌙 Pyhare",
+    // --- ajustes de animación (lo demás del panel queda en español) ---
+    "Día": "Ára", "Noche": "Pyhare", "Nubes": "Arai", "Estrellas y luna": "Mbyja ha jasy", "Lluvia y granizo": "Ama ha ama itá", "Aves y luciérnagas": "Guyra ha mua",
     // --- estado del cielo ---
     "Despejado": "Yvága hesakã", "Mayormente despejado": "Yvága hesakã heta", "Parcialmente nublado": "Arai sa'i", "Nublado": "Arai hetáva",
     "Niebla": "Arai yvýpe", "Niebla con escarcha": "Arai yvýpe ro'ysã reheve",
