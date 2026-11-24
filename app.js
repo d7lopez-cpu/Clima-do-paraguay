@@ -1683,6 +1683,7 @@
           const n = Math.max(14, cant(34)), vel = eH * (0.0003 + Math.random() * 0.0001);
           f.chispas = Array.from({ length: n }, (_, i) => { const a = i / n * 6.283 + Math.random() * 0.2, s = vel * (0.7 + Math.random() * 0.45); return { x: f.x, y: f.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s }; });
           f.dur = 1500 + Math.random() * 600; f.cx = f.x; f.cy = f.y;
+          if (window.climaSonido && climaSonido.estallido) climaSonido.estallido(0.4 + Math.random() * 0.6);   // suena solo si el sonido del clima está encendido
         }
         return true;
       }
