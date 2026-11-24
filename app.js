@@ -1715,11 +1715,24 @@
   }
 
   // ============ SONIDO DEL CLIMA ============
-  // Un paisaje sonoro que cambia con el clima de la ciudad elegida. Todo se fabrica aquí mismo con el navegador (no se descarga nada):
-  //  ☀️ día soleado: aves, brisa y, con calor, cigarras · 🌇 hora dorada: coro de aves · 🌙 noche: grillos y ranas
-  //  ☁️ nublado: brisa y aves lejanas · 🌫️ niebla: sonido amortiguado · 🌧️ lluvia: gotas y ranas · ⛈️ tormenta: lluvia fuerte, viento y truenos
+  // Un paisaje sonoro que cambia con el clima de la ciudad elegida (o con la vista previa). Todo se fabrica aquí mismo con el navegador
+  // (Web Audio: ruido y osciladores, no se descarga nada) y solo suena si la persona toca 🔈.
+  //  ☀️ día: aves y brisa; con calor de verano (≥ 28 °C, de noviembre a marzo) chicharras · 🌇 hora dorada: coro de aves
+  //  🌙 noche despejada o con pocas nubes: grillos (cantan más rápido cuanto más calor hace) y ranas · ☁️ nublado: brisa y aves lejanas
+  //  🌫️ niebla: sonido amortiguado · 🌧️ lluvia: siseo y gotas según la intensidad · ⛈️ tormenta: lluvia fuerte, truenos que llegan
+  //  con más o menos retraso según la distancia y, con granizo (códigos 96/99), golpeteo sobre el techo · 💨 viento: ráfagas según los km/h
+  // Volumen general = prefsAnim.volumen (ganancia maestra; cambiarlo es barato y suave). Las capas continuas se crean UNA vez;
+  // los sonidos sueltos (aves, gotas, granizo, truenos) se apagan y se liberan solos, con un tope de truenos simultáneos.
   let au = null, sonando = false;
   const azar = (a, b) => a + Math.random() * (b - a);
+  const gananciaVolumen = () => 1.5 * limitar(Number(prefsAnim.volumen) || 0, 0, 1);   // 0,6 (el valor de fábrica) → 0,9, como antes
+  // ¿Granizo? Solo con tormenta real con granizo (códigos 96/99); una vista previa que elige otro tipo de clima no lo hereda
+  const hayGranizo = () => amb.tipo === 'tormenta' && !!ultimoAmbiente && [96, 99].includes(ultimoAmbiente[0].weather_code) && !(prefsAnim.vistaPrevia && prefsAnim.vistaPrevia.tipo);
+  let mesCache = { t: -1e9, verano: false };
+  const mesVerano = () => {                                        // noviembre a marzo (en Asunción); se recalcula cada 10 min como mucho
+    if (performance.now() - mesCache.t > 600000) { const m = +horaAsuncion().slice(5, 7); mesCache = { t: performance.now(), verano: m >= 11 || m <= 3 }; }
+    return mesCache.verano;
+  };
 
   function crearAudio() {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -1728,7 +1741,7 @@
     master.gain.value = 0; suave.type = 'lowpass'; suave.frequency.value = 16000;
     master.connect(suave); suave.connect(comp); comp.connect(ctx.destination);
 
-    // Ruido rosa (más grave y natural que el blanco): es la materia prima del viento, la lluvia, las cigarras y los truenos
+    // Ruido rosa (más grave y natural que el blanco): es la materia prima del viento, la lluvia, las chicharras, el granizo y los truenos
     const N = ctx.sampleRate * 6, F = Math.round(ctx.sampleRate * 0.5), buf = ctx.createBuffer(1, N, ctx.sampleRate), ch = buf.getChannelData(0), x = new Float32Array(N + F);
     let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
     for (let i = 0; i < x.length; i++) {
@@ -1754,12 +1767,14 @@
       return { g, fl };
     };
     const lfo = (hz, prof, destino) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = hz; g.gain.value = prof; o.connect(g); g.connect(destino); o.start(); };
-    // Viento: el filtro y el volumen suben y bajan despacio, como las ráfagas
+    // Viento de fondo: el filtro y el volumen suben y bajan despacio
     const viento = capa('bandpass', 400, 0.6, 60);
     lfo(0.11, 140, viento.fl.frequency); lfo(0.043, 0.012, viento.g.gain);
+    // Ráfagas: otra banda de ruido cuyo volumen y tono se programan a saltos irregulares (ver programarRafaga); con viento fuerte, un silbido
+    const rafaga = capa('bandpass', 520, 0.9, 90), silbido = capa('bandpass', 1100, 14, 400);
     // Lluvia: un "siseo" parejo + un murmullo grave (más presente en las tormentas)
     const lluvia = capa('lowpass', 7500, 0.2, 1400), lluviaBajo = capa('lowpass', 700, 0.4, 120);
-    // Cigarras: ruido agudo que "vibra" ~60-80 veces por segundo y se hincha y se apaga despacio
+    // Chicharras: ruido agudo que "vibra" ~60-80 veces por segundo y se hincha y se apaga despacio
     const cigarra = (f, hz) => {
       const s = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), am = ctx.createGain(), sw = ctx.createGain(), nivel = ctx.createGain(), l = ctx.createOscillator(), lg = ctx.createGain();
       s.buffer = buf; s.loop = true; bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 5;
@@ -1769,29 +1784,35 @@
       return nivel;
     };
     const cig = [cigarra(4900, 62), cigarra(6200, 77)];
-    // Grillos: un tono agudo que "late" en pulsos rápidos agrupados en cantos cortos; tres grillos desfasados hacen un coro
+    // Grillos: un tono agudo que "late" en pulsos rápidos agrupados en cantos; tres grillos desfasados hacen un coro.
+    // El ritmo de los cantos (grupo) se ajusta con la temperatura en mezclar().
     const grillo = (f, pulso, grupo) => {
       const o = ctx.createOscillator(), am = ctx.createGain(), gate = ctx.createGain(), nivel = ctx.createGain();
-      const onda = (hz, corte) => { const p = ctx.createOscillator(), pf = ctx.createBiquadFilter(), pg = ctx.createGain(); p.type = 'square'; p.frequency.value = hz; pf.type = 'lowpass'; pf.frequency.value = corte; pg.gain.value = 0.5; p.connect(pf); pf.connect(pg); p.start(); return pg; };
+      const onda = (hz, corte) => { const p = ctx.createOscillator(), pf = ctx.createBiquadFilter(), pg = ctx.createGain(); p.type = 'square'; p.frequency.value = hz; pf.type = 'lowpass'; pf.frequency.value = corte; pg.gain.value = 0.5; p.connect(pf); pf.connect(pg); p.start(); return { pg, p }; };
       o.type = 'sine'; o.frequency.value = f; am.gain.value = 0.5; gate.gain.value = 0.5; nivel.gain.value = 0;
-      onda(pulso, 70).connect(am.gain); onda(grupo, 14).connect(gate.gain);
+      const pu = onda(pulso, 70), gr = onda(grupo, 14);
+      pu.pg.connect(am.gain); gr.pg.connect(gate.gain);
       o.connect(am); am.connect(gate); gate.connect(nivel); nivel.connect(master); o.start();
-      return nivel;
+      return { nivel, ritmo: gr.p.frequency, grupo };
     };
     const gri = [grillo(4300, 29, 1.9), grillo(4650, 33, 2.3), grillo(5050, 27, 1.6)];
 
-    // Cada 250 ms se decide al azar si suena un ave, una rana o una tanda de gotas, según el clima
+    // Cada 250 ms: aves, ranas, ráfagas y truenos sueltos; cada 100 ms: gotas y granizo (todo según el clima)
     const intervaloAves = setInterval(() => {
       if (!sonando || document.hidden) return;
       if (Math.random() < au.tasaAves * 0.07) llamadaAve();
       if (Math.random() < au.tasaRanas * 0.12) rana();
+      if (au.ctx.currentTime >= au.proxRafaga) programarRafaga();
+      // si el cielo no está dibujando relámpagos (fondo apagado, movimiento reducido…), los truenos llegan solos de vez en cuando
+      if (amb.tipo === 'tormenta' && performance.now() - au.ultTrueno > au.esperaTrueno) trueno();
     }, 250);
     const intervaloGotas = setInterval(() => {
-      if (!sonando || document.hidden || amb.lluvia <= 0) return;
-      const n = Math.round(amb.lluvia * (1 + Math.random() * 3));
-      for (let i = 0; i < n; i++) setTimeout(gota, Math.random() * 100);
+      if (!sonando || document.hidden) return;
+      if (amb.lluvia > 0) { const n = Math.round(amb.lluvia * (1 + Math.random() * 3)); for (let i = 0; i < n; i++) setTimeout(gota, Math.random() * 100); }
+      if (au.granizo) { const n = Math.round(azar(1, 4)); for (let i = 0; i < n; i++) setTimeout(piedra, Math.random() * 100); }
     }, 100);
-    return { ctx, master, suave, viento, lluvia, lluviaBajo, cig, gri, aves, rev, buf, intervaloAves, intervaloGotas, tasaAves: 0, tasaRanas: 0 };
+    return { ctx, master, suave, viento, rafaga, silbido, lluvia, lluviaBajo, cig, gri, aves, rev, buf, intervaloAves, intervaloGotas,
+      tasaAves: 0, tasaRanas: 0, granizo: false, proxRafaga: 0, ultTrueno: performance.now(), esperaTrueno: 15000, truenos: [], niveles: {} };
   }
 
   function salida(destino) {                                       // un punto al azar del estéreo
@@ -1841,46 +1862,101 @@
     g.gain.setValueAtTime(0, T); g.gain.linearRampToValueAtTime(0.15 + Math.random() * 0.25, T + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, T + 0.05 + Math.random() * 0.05);
     s.connect(f); f.connect(g); g.connect(salida(master)); s.start(T, Math.random() * 4, 0.12);
   }
-  // Trueno: llega con un pequeño retraso después del relámpago del cielo (cuanto más tarda, más lejos suena)
+  // Granizo: un golpe seco y agudo (piedra sobre chapa o tejas), a veces con un "toc" más grave
+  function piedra() {
+    const { ctx, master, buf } = au, T = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), d = azar(0.012, 0.03);
+    s.buffer = buf; f.type = Math.random() < 0.25 ? 'bandpass' : 'highpass'; f.frequency.value = f.type === 'bandpass' ? azar(700, 1300) : azar(3200, 6500); f.Q.value = 3;
+    g.gain.setValueAtTime(0, T); g.gain.linearRampToValueAtTime(azar(0.18, 0.45), T + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, T + d);
+    s.connect(f); f.connect(g); g.connect(salida(master)); s.start(T, Math.random() * 4, d + 0.02);
+  }
+  // Ráfagas de viento: cada pocos segundos el volumen y el tono de la capa de ráfagas suben y bajan; cuanto más viento, más seguidas y fuertes
+  function programarRafaga() {
+    const { ctx, rafaga, silbido } = au, T = ctx.currentTime, v = amb.viento || 0, k = limitar((v - 8) / 42, 0, 1);
+    au.proxRafaga = T + azar(2.5, 7) / (0.6 + k * 1.4);
+    if (k <= 0) return;                                            // con menos de ~8 km/h no hay ráfagas, solo la brisa de fondo
+    const sube = azar(0.5, 1.4), dura = azar(1.2, 3.5) * (1.2 - k * 0.4), pico = (0.08 + 0.45 * k) * azar(0.6, 1);
+    const sostener = p => { if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(T); else p.cancelScheduledValues(T); };
+    sostener(rafaga.g.gain); rafaga.g.gain.setTargetAtTime(pico, T, sube / 3); rafaga.g.gain.setTargetAtTime(0.02 * k, T + sube + dura * 0.4, dura / 3);
+    sostener(rafaga.fl.frequency); rafaga.fl.frequency.setTargetAtTime(380 + 600 * k * azar(0.7, 1.2), T, sube / 2); rafaga.fl.frequency.setTargetAtTime(380, T + sube + dura * 0.4, dura / 2);
+    if (v >= 35) {                                                 // viento fuerte: un silbido que sube y baja con la ráfaga
+      const ks = limitar((v - 35) / 30, 0.15, 1);
+      sostener(silbido.g.gain); silbido.g.gain.setTargetAtTime(0.05 * ks * azar(0.5, 1), T, sube / 2); silbido.g.gain.setTargetAtTime(0, T + sube + dura * 0.3, dura / 3);
+      sostener(silbido.fl.frequency); silbido.fl.frequency.setTargetAtTime(azar(900, 1500), T, sube);
+    }
+  }
+  // Trueno: llega después del relámpago con un retraso según la distancia (unos 0,4 s por km, comprimido: en la realidad son ~3 s por km).
+  // Cerca: chasquido seco y retumbo fuerte; lejos: solo un rumor grave, más largo y más bajo. Como mucho 3 truenos sonando a la vez.
   function trueno() {
     if (!au || !sonando || amb.tipo !== 'tormenta') return;
-    const { ctx, buf } = au, esp = azar(0.5, 3.5), T = ctx.currentTime + esp, cerca = 1 - esp / 3.5 * 0.6, sal = salida(au.master);
+    const { ctx, buf } = au, ahora = ctx.currentTime;
+    au.ultTrueno = performance.now(); au.esperaTrueno = azar(14000, 24000);
+    au.truenos = au.truenos.filter(f => f > ahora);
+    if (au.truenos.length >= 3) return;
+    const km = azar(0.6, 9), esp = 0.3 + km * 0.4, T = ahora + esp, cerca = limitar(1.15 - km / 10, 0.25, 1), sal = salida(au.master);
     const ruido = (t, tipo, f0, f1, vol, dur, ataque) => {
       const s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
       s.buffer = buf; s.loop = true; fl.type = tipo; fl.frequency.setValueAtTime(f0, t); fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + ataque); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       s.connect(fl); fl.connect(g); g.connect(sal); s.start(t, Math.random() * 3); s.stop(t + dur + 0.1);
+      return t + dur + 0.1;
     };
-    if (esp < 1.6) ruido(T, 'highpass', 1500, 900, 0.5 * cerca, 0.3, 0.01);                // el chasquido, solo si cayó cerca
-    ruido(T, 'lowpass', 260, 55, 1.6 * cerca, azar(3.5, 5.5), 0.25);                       // el retumbo largo
-    ruido(T + azar(0.8, 1.6), 'lowpass', 200, 50, 1 * cerca, azar(2.5, 4), 0.3);           // y su eco
+    let fin = T;
+    if (km < 2.5) fin = Math.max(fin, ruido(T, 'highpass', 1800, 900, 0.55 * cerca, 0.3, 0.008));           // el chasquido, solo si cayó cerca
+    const corte = 300 - km * 18;                                   // cuanto más lejos, más grave (el aire se come los agudos)
+    fin = Math.max(fin, ruido(T, 'lowpass', corte, 50, 1.6 * cerca, azar(3.5, 5.5) + km * 0.15, 0.12 + km * 0.05));   // el retumbo largo
+    const ecos = km < 4 ? 2 : 1;                                   // y sus ecos, que "ruedan" por el cielo
+    for (let i = 0; i < ecos; i++) fin = Math.max(fin, ruido(T + azar(0.7, 1.8) * (i + 1), 'lowpass', corte * 0.8, 45, cerca * azar(0.6, 1), azar(2.5, 4), 0.3));
+    au.truenos.push(fin);
   }
   function describirSonido() {
-    const { tipo, dia, dorado, temp } = amb;
-    if (tipo === 'tormenta') return 'Tormenta: lluvia fuerte, viento y truenos';
-    if (tipo === 'lluvia') return dia ? 'Lluvia: gotas sobre las hojas y aves lejanas' : 'Noche de lluvia: gotas y ranas';
+    const { tipo, dia, dorado, temp, viento: v } = amb;
+    const ventoso = (v || 0) >= 35 ? ' y ráfagas fuertes de viento' : (v || 0) >= 15 ? ' y ráfagas de viento' : '';
+    if (tipo === 'tormenta') return (hayGranizo() ? 'Tormenta con granizo: golpeteo de piedras, lluvia fuerte y truenos' : 'Tormenta: lluvia fuerte, viento y truenos que se acercan y se alejan');
+    if (tipo === 'lluvia') return (amb.lluvia >= 0.7 ? (dia ? 'Lluvia fuerte: aguacero sobre las hojas' : 'Noche de lluvia fuerte: aguacero y ranas') : dia ? 'Lluvia: gotas sobre las hojas y aves lejanas' : 'Noche de lluvia: gotas y ranas') + ventoso;
     if (tipo === 'niebla') return 'Niebla: sonido amortiguado y brisa suave';
-    if (!dia) return 'Noche tranquila: grillos y ranas';
-    if (dorado) return 'Hora dorada: coro de aves y brisa suave';
-    if (tipo === 'nublado') return 'Cielo nublado: brisa suave y aves lejanas';
-    return (temp || 0) >= 27 ? 'Día soleado: aves, brisa y cigarras' : 'Día tranquilo: aves y brisa suave';
+    if (!dia) return (tipo === 'despejado' || tipo === 'parcial' ? ((temp || 0) >= 12 ? 'Noche tranquila: grillos y ranas' : 'Noche fresca: ranas lejanas') : 'Noche nublada: ranas y grillos lejanos') + ventoso;
+    if (dorado) return 'Hora dorada: coro de aves y brisa suave' + ventoso;
+    if (tipo === 'nublado') return 'Cielo nublado: brisa suave y aves lejanas' + ventoso;
+    return ((temp || 0) >= 28 && mesVerano() ? 'Día caluroso de verano: chicharras, aves y brisa' : 'Día tranquilo: aves y brisa suave') + ventoso;
+  }
+  // Cambia el valor de un parámetro de audio suavemente (constante de tiempo s), sin acumular eventos viejos en su línea de tiempo
+  function irHacia(p, val, s) {
+    const T = au.ctx.currentTime;
+    if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(T); else p.cancelScheduledValues(T);
+    p.setTargetAtTime(val, T, s || 2);
   }
   function mezclar() {                                             // ajusta cada capa al clima actual (los cambios son suaves, de unos 2 segundos)
     if (!au) return;
-    const { ctx, viento, lluvia, lluviaBajo, cig, gri, suave } = au, T = ctx.currentTime, { tipo, dia, dorado, lluvia: ll, viento: v } = amb, temp = amb.temp || 25;
-    const seco = tipo !== 'lluvia' && tipo !== 'tormenta', objetivo = (p, val, s) => p.setTargetAtTime(val, T, s || 2);
-    objetivo(viento.g.gain, 0.085 + limitar(v / 40, 0, 1) * 0.35 + (tipo === 'tormenta' ? 0.12 : 0));
-    objetivo(viento.fl.frequency, 260 + v * 12);
-    objetivo(lluvia.g.gain, ll * 0.42); objetivo(lluviaBajo.g.gain, ll * ll * 0.7);
-    const calor = dia && !dorado && (tipo === 'despejado' || tipo === 'parcial') && temp >= 27 ? (tipo === 'despejado' ? 1 : 0.6) * limitar((temp - 26) / 8, 0.25, 1) : 0;
-    cig.forEach(n => objetivo(n.gain, calor * 1.3));
-    const noche = !dia && seco ? (tipo === 'niebla' ? 0.5 : 1) : 0;
-    gri.forEach(n => objetivo(n.gain, noche * 0.06));
-    au.tasaAves = dia && tipo !== 'tormenta' ? { despejado: 1, parcial: 0.8, nublado: 0.45, niebla: 0.3, lluvia: 0.12 }[tipo] * (dorado ? 2.2 : 1) : 0;
-    au.tasaRanas = !dia ? (ll > 0 ? 0.9 : tipo === 'despejado' || tipo === 'parcial' ? 0.35 : 0.15) : (ll > 0 && ll < 0.7 ? 0.08 : 0);
-    objetivo(suave.frequency, tipo === 'niebla' ? 2600 : tipo === 'lluvia' || tipo === 'tormenta' ? 9000 : 16000, 1.5);
     $('btnSonido').title = describirSonido();
+    irHacia(au.master.gain, sonando ? gananciaVolumen() : 0, sonando ? 0.25 : 0.8);   // volumen general: barato (un solo nodo)
+    const { viento, lluvia, lluviaBajo, cig, gri, suave } = au, { tipo, fase, dia, dorado, lluvia: ll, viento: v } = amb, temp = amb.temp === undefined || amb.temp === null ? 25 : amb.temp;
+    const abierto = tipo === 'despejado' || tipo === 'parcial';
+    const nv = {};
+    nv.viento = 0.085 + limitar(v / 40, 0, 1) * 0.3 + (tipo === 'tormenta' ? 0.12 : 0);
+    irHacia(viento.g.gain, nv.viento); irHacia(viento.fl.frequency, 260 + v * 12);
+    nv.rafagas = limitar((v - 8) / 42, 0, 1);                      // la capa de ráfagas se maneja en programarRafaga(); aquí solo se anota
+    if (nv.rafagas <= 0) irHacia(au.rafaga.g.gain, 0, 1.5);
+    if (v < 35) irHacia(au.silbido.g.gain, 0, 1.5);
+    nv.lluvia = ll * 0.42; nv.lluviaBajo = ll * ll * 0.7;
+    irHacia(lluvia.g.gain, nv.lluvia); irHacia(lluviaBajo.g.gain, nv.lluviaBajo); irHacia(lluvia.fl.frequency, 4500 + ll * 4000);
+    // chicharras: de día (no en la hora dorada), con 28 °C o más, de noviembre a marzo; con nubes, más bajas
+    nv.chicharras = fase === 'dia' && temp >= 28 && mesVerano() && (abierto || tipo === 'nublado') ? (tipo === 'despejado' ? 1 : tipo === 'parcial' ? 0.7 : 0.35) * limitar((temp - 27) / 7, 0.3, 1) : 0;
+    cig.forEach(n => irHacia(n.gain, nv.chicharras * 1.3));
+    // grillos: noches despejadas o con pocas nubes (más bajitos con cielo cubierto y al atardecer); con frío (< 12 °C) se callan
+    nv.grillos = temp < 12 ? 0 : !dia ? (abierto ? 1 : tipo === 'nublado' ? 0.3 : 0) : fase === 'atardecer' && abierto ? 0.35 : 0;
+    // ritmo de los cantos según la temperatura (ley de Dolbear: con calor cantan más rápido); 1 = el ritmo de base a ~24 °C
+    const ritmo = limitar((4 * ((temp * 9 / 5 + 32) - 50) + 40) / 147, 0.5, 1.35);
+    gri.forEach(g => { irHacia(g.nivel.gain, nv.grillos * 0.06); irHacia(g.ritmo, g.grupo * ritmo, 1); });
+    au.granizo = nv.granizo = hayGranizo();
+    au.tasaAves = nv.aves = dia && tipo !== 'tormenta' ? { despejado: 1, parcial: 0.8, nublado: 0.45, niebla: 0.3, lluvia: 0.12 }[tipo] * (dorado ? 2.2 : 1) : 0;
+    au.tasaRanas = nv.ranas = !dia ? (ll > 0 ? 0.9 : abierto ? 0.35 : 0.15) : (ll > 0 && ll < 0.7 ? 0.08 : 0);
+    irHacia(suave.frequency, tipo === 'niebla' ? 2600 : tipo === 'lluvia' || tipo === 'tormenta' ? 9000 : 16000, 1.5);
+    au.niveles = nv;
   }
+  // Para pruebas automáticas y la consola: lo que el sonido está haciendo ahora (null si nunca se activó)
+  window.climaSonido = Object.freeze({
+    estado: () => au ? { sonando, volumen: sonando ? gananciaVolumen() : 0, capas: { ...au.niveles }, truenos: au.truenos.filter(f => f > au.ctx.currentTime).length, contexto: au.ctx.state, descripcion: describirSonido() } : null
+  });
   function visibilidadSonido() { if (au && sonando) { if (document.hidden) au.ctx.suspend(); else au.ctx.resume(); } }
   window.addEventListener('pagehide', () => {
     sonando = false;
@@ -1890,8 +1966,7 @@
     if (!au) { au = crearAudio(); if (!au) { aviso('Tu navegador no permite reproducir sonido.'); return; } }
     sonando = !sonando;
     if (sonando) await au.ctx.resume();
-    au.master.gain.setTargetAtTime(sonando ? 0.9 : 0, au.ctx.currentTime, 0.8);
-    if (!sonando) setTimeout(() => { if (!sonando) au.ctx.suspend(); }, 3500);
+    if (!sonando) setTimeout(() => { if (!sonando && au) au.ctx.suspend(); }, 3500);
     const b = $('btnSonido');
     b.textContent = sonando ? '🔊' : '🔈'; b.classList.toggle('on', sonando); b.setAttribute('aria-pressed', sonando);
     b.setAttribute('aria-label', sonando ? 'Silenciar el sonido del clima' : 'Activar el sonido del clima');
