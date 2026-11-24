@@ -1581,24 +1581,39 @@
   // ---- Temporada (grupo «especiales») ----
   const COL_GUIR = ['255,214,150', '255,168,72', '236,96,84', '130,206,140'];   // luces cálidas: blanco cálido, ámbar, rojo y verde suaves
   function spritesGuirnalda() { return COL_GUIR.map(c => { const k = document.createElement('canvas'); k.width = k.height = 24; const g = k.getContext('2d'), gr = g.createRadialGradient(12, 12, 0, 12, 12, 12); gr.addColorStop(0, `rgba(${c},0.9)`); gr.addColorStop(0.3, `rgba(${c},0.35)`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(0, 0, 24, 24); return k; }); }
-  // Guirnalda colgada entre dos troncos (a y b: funciones de palmaEsc), con luces que se encienden y apagan muy despacio
-  function guirnalda(a, b, ua, ub, t, noche, cable, i0) {
+  // Guirnalda colgada entre dos troncos (a y b: funciones de palmaEsc). Las bombillas parpadean como una guirnalda real:
+  // una onda lenta (~7 s) recorre la guirnalda y pares e impares van a destiempo; nunca se apagan del todo ni destellan.
+  // Con `fija` (clase navidad-quieta en <html>, movimiento reducido o escena quieta) quedan encendidas sin parpadear.
+  // De ella cuelgan dos rosetas de ñandutí doradas que se mecen apenas.
+  function guirnalda(a, b, ua, ub, t, noche, cable, i0, fija, kLuz) {
     const [x1, y1] = a(ua), [x2, y2] = b(ub), cx1 = (x1 + x2) / 2, cy1 = Math.max(y1, y2) + Math.abs(x2 - x1) * 0.28, n = 9;
+    const punto = u => { const v = 1 - u; return [v * v * x1 + 2 * u * v * cx1 + u * u * x2, v * v * y1 + 2 * u * v * cy1 + u * u * y2]; };
     ex.strokeStyle = cable; ex.lineWidth = 0.8; ex.beginPath(); ex.moveTo(x1, y1); ex.quadraticCurveTo(cx1, cy1, x2, y2); ex.stroke();
+    // rosetas de ñandutí: un hilo, un aro con rayos y un centro
+    const rr = Math.max(2.6, eH * 0.02), oro = `rgba(232,196,110,${0.6 + 0.4 * kLuz})`;
+    ex.strokeStyle = oro; ex.lineWidth = 0.6;
+    for (const [u, j] of [[0.3, 0], [0.7, 1]]) {
+      const [hx, hy] = punto(u), sw = fija ? 0 : Math.sin(t / 1700 + j * 2 + i0) * 0.12, hl = eH * 0.03, rx = hx + Math.sin(sw) * (hl + rr), ry = hy + Math.cos(sw) * (hl + rr);
+      ex.beginPath(); ex.moveTo(hx, hy); ex.lineTo(hx + Math.sin(sw) * hl, hy + Math.cos(sw) * hl);
+      ex.moveTo(rx + rr, ry); ex.arc(rx, ry, rr, 0, 6.283); ex.moveTo(rx + rr * 0.45, ry); ex.arc(rx, ry, rr * 0.45, 0, 6.283);
+      for (let k = 0; k < 10; k++) { const an = k * 0.6283 + sw; ex.moveTo(rx + Math.cos(an) * rr * 0.45, ry + Math.sin(an) * rr * 0.45); ex.lineTo(rx + Math.cos(an) * rr, ry + Math.sin(an) * rr); }
+      ex.stroke(); ex.fillStyle = oro; ex.fillRect(rx - 0.7, ry - 0.7, 1.4, 1.4);
+    }
     if (!eSprGuir) eSprGuir = spritesGuirnalda();
     for (let i = 1; i < n; i++) {
-      const u = i / n, v = 1 - u, x = v * v * x1 + 2 * u * v * cx1 + u * u * x2, y = v * v * y1 + 2 * u * v * cy1 + u * u * y2 + 1.5, c = (i + i0) % 4;
-      const br = 0.55 + 0.45 * Math.sin(t / 1900 + (i + i0) * 1.9);
-      ex.globalAlpha = br * (0.35 + 0.65 * noche); ex.drawImage(eSprGuir[c], x - 7, y - 7, 14, 14);
-      ex.globalAlpha = 0.6 + 0.4 * br; ex.fillStyle = `rgb(${COL_GUIR[c]})`; ex.fillRect(x - 1, y - 1, 2, 2);
+      const [x, y0] = punto(i / n), y = y0 + 2.2, c = (i + i0) % 4;
+      const ola = 0.5 + 0.5 * Math.sin(t / 1100 - (i + i0) * 0.85 + (i % 2) * 1.9), br = fija ? 1 : 0.3 + 0.7 * ola * ola * (3 - 2 * ola);
+      ex.globalAlpha = br * (0.3 + 0.7 * noche); ex.drawImage(eSprGuir[c], x - 8, y - 8, 16, 16);   // halo cálido
+      ex.globalAlpha = 1; ex.fillStyle = cable; ex.fillRect(x - 0.7, y0, 1.4, 1.4);                    // portalámpara
+      ex.globalAlpha = 0.45 + 0.55 * br; ex.fillStyle = `rgb(${COL_GUIR[c]})`; ex.beginPath(); ex.ellipse(x, y + 0.4, 1.25, 1.75, 0, 0, 6.283); ex.fill();   // bombilla
     }
     ex.globalAlpha = 1;
   }
-  // Estrella dorada de Navidad: cuatro puntas largas y cuatro cortas, con un halo que late despacio
-  function estrellaNavidad(x, y, r, a, t) {
-    const p = 1 + 0.12 * Math.sin(t / 2200), gl = ex.createRadialGradient(x, y, 0, x, y, r * 3.2 * p);
-    gl.addColorStop(0, `rgba(255,214,120,${0.42 * a})`); gl.addColorStop(1, 'rgba(255,214,120,0)'); ex.fillStyle = gl; ex.fillRect(x - r * 3.2 * p, y - r * 3.2 * p, r * 6.4 * p, r * 6.4 * p);
-    ex.fillStyle = `rgba(255,232,160,${a})`; ex.beginPath();
+  // Estrella dorada de Navidad: cuatro puntas largas y cuatro cortas; de noche, con un halo que late despacio (fija: no late)
+  function estrellaNavidad(x, y, r, a, halo, t, fija) {
+    const p = fija ? 1 : 1 + 0.1 * Math.sin(t / 2200);
+    if (halo > 0.02) { const gl = ex.createRadialGradient(x, y, 0, x, y, r * 3.4 * p); gl.addColorStop(0, `rgba(255,214,120,${0.45 * halo})`); gl.addColorStop(1, 'rgba(255,214,120,0)'); ex.fillStyle = gl; ex.fillRect(x - r * 3.4 * p, y - r * 3.4 * p, r * 6.8 * p, r * 6.8 * p); }
+    ex.fillStyle = `rgba(255,226,140,${a})`; ex.beginPath();
     for (let i = 0; i < 16; i++) { const ang = i * Math.PI / 8 - Math.PI / 2, L = i % 4 === 0 ? r * 1.6 * p : i % 2 === 0 ? r * 0.75 : r * 0.22; ex.lineTo(x + Math.cos(ang) * L, y + Math.sin(ang) * L); }
     ex.closePath(); ex.fill();
   }
@@ -1703,7 +1718,7 @@
         const Lr = Math.hypot(eW, eH) * 0.75, gr = ex.createRadialGradient(sx, sy, R, sx, sy, Lr);
         gr.addColorStop(0, `rgba(255,${Math.round(190 + 40 * k)},140,${0.06 * kr})`); gr.addColorStop(0.5, `rgba(255,200,140,${0.02 * kr})`); gr.addColorStop(1, 'rgba(255,200,140,0)');
         ex.save(); ex.globalCompositeOperation = 'lighter'; ex.fillStyle = gr;
-        for (const m of [1, 0.45]) {                                // dos pasadas (ancha y angosta): el borde de cada rayo queda difuso
+        for (const m of nivelR() < 1 ? [0.75] : [1, 0.45]) {        // dos pasadas (ancha y angosta): el borde de cada rayo queda difuso; con calidad baja, una
           ex.beginPath();
           for (let i = 0; i < 10; i++) {
             const a = i / 10 * 6.283 + 0.18 * Math.sin(t / 9000 + i * 1.3), w = (0.05 + 0.03 * Math.sin(t / 3700 + i * 2.3)) * m;
@@ -1725,15 +1740,6 @@
       ex.fillStyle = gl; ex.fillRect(mx - R * 4.5, my - R * 4.5, R * 9, R * 9);
       dibujarLuna(ex, mx, my, R * 0.85, al);
       refLuna = { x: mx, col: '222,230,255', a: 0.42 * al * (0.3 + 0.7 * il), w: R * 1.1 };
-    }
-    {                                                               // Navidad: una estrella dorada, más brillante que las demás, desde el anochecer
-      const kN = esp && A.lluvia === 0 && document.documentElement.classList.contains('navidad') ? (1 - kLuz) * (A.tipo === 'niebla' ? 0.35 : A.tipo === 'nublado' ? 0.55 : 1) : 0;
-      if (kN > 0.03) {
-        const mx = eW * vAst.mx, my = eH * vAst.my, lejos = R * 4.5;
-        let x = eW * 0.3; const y0 = eH * 0.2;
-        if (vAst.mf > 0.05 && Math.abs(mx - x) < lejos && Math.abs(my - y0) < lejos) x = mx < x ? mx + lejos : mx - lejos;   // no se encima con la luna
-        estrellaNavidad(x, libreDeEtq(x, y0, R * 0.9), R * 0.55, kN, t);
-      }
     }
     // nubes y aves
     if (eNubes.length) {                                          // por capas: las lejanas se tiñen del cielo; medias y cercanas llevan la panza en sombra
@@ -1761,8 +1767,8 @@
       const f = Math.sin(t / 140 + b.f) * b.s * 0.45, y = b.y + Math.sin(t / 1500 + b.f) * 4;
       ex.beginPath(); ex.moveTo(b.x - b.s, y - f); ex.quadraticCurveTo(b.x - b.s * 0.4, y - b.s * 0.3 - f * 0.4, b.x, y); ex.quadraticCurveTo(b.x + b.s * 0.4, y - b.s * 0.3 - f * 0.4, b.x + b.s, y - f); ex.stroke();
     });
-    // fuegos artificiales de Año Nuevo (nunca con la escena quieta ni con movimiento reducido)
-    if (esp && anim && esAnoNuevo()) fuegos(t, dt, yAgua); else if (eFuegos.length) eFuegos = [];
+    // fuegos artificiales de Año Nuevo (nunca con la escena quieta, con movimiento reducido ni con <html class="sin-fuegos">)
+    if (esp && anim && esAnoNuevo() && !document.documentElement.classList.contains('sin-fuegos')) fuegos(t, dt, yAgua); else if (eFuegos.length) eFuegos = [];   // la clase sin-fuegos los apaga (panel)
     // colinas lejanas y cercanas
     ex.translate(pX(0.25), 0); colinaEsc(eH * 0.56, eH * 0.07, 2, 5, 0.6, T[0]); ex.translate(-pX(0.25), 0);
     // bruma atmosférica: lo lejano se funde con el color del horizonte (más de día, menos de noche)
@@ -1880,7 +1886,12 @@
     const pa = palmaEsc(eW * 0.08, yAgua - eH * 0.04, eH * 0.7, t, T[3], vp), pb = palmaEsc(eW * 0.17, yAgua - eH * 0.01, eH * 0.44, t + 900, T[3], vp);
     const pc = palmaEsc(eW * 0.92, yAgua - eH * 0.035, eH * 0.62, t + 400, T[3], vp), pd = palmaEsc(eW * 0.84, yAgua - eH * 0.005, eH * 0.4, t + 1600, T[3], vp);
     const navidad = esp && document.documentElement.classList.contains('navidad');
-    if (navidad) { const cab = mezcla(T[3], '#000000', 0.3); guirnalda(pa, pb, 0.52, 0.66, t, 1 - kLuz, cab, 0); guirnalda(pd, pc, 0.66, 0.52, t + 700, 1 - kLuz, cab, 2); }   // guirnaldas entre las palmeras de cada orilla
+    if (navidad) {                                                // guirnaldas entre las palmeras de cada orilla y una estrella dorada sobre la palmera chica de la derecha
+      const cab = mezcla(T[3], '#000000', 0.3), fija = !anim || document.documentElement.classList.contains('navidad-quieta');
+      guirnalda(pa, pb, 0.52, 0.66, t, 1 - kLuz, cab, 0, fija, kLuz); guirnalda(pd, pc, 0.66, 0.52, t + 700, 1 - kLuz, cab, 2, fija, kLuz);
+      const [tx, ty] = pd(1), ys = libreDeEtq(tx + dxO, ty - R * 1.6, R * 0.8);
+      estrellaNavidad(tx, ys, R * 0.5, 0.75 + 0.25 * (1 - kLuz), (1 - kLuz) * (A.tipo === 'niebla' ? 0.4 : A.lluvia ? 0.6 : 1), t, fija);
+    }
     ex.translate(-dxO, 0);
     // luciérnagas
     if (kLuci > 0.02 && eLuci.length) {                            // luciérnagas: con viento derivan hacia un lado y, si es fuerte, casi no se ven
@@ -1972,7 +1983,7 @@
         }
       } else eRayo = null;
     }
-    if (kDor > 0.02) {                                            // hora dorada: un resplandor cálido y suave que baña el cuadro desde el sol
+    if (kDor > 0.02 && nivelR() >= 0.75) {                                            // hora dorada: un resplandor cálido y suave que baña el cuadro desde el sol
       const rg = Math.max(eW, eH) * 0.55, gd = ex.createRadialGradient(sx, sy, 0, sx, sy, rg);
       gd.addColorStop(0, `rgba(255,178,105,${0.2 * kDor})`); gd.addColorStop(0.4, `rgba(255,150,90,${0.07 * kDor})`); gd.addColorStop(1, 'rgba(255,150,90,0)');
       ex.save(); ex.globalCompositeOperation = 'lighter'; ex.fillStyle = gd; ex.fillRect(Math.max(0, sx - rg), 0, Math.min(eW, sx + rg) - Math.max(0, sx - rg), eH); ex.restore();
