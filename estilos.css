@@ -5,6 +5,12 @@
     src: url("fonts/inter-latin-wght-normal.woff2") format("woff2");
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
   }
+  /* Solo las letras del guaraní que no están en el subconjunto latin: ĩ ũ ẽ ỹ y la tilde de g̃ (subconjunto vietnamita de Inter, 10 KB) */
+  @font-face {
+    font-family: "Inter"; font-style: normal; font-weight: 100 900; font-display: swap;
+    src: url("fonts/inter-vietnamese-wght-normal.woff2") format("woff2");
+    unicode-range: U+0128-0129, U+0168-0169, U+0303, U+1EBC-1EBD, U+1EF8-1EF9;
+  }
   /* ============ ESTILOS ============ */
   :root {
     --card: rgba(15, 23, 42, 0.74);
@@ -498,3 +504,10 @@
   /* Foco visible también en el buscador y dentro del mapa (el contenedor recorta el contorno exterior) */
   .acciones input:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
   #mapa:focus-visible { outline-offset: -3px; border-radius: 12px; }
+
+  /* ============ Cabecera de la ciudad: nombre entero y botones que bajan de línea ============ */
+  /* El nombre ya no se parte letra por letra (body usa overflow-wrap: anywhere, que deja encoger el texto hasta una letra);
+     si Compartir y WhatsApp no caben junto al nombre, pasan a la línea de abajo. */
+  .ciudad-fila { flex-wrap: wrap; gap: 6px 8px; margin-bottom: 6px; }
+  .ciudad-nombre { overflow-wrap: break-word; }
+  .ciudad-fila .btn { white-space: nowrap; }

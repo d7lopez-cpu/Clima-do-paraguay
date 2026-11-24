@@ -1229,7 +1229,7 @@
     refrescarVistas();                                             // los colores de texto cambian según el tema
     if (detalleActual && detalleActual.c.n === seleccionada) pintarDetalle();
   });
-  const pintarUnidad = () => { $('btnUnidad').textContent = usaF ? '°F' : '°C'; };
+  const pintarUnidad = () => { $('btnUnidad').textContent = usaF ? '°F' : '°C'; $('btnUnidad').setAttribute('aria-label', usaF ? 'Cambiar a grados Celsius' : 'Cambiar a grados Fahrenheit'); };
   $('btnUnidad').addEventListener('click', () => {
     usaF = !usaF; guardar('clima-py-f', usaF ? '1' : '0');
     pintarUnidad(); pintarCapas(); refrescarVistas();
@@ -2074,7 +2074,7 @@
   function pintarDetalle() {
     const { c, d } = detalleActual;
     $('detalle').innerHTML = htmlCabecera(c, d.current, d) + `
-      <div class="pestanas" role="tablist">
+      <div class="pestanas" role="tablist" aria-label="Vista del pronóstico">
         <button class="pestana${pestana === 'horas' ? ' on' : ''}" data-tab="horas" role="tab" aria-selected="${pestana === 'horas'}">Próximas horas</button>
         <button class="pestana${pestana === 'grafico' ? ' on' : ''}" data-tab="grafico" role="tab" aria-selected="${pestana === 'grafico'}">Gráfico 24 h</button>
         <button class="pestana${pestana === 'dias' ? ' on' : ''}" data-tab="dias" role="tab" aria-selected="${pestana === 'dias'}">Próximos días</button>
