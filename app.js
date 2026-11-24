@@ -1305,7 +1305,7 @@
   const ec = $('escenaCv'), ex = ec.getContext('2d');
   let eW = 0, eH = 0, eD = 1, eClave = '', eFirma = '', eNubes = [], eAves = [], eLuci = [], eEstr = [], eGotas = [], eGranizo = [], eHojas = [], ePetalos = [], eOndas = [], eNiebla = [], eRayo = null, eFugaz = null;
   let eTexNiebla = null, eSprLuci = null, eSombra = null, ultRayoT = -1, reGolpe = 0;
-  let eLuces = [], eViaL = null, eCharcos = [], eMoj = -1, eFoto = null, eFundido = 0, eEtq = [], eEtqSucio = true;        // fundido entre escenas · zonas ocupadas por las etiquetas
+  let eFuegos = [], eSprGuir = null, eNuevo = { t: -1e9, si: false }, eLuces = [], eViaL = null, eCharcos = [], eMoj = -1, eFoto = null, eFundido = 0, eEtq = [], eEtqSucio = true;        // fundido entre escenas · zonas ocupadas por las etiquetas
   const vAst = { ok: false, sx: 0, sy: 0, so: 0, mx: 0, my: 0, mf: 0 };   // sol y luna suavizados (no saltan al cambiar de momento del día)
   // Paralaje: el puntero sobre el cuadro (o la inclinación del celular, donde el navegador la da sin pedir permiso) corre un poco
   // cada capa según su distancia: lo lejano casi nada, las palmeras y la orilla lo que más. Nunca con movimiento reducido.
@@ -1574,6 +1574,65 @@
       ex.beginPath(); ex.moveTo(tx, ty);
       ex.quadraticCurveTo(tx + Math.cos(ang) * L * 0.55, ty + Math.sin(ang) * L * 0.75 - L * 0.12, tx + Math.cos(ang) * L, ty + Math.sin(ang) * L * 0.55 + L * 0.42); ex.stroke();
     }
+    return u => { const v = 1 - u; return [v * v * x + 2 * u * v * (x + s * 0.01) + u * u * tx, v * v * y + 2 * u * v * (y - s * 0.55) + u * u * ty]; };   // punto del tronco (u: 0 pie … 1 copa)
+  }
+  // ---- Temporada (grupo «especiales») ----
+  const COL_GUIR = ['255,214,150', '255,168,72', '236,96,84', '130,206,140'];   // luces cálidas: blanco cálido, ámbar, rojo y verde suaves
+  function spritesGuirnalda() { return COL_GUIR.map(c => { const k = document.createElement('canvas'); k.width = k.height = 24; const g = k.getContext('2d'), gr = g.createRadialGradient(12, 12, 0, 12, 12, 12); gr.addColorStop(0, `rgba(${c},0.9)`); gr.addColorStop(0.3, `rgba(${c},0.35)`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(0, 0, 24, 24); return k; }); }
+  // Guirnalda colgada entre dos troncos (a y b: funciones de palmaEsc), con luces que se encienden y apagan muy despacio
+  function guirnalda(a, b, ua, ub, t, noche, cable, i0) {
+    const [x1, y1] = a(ua), [x2, y2] = b(ub), cx1 = (x1 + x2) / 2, cy1 = Math.max(y1, y2) + Math.abs(x2 - x1) * 0.28, n = 9;
+    ex.strokeStyle = cable; ex.lineWidth = 0.8; ex.beginPath(); ex.moveTo(x1, y1); ex.quadraticCurveTo(cx1, cy1, x2, y2); ex.stroke();
+    if (!eSprGuir) eSprGuir = spritesGuirnalda();
+    for (let i = 1; i < n; i++) {
+      const u = i / n, v = 1 - u, x = v * v * x1 + 2 * u * v * cx1 + u * u * x2, y = v * v * y1 + 2 * u * v * cy1 + u * u * y2 + 1.5, c = (i + i0) % 4;
+      const br = 0.55 + 0.45 * Math.sin(t / 1900 + (i + i0) * 1.9);
+      ex.globalAlpha = br * (0.35 + 0.65 * noche); ex.drawImage(eSprGuir[c], x - 7, y - 7, 14, 14);
+      ex.globalAlpha = 0.6 + 0.4 * br; ex.fillStyle = `rgb(${COL_GUIR[c]})`; ex.fillRect(x - 1, y - 1, 2, 2);
+    }
+    ex.globalAlpha = 1;
+  }
+  // Estrella dorada de Navidad: cuatro puntas largas y cuatro cortas, con un halo que late despacio
+  function estrellaNavidad(x, y, r, a, t) {
+    const p = 1 + 0.12 * Math.sin(t / 2200), gl = ex.createRadialGradient(x, y, 0, x, y, r * 3.2 * p);
+    gl.addColorStop(0, `rgba(255,214,120,${0.42 * a})`); gl.addColorStop(1, 'rgba(255,214,120,0)'); ex.fillStyle = gl; ex.fillRect(x - r * 3.2 * p, y - r * 3.2 * p, r * 6.4 * p, r * 6.4 * p);
+    ex.fillStyle = `rgba(255,232,160,${a})`; ex.beginPath();
+    for (let i = 0; i < 16; i++) { const ang = i * Math.PI / 8 - Math.PI / 2, L = i % 4 === 0 ? r * 1.6 * p : i % 2 === 0 ? r * 0.75 : r * 0.22; ex.lineTo(x + Math.cos(ang) * L, y + Math.sin(ang) * L); }
+    ex.closePath(); ex.fill();
+  }
+  // ¿Es Año Nuevo en Paraguay? (31 de diciembre desde las 23:30 hasta la 1:00 del 1 de enero, hora de Asunción). Se consulta cada 15 s.
+  function esAnoNuevo() {
+    const ahora = Date.now(); if (Math.abs(ahora - eNuevo.t) < 15000) return eNuevo.si;
+    const p = {}; eNuevo.t = ahora;
+    try { new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Asuncion', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(ahora)).forEach(x => { p[x.type] = +x.value; }); } catch (e) { return eNuevo.si = false; }
+    return eNuevo.si = (p.month === 12 && p.day === 31 && p.hour * 60 + p.minute >= 23 * 60 + 30) || (p.month === 1 && p.day === 1 && p.hour < 1);
+  }
+  const COL_FUEGO = ['255,210,120', '255,150,175', '150,220,232', '255,238,212', '170,228,150'];
+  // Fuegos artificiales sobre el río: cohetes que suben por detrás de las colinas y estallan en chispas que caen despacio.
+  // Sin destellos: solo un halo tenue en el estallido y su reflejo en el agua.
+  function fuegos(t, dt, yAgua) {
+    if (eFuegos.filter(f => !f.chispas).length < 2 && Math.random() < dt / 1700 * prefsAnim.intensidad)
+      eFuegos.push({ x: eW * (0.3 + Math.random() * 0.42), y: yAgua - eH * 0.06, v: eH * (0.00055 + Math.random() * 0.0002), meta: eH * (0.12 + Math.random() * 0.2), c: COL_FUEGO[Math.floor(Math.random() * COL_FUEGO.length)], chispas: null, vida: 0 });
+    ex.lineCap = 'round';
+    eFuegos = eFuegos.filter(f => {
+      if (!f.chispas) {                                             // subiendo: un punto con una estela corta
+        f.y -= f.v * dt; f.v *= Math.exp(-dt / 2600);
+        ex.strokeStyle = `rgba(${f.c},0.55)`; ex.lineWidth = 1.2; ex.beginPath(); ex.moveTo(f.x, f.y); ex.lineTo(f.x, f.y + eH * 0.05); ex.stroke();
+        if (f.y <= f.meta) {
+          const n = Math.max(14, cant(34)), vel = eH * (0.0003 + Math.random() * 0.0001);
+          f.chispas = Array.from({ length: n }, (_, i) => { const a = i / n * 6.283 + Math.random() * 0.2, s = vel * (0.7 + Math.random() * 0.45); return { x: f.x, y: f.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s }; });
+          f.dur = 1500 + Math.random() * 600; f.cx = f.x; f.cy = f.y;
+        }
+        return true;
+      }
+      f.vida += dt; const u = f.vida / f.dur; if (u >= 1) return false;
+      const a = (1 - u) ** 1.6, ar = Math.exp(-dt / 900), g = eH * 1.3e-7 * dt;
+      if (u < 0.5) { const r = eH * 0.16, gl = ex.createRadialGradient(f.cx, f.cy, 0, f.cx, f.cy, r); gl.addColorStop(0, `rgba(${f.c},${0.1 * (1 - u * 2) ** 2})`); gl.addColorStop(1, `rgba(${f.c},0)`); ex.fillStyle = gl; ex.fillRect(f.cx - r, f.cy - r, r * 2, r * 2); }
+      ex.strokeStyle = `rgba(${f.c},${0.85 * a})`; ex.lineWidth = 1.3; ex.beginPath();
+      for (const c of f.chispas) { c.vx *= ar; c.vy = c.vy * ar + g; c.x += c.vx * dt; c.y += c.vy * dt; ex.moveTo(c.x, c.y); ex.lineTo(c.x - c.vx * 55, c.y - c.vy * 55); }
+      ex.stroke();
+      return true;
+    });
   }
   function pintarEscena(t, dt, quieto) {
     const w = ec.clientWidth, h = ec.clientHeight;
@@ -1665,6 +1724,15 @@
       dibujarLuna(ex, mx, my, R * 0.85, al);
       refLuna = { x: mx, col: '222,230,255', a: 0.42 * al * (0.3 + 0.7 * il), w: R * 1.1 };
     }
+    {                                                               // Navidad: una estrella dorada, más brillante que las demás, desde el anochecer
+      const kN = esp && A.lluvia === 0 && document.documentElement.classList.contains('navidad') ? (1 - kLuz) * (A.tipo === 'niebla' ? 0.35 : A.tipo === 'nublado' ? 0.55 : 1) : 0;
+      if (kN > 0.03) {
+        const mx = eW * vAst.mx, my = eH * vAst.my, lejos = R * 4.5;
+        let x = eW * 0.3; const y0 = eH * 0.2;
+        if (vAst.mf > 0.05 && Math.abs(mx - x) < lejos && Math.abs(my - y0) < lejos) x = mx < x ? mx + lejos : mx - lejos;   // no se encima con la luna
+        estrellaNavidad(x, libreDeEtq(x, y0, R * 0.9), R * 0.55, kN, t);
+      }
+    }
     // nubes y aves
     if (eNubes.length) {                                          // por capas: las lejanas se tiñen del cielo; medias y cercanas llevan la panza en sombra
       const cc = aRgb(vEsc.cc), cielo = hexA(P[2]), lejos = mezA(cc, cielo, 0.4).map(Math.round).join(','), panza = mezA(cc, [20, 28, 45], A.tipo === 'tormenta' ? 0.35 : 0.2).map(Math.round).join(',');
@@ -1691,6 +1759,8 @@
       const f = Math.sin(t / 140 + b.f) * b.s * 0.45, y = b.y + Math.sin(t / 1500 + b.f) * 4;
       ex.beginPath(); ex.moveTo(b.x - b.s, y - f); ex.quadraticCurveTo(b.x - b.s * 0.4, y - b.s * 0.3 - f * 0.4, b.x, y); ex.quadraticCurveTo(b.x + b.s * 0.4, y - b.s * 0.3 - f * 0.4, b.x + b.s, y - f); ex.stroke();
     });
+    // fuegos artificiales de Año Nuevo (nunca con la escena quieta ni con movimiento reducido)
+    if (esp && anim && esAnoNuevo()) fuegos(t, dt, yAgua); else if (eFuegos.length) eFuegos = [];
     // colinas lejanas y cercanas
     ex.translate(pX(0.25), 0); colinaEsc(eH * 0.56, eH * 0.07, 2, 5, 0.6, T[0]); ex.translate(-pX(0.25), 0);
     // bruma atmosférica: lo lejano se funde con el color del horizonte (más de día, menos de noche)
@@ -1761,6 +1831,12 @@
       for (const l of eLuces) { const L = 3 + l.r * 4 + Math.sin(t / 600 + l.x) * 1.5; ex.fillRect(l.x + dxC - 0.5 + Math.sin(t / 500 + l.y) * 0.6, yAgua + 1.5, 1, L); }
       ex.globalAlpha = 1;
     }
+    for (const f of eFuegos) if (f.chispas && f.vida < f.dur * 0.6) {   // el estallido se refleja apenas en el agua
+      const k = 1 - f.vida / (f.dur * 0.6), r = eH * 0.2;
+      ex.save(); ex.translate(f.cx, yAgua + hAg * 0.35); ex.scale(1, 0.3);
+      const gw = ex.createRadialGradient(0, 0, 0, 0, 0, r); gw.addColorStop(0, `rgba(${f.c},${0.16 * k * k})`); gw.addColorStop(1, `rgba(${f.c},0)`);
+      ex.fillStyle = gw; ex.fillRect(-r, -r, r * 2, r * 2); ex.restore();
+    }
     if (refSol) reflejo(refSol);
     if (refLuna) reflejo(refLuna);
     if (eGotas.length || eOndas.length) {                         // anillos y salpicaduras de la lluvia sobre el río
@@ -1799,8 +1875,10 @@
       }
     }
     const vp = efectoActivo('viento') && !simple ? vientoVis() : 0;
-    palmaEsc(eW * 0.08, yAgua - eH * 0.04, eH * 0.7, t, T[3], vp); palmaEsc(eW * 0.17, yAgua - eH * 0.01, eH * 0.44, t + 900, T[3], vp);
-    palmaEsc(eW * 0.92, yAgua - eH * 0.035, eH * 0.62, t + 400, T[3], vp); palmaEsc(eW * 0.84, yAgua - eH * 0.005, eH * 0.4, t + 1600, T[3], vp);
+    const pa = palmaEsc(eW * 0.08, yAgua - eH * 0.04, eH * 0.7, t, T[3], vp), pb = palmaEsc(eW * 0.17, yAgua - eH * 0.01, eH * 0.44, t + 900, T[3], vp);
+    const pc = palmaEsc(eW * 0.92, yAgua - eH * 0.035, eH * 0.62, t + 400, T[3], vp), pd = palmaEsc(eW * 0.84, yAgua - eH * 0.005, eH * 0.4, t + 1600, T[3], vp);
+    const navidad = esp && document.documentElement.classList.contains('navidad');
+    if (navidad) { const cab = mezcla(T[3], '#000000', 0.3); guirnalda(pa, pb, 0.52, 0.66, t, 1 - kLuz, cab, 0); guirnalda(pd, pc, 0.66, 0.52, t + 700, 1 - kLuz, cab, 2); }   // guirnaldas entre las palmeras de cada orilla
     ex.translate(-dxO, 0);
     // luciérnagas
     if (kLuci > 0.02 && eLuci.length) {                            // luciérnagas: con viento derivan hacia un lado y, si es fuerte, casi no se ven
