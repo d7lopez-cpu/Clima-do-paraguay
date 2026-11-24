@@ -2918,6 +2918,7 @@
   });
   $('buscador').addEventListener('keydown', e => {
     if (e.key === 'Enter') {
+      if (e.defaultPrevented) return;                            // ya eligió una sugerencia del buscador de lugares: no elegir otra encima
       const primera = CIUDADES.filter(coincide).sort((a, b) => a.n.localeCompare(b.n, 'es'))[0];
       if (primera) elegir(primera.n, { zoom: true });
     } else if (e.key === 'Escape') { limpiarFiltros(); }
