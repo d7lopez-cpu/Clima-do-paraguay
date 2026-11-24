@@ -1307,6 +1307,26 @@
   let eTexNiebla = null, eSprLuci = null, eSombra = null, ultRayoT = -1, reGolpe = 0;
   let eFoto = null, eFundido = 0, eEtq = [], eEtqSucio = true;        // fundido entre escenas · zonas ocupadas por las etiquetas
   const vAst = { ok: false, sx: 0, sy: 0, so: 0, mx: 0, my: 0, mf: 0 };   // sol y luna suavizados (no saltan al cambiar de momento del día)
+  // Paralaje: el puntero sobre el cuadro (o la inclinación del celular, donde el navegador la da sin pedir permiso) corre un poco
+  // cada capa según su distancia: lo lejano casi nada, las palmeras y la orilla lo que más. Nunca con movimiento reducido.
+  const par = { x: 0, y: 0, tx: 0, ty: 0, b0: null, g0: null };
+  if (!REDUCIDO) {
+    const sec = $('escena');
+    if (sec) {
+      sec.addEventListener('pointermove', e => { if (e.pointerType !== 'mouse') return; const r = sec.getBoundingClientRect(); if (!r.width) return; par.tx = limitar((e.clientX - r.left) / r.width * 2 - 1, -1, 1); par.ty = limitar((e.clientY - r.top) / r.height * 2 - 1, -1, 1); }, { passive: true });
+      sec.addEventListener('pointerleave', () => { par.tx = par.ty = 0; }, { passive: true });
+    }
+    // deviceorientation: Android lo da sin pedir nada; iOS exige pedir permiso y entonces simplemente no llega (no se pide).
+    // Se mide respecto de cómo se sostiene el celular (la referencia se acomoda despacio), así no queda torcido.
+    addEventListener('deviceorientation', e => {
+      if (e.beta == null || e.gamma == null) return;
+      const ang = (screen.orientation && screen.orientation.angle) || 0, de = ang % 180 ? [e.beta, e.gamma] : [e.gamma, e.beta];
+      const gx = ang === 90 || ang === 180 ? -de[0] : de[0], by = ang === 180 || ang === 270 ? -de[1] : de[1];
+      if (par.g0 === null) { par.g0 = gx; par.b0 = by; }
+      par.g0 += (gx - par.g0) * 0.01; par.b0 += (by - par.b0) * 0.01;
+      par.tx = limitar((gx - par.g0) / 18, -1, 1); par.ty = limitar((by - par.b0) / 18, -1, 1);
+    }, { passive: true });
+  }
   const hexA = s => [1, 3, 5].map(i => parseInt(s.slice(i, i + 2), 16));
   const mezcla = (a, b, k) => { const x = hexA(a), y = hexA(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
   // colores de la tierra: [colinas lejanas, colinas cercanas, orilla, palmeras]
@@ -1468,8 +1488,11 @@
     const grandes = A.tipo === 'nublado' || A.tipo === 'lluvia' || A.tipo === 'tormenta', abierto = A.tipo === 'despejado' || A.tipo === 'parcial';
     const nN = { despejado: 2, parcial: 4, nublado: 6, niebla: 0, lluvia: 7, tormenta: 7 }[A.tipo];
     // las nubes dicen qué clima hace: su cantidad varía menos que la de las demás partículas
-    eNubes = efectoActivo('nubes') ? Array.from({ length: Math.round(nN * limitar(multFx(), 0.7, 1.3)) }, () => ({
-      x: Math.random() * eW, y: eH * (grandes ? 0.07 + Math.random() * 0.2 : 0.08 + Math.random() * 0.3), r: eH * (0.06 + Math.random() * 0.06) * (grandes ? 1.6 : 1), v: 0.008 + Math.random() * 0.014 })) : [];
+    // en 3 capas (z): lejanas (chicas, bajas, lentas y desvaídas), medias y cercanas (grandes, altas y más rápidas)
+    eNubes = efectoActivo('nubes') ? Array.from({ length: Math.round(nN * limitar(multFx(), 0.7, 1.3)) }, (_, i) => {
+      const z = (i + 1) % 3, y = grandes ? [0.2, 0.08, 0.02][z] + Math.random() * [0.12, 0.18, 0.16][z] : [0.27, 0.1, 0.05][z] + Math.random() * [0.12, 0.25, 0.2][z];
+      return { x: Math.random() * eW, y: eH * y, r: eH * (0.06 + Math.random() * 0.06) * (grandes ? 1.6 : 1) * [0.6, 0.95, 1.2][z], v: (0.008 + Math.random() * 0.014) * [0.45, 1, 1.6][z], z };
+    }).sort((a, b) => a.z - b.z) : [];
     eAves = part('fauna') && A.tipo !== 'lluvia' && A.tipo !== 'tormenta' && A.tipo !== 'niebla' ? Array.from({ length: Math.max(1, cant(4)) }, () => ({ x: Math.random() * eW, y: eH * (0.12 + Math.random() * 0.25), v: 0.03 + Math.random() * 0.03, f: Math.random() * 6.28, s: eH * (0.025 + Math.random() * 0.02) })) : [];
     eLuci = part('fauna') && A.lluvia === 0 && A.tipo !== 'niebla' ? Array.from({ length: cant(16) }, () => ({ x: Math.random() * eW, y: eH * (0.55 + Math.random() * 0.4), f: Math.random() * 6.28, v: 0.0004 + Math.random() * 0.0006 })) : [];
     eEstr = part('estrellas') && abierto ? Array.from({ length: cant(45) }, () => ({ x: Math.random() * eW, y: Math.random() * eH * 0.5, r: 0.4 + Math.random() * 1.1 })) : [];
@@ -1491,15 +1514,14 @@
     if (!eSprLuci) eSprLuci = spriteLuci();
     eSombra = ex.createLinearGradient(0, 0, 0, eH * 0.4); eSombra.addColorStop(0, 'rgba(0,0,0,0.28)'); eSombra.addColorStop(1, 'rgba(0,0,0,0)');
   }
-  function nubeEsc(x, y, r) {                                      // una nube: varias bolitas que se funden en una sola forma
-    ex.beginPath();
-    [[0, 0, 1], [-0.9, 0.2, 0.7], [0.9, 0.15, 0.75], [-0.4, -0.45, 0.65], [0.45, -0.4, 0.6], [1.5, 0.3, 0.5], [-1.5, 0.3, 0.5]].forEach(([dx, dy, k]) => { ex.moveTo(x + dx * r + r * k, y + dy * r); ex.arc(x + dx * r, y + dy * r, r * k, 0, 6.283); });
-    ex.fill();
+  const BOLITAS = [[0, 0, 1], [-0.9, 0.2, 0.7], [0.9, 0.15, 0.75], [-0.4, -0.45, 0.65], [0.45, -0.4, 0.6], [1.5, 0.3, 0.5], [-1.5, 0.3, 0.5]];
+  function nubeRuta(x, y, r) {                                     // una nube: varias bolitas que se funden en una sola forma (se suma al trazo abierto)
+    for (const [dx, dy, k] of BOLITAS) { ex.moveTo(x + dx * r + r * k, y + dy * r); ex.arc(x + dx * r, y + dy * r, r * k, 0, 6.283); }
   }
-  function colinaEsc(y0, amp, f1, f2, ph, color) {
-    ex.fillStyle = color; ex.beginPath(); ex.moveTo(0, eH);
-    for (let x = 0; x <= eW + 8; x += 8) { const u = x / eW * 6.283; ex.lineTo(x, y0 - amp * (Math.sin(u * f1 + ph) * 0.6 + Math.sin(u * f2 + ph * 2.3) * 0.4)); }
-    ex.lineTo(eW, eH); ex.closePath(); ex.fill();
+  function colinaEsc(y0, amp, f1, f2, ph, color) {                 // se dibuja un poco más ancha que el cuadro, por el paralaje
+    ex.fillStyle = color; ex.beginPath(); ex.moveTo(-16, eH);
+    for (let x = -16; x <= eW + 16; x += 8) { const u = x / eW * 6.283; ex.lineTo(x, y0 - amp * (Math.sin(u * f1 + ph) * 0.6 + Math.sin(u * f2 + ph * 2.3) * 0.4)); }
+    ex.lineTo(eW + 16, eH); ex.closePath(); ex.fill();
   }
   function palmaEsc(x, y, s, t, color, v) {                        // palmera: tronco curvo y hojas que se mecen (y se inclinan) con el viento
     const raf = 0.6 + 0.4 * Math.sin(t / 2300 + x * 0.01), lean = Math.min(0.09, v / 700) * raf;
@@ -1535,6 +1557,8 @@
     const anim = !quieto && !simple;
     const A = amb, P = vEsc.Ph, T = vEsc.Th, yAgua = eH * 0.74, vis = A.tipo === 'despejado' || A.tipo === 'parcial';
     const [kCca, kEstr, kAves, kLuci, kLuna, kNb, kLuz, kArco = 0, kCalor = 0] = vEsc.esc, ast = arcoAstros(), esp = efectoActivo('especiales');
+    if (anim) { const k = 1 - Math.exp(-dt / 380); par.x += (par.tx - par.x) * k; par.y += (par.ty - par.y) * k; } else par.x = par.y = 0;
+    const pA = Math.min(10, eW * 0.008), pX = z => par.x * pA * z, pY = z => par.y * pA * 0.4 * z;   // desplazamiento de una capa a la distancia z (0 lejos … 1 cerca)
     // cielo
     const g = ex.createLinearGradient(0, 0, 0, yAgua); g.addColorStop(0, P[0]); g.addColorStop(0.55, P[1]); g.addColorStop(1, P[2]);
     ex.fillStyle = g; ex.fillRect(0, 0, eW, eH);
@@ -1578,8 +1602,18 @@
       dibujarLuna(ex, mx, my, R * 0.85, al);
     }
     // nubes y aves
-    ex.fillStyle = `rgba(${vEsc.cc},${kCca})`;
-    eNubes.forEach(n => { n.x += n.v * dt * (1 + A.viento / 20); if (n.x - n.r * 3 > eW) n.x = -n.r * 3; nubeEsc(n.x, n.y, n.r); });
+    if (eNubes.length) {                                          // por capas: las lejanas se tiñen del cielo; medias y cercanas llevan la panza en sombra
+      const cc = aRgb(vEsc.cc), cielo = hexA(P[2]), lejos = mezA(cc, cielo, 0.4).map(Math.round).join(','), panza = mezA(cc, [20, 28, 45], A.tipo === 'tormenta' ? 0.35 : 0.2).map(Math.round).join(',');
+      for (let z = 0; z < 3; z++) {
+        const dx = pX([0.2, 0.45, 0.8][z]), dy = pY([0.2, 0.45, 0.8][z]);
+        let hay = false;
+        for (const n of eNubes) if (n.z === z) { hay = true; n.x += n.v * dt * (1 + A.viento / 20); if (n.x - n.r * 3 > eW) n.x = -n.r * 3; }
+        if (!hay) continue;
+        if (z) { ex.fillStyle = `rgba(${panza},${kCca})`; ex.beginPath(); for (const n of eNubes) if (n.z === z) nubeRuta(n.x + dx, n.y + dy + n.r * 0.2, n.r * 0.93); ex.fill(); }
+        ex.fillStyle = z ? `rgba(${vEsc.cc},${kCca})` : `rgba(${lejos},${kCca * 0.8})`; ex.beginPath();
+        for (const n of eNubes) if (n.z === z) nubeRuta(n.x + dx, n.y + dy - (z ? n.r * 0.04 : 0), n.r); ex.fill();
+      }
+    }
     // arcoíris: lluvia débil con sol de día, del lado opuesto al sol
     if (esp && kArco > 0.01) {
       const ax = eW * limitar(1 - (S ? S.x : 0.72), 0.3, 0.7), ar = Math.min(eW * 0.42, eH * 0.62), ay = yHor + eH * 0.1, a = 0.26 * kArco * Math.min(1.2, prefsAnim.intensidad);
@@ -1594,8 +1628,14 @@
       ex.beginPath(); ex.moveTo(b.x - b.s, y - f); ex.quadraticCurveTo(b.x - b.s * 0.4, y - b.s * 0.3 - f * 0.4, b.x, y); ex.quadraticCurveTo(b.x + b.s * 0.4, y - b.s * 0.3 - f * 0.4, b.x + b.s, y - f); ex.stroke();
     });
     // colinas lejanas y cercanas
-    colinaEsc(eH * 0.56, eH * 0.07, 2, 5, 0.6, T[0]);
-    colinaEsc(eH * 0.65, eH * 0.07, 3, 7, 2.1, T[1]);
+    ex.translate(pX(0.25), 0); colinaEsc(eH * 0.56, eH * 0.07, 2, 5, 0.6, T[0]); ex.translate(-pX(0.25), 0);
+    // bruma atmosférica: lo lejano se funde con el color del horizonte (más de día, menos de noche)
+    const hz = hexA(P[2]).join(','), aBr = 0.22 + 0.16 * kLuz;
+    const gb = ex.createLinearGradient(0, eH * 0.46, 0, eH * 0.64); gb.addColorStop(0, `rgba(${hz},0)`); gb.addColorStop(1, `rgba(${hz},${aBr})`);
+    ex.fillStyle = gb; ex.fillRect(0, eH * 0.46, eW, eH * 0.18);
+    ex.translate(pX(0.45), 0); colinaEsc(eH * 0.65, eH * 0.07, 3, 7, 2.1, T[1]); ex.translate(-pX(0.45), 0);
+    const gb2 = ex.createLinearGradient(0, eH * 0.6, 0, yAgua); gb2.addColorStop(0, `rgba(${hz},0)`); gb2.addColorStop(1, `rgba(${hz},${aBr * 0.45})`);
+    ex.fillStyle = gb2; ex.fillRect(0, eH * 0.6, eW, yAgua - eH * 0.6);
     // lapachos en flor sobre la colina (julio a septiembre): pequeños y apagados según la luz, para que sean un detalle
     if (esp && mesLapacho()) {
       const os = 1 - kLuz, s = eH * 0.05;
@@ -1639,12 +1679,14 @@
       });
     }
     // orillas y palmeras
+    const dxO = pX(1); ex.translate(dxO, 0);
     ex.fillStyle = T[2];
-    ex.beginPath(); ex.moveTo(0, eH); ex.lineTo(0, yAgua - eH * 0.05); ex.quadraticCurveTo(eW * 0.2, yAgua - eH * 0.02, eW * 0.3, eH); ex.fill();
-    ex.beginPath(); ex.moveTo(eW, eH); ex.lineTo(eW, yAgua - eH * 0.04); ex.quadraticCurveTo(eW * 0.84, yAgua - eH * 0.01, eW * 0.72, eH); ex.fill();
+    ex.beginPath(); ex.moveTo(-12, eH); ex.lineTo(-12, yAgua - eH * 0.05); ex.lineTo(0, yAgua - eH * 0.05); ex.quadraticCurveTo(eW * 0.2, yAgua - eH * 0.02, eW * 0.3, eH); ex.fill();
+    ex.beginPath(); ex.moveTo(eW + 12, eH); ex.lineTo(eW + 12, yAgua - eH * 0.04); ex.lineTo(eW, yAgua - eH * 0.04); ex.quadraticCurveTo(eW * 0.84, yAgua - eH * 0.01, eW * 0.72, eH); ex.fill();
     const vp = efectoActivo('viento') && !simple ? vientoVis() : 0;
     palmaEsc(eW * 0.08, yAgua - eH * 0.04, eH * 0.7, t, T[3], vp); palmaEsc(eW * 0.17, yAgua - eH * 0.01, eH * 0.44, t + 900, T[3], vp);
     palmaEsc(eW * 0.92, yAgua - eH * 0.035, eH * 0.62, t + 400, T[3], vp); palmaEsc(eW * 0.84, yAgua - eH * 0.005, eH * 0.4, t + 1600, T[3], vp);
+    ex.translate(-dxO, 0);
     // luciérnagas
     if (kLuci > 0.02 && eLuci.length) eLuci.forEach(l => {
       l.x += Math.sin(t * l.v + l.f) * 0.35 * (dt / 16); l.y += Math.cos(t * l.v * 1.3 + l.f) * 0.25 * (dt / 16);
@@ -1725,11 +1767,15 @@
   }
   function etiquetaEscena(a) {                                     // las etiquetas sobre el cuadro: ciudad, clima y momento del día
     // en una vista previa se muestra el clima elegido (con el mismo texto que la app usa para un código típico de ese clima), no el real
-    const c0 = a.weather_code, real = [95, 96, 99].includes(c0) ? 'tormenta' : c0 >= 51 && c0 <= 86 ? 'lluvia' : c0 === 45 || c0 === 48 ? 'niebla' : c0 === 3 ? 'nublado' : c0 === 2 ? 'parcial' : 'despejado';
+    // Sin emojis: cada etiqueta lleva data-icono (minúsculas, sin tildes) para que la interfaz dibuje su propio ícono.
+    const tipoDe = c => [95, 96, 99].includes(c) ? 'tormenta' : c >= 51 && c <= 86 ? 'lluvia' : c === 45 || c === 48 ? 'niebla' : c === 3 ? 'nublado' : c === 2 ? 'parcial' : 'despejado';
+    const c0 = a.weather_code, real = tipoDe(c0);
     const cod = amb.previa && real !== amb.tipo ? { despejado: 0, parcial: 2, nublado: 3, lluvia: 63, tormenta: 95, niebla: 45 }[amb.tipo] : c0;   // si coincide con el real, se deja el texto real (p. ej. «Tormenta con granizo»)
-    const w = clima(cod, amb.previa ? (amb.fase === 'noche' ? 0 : 1) : a.is_day), tx = [`📍 ${seleccionada}`, `${w.emoji} ${w.texto}`, { amanecer: '🌅 Amanecer', dia: '☀️ Día', atardecer: '🌇 Atardecer', noche: '🌙 Noche' }[amb.fase] || '☀️ Día'], caja = $('escenaEtq');
+    const deNoche = amb.previa ? amb.fase === 'noche' : a.is_day === 0, w = clima(cod, deNoche ? 0 : 1), tc = tipoDe(cod), caja = $('escenaEtq');
+    const fase = { amanecer: 'Amanecer', dia: 'Día', atardecer: 'Atardecer', noche: 'Noche' }[amb.fase] ? amb.fase : 'dia';
+    const tx = [['ubicacion', seleccionada], [(tc === 'despejado' || tc === 'parcial') && deNoche ? tc + '-noche' : tc, w.texto], [fase, { amanecer: 'Amanecer', dia: 'Día', atardecer: 'Atardecer', noche: 'Noche' }[fase]]];
     if (vigiaEtq) vigiaEtq.disconnect();
-    caja.textContent = ''; tx.forEach(s => { const e = document.createElement('span'); e.textContent = s; caja.appendChild(e); if (vigiaEtq) vigiaEtq.observe(e); });
+    caja.textContent = ''; tx.forEach(([ic, s]) => { const e = document.createElement('span'); e.dataset.icono = ic; e.textContent = s; caja.appendChild(e); if (vigiaEtq) vigiaEtq.observe(e); });
     eEtqSucio = true;
   }
   // Barra de navegación del celular
