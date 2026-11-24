@@ -1559,17 +1559,74 @@
       if (destello > 0.02) { cx.fillStyle = `rgba(220,230,255,${destello * 0.16})`; cx.fillRect(0, 0, cvW, cvH); destello *= 0.86; }
     }
   }
+  // ---- Bucle de animación y calidad ----
+  // Un solo requestAnimationFrame pinta el cielo de fondo y el paisaje. prefsAnim.calidad decide cuántos cuadros por segundo y cuántas partículas:
+  //   'alta' → ~30 cuadros/s y nivelCalidad 1 · 'ahorro' → ~20 cuadros/s y nivelCalidad 0.5
+  //   'auto' → empieza en el escalón 0 y mide cuánto tarda de verdad cada cuadro; si va lento de forma sostenida baja un escalón,
+  //            si sobra tiempo durante bastante rato sube uno (con espera creciente para no oscilar).
+  // `ms` es el intervalo objetivo entre cuadros (los rAF llegan cada ~16,7 ms en una pantalla de 60 Hz: 33 → 30/s, 50 → 20/s, 66 → 15/s).
+  const ESCALONES_CAL = [{ nivel: 1, ms: 33 }, { nivel: 0.7, ms: 40 }, { nivel: 0.45, ms: 50 }, { nivel: 0.45, ms: 66 }];
+  const CAL_FIJA = { alta: { nivel: 1, ms: 33 }, ahorro: { nivel: 0.5, ms: 50 } };
+  const VENTANA_CAL = 2000;                                        // se juzga cada ~2 s de animación, no cuadro a cuadro
+  const autoCal = { escalon: 0, ini: 0, n: 0, costo: 0, salto: 0, calentar: 0, lentas: 0, rapidas: 0, espera: 15000, desde: 0, subidaEn: -1e9, pref: prefsAnim.calidad };
+  let msCuadro = 33;
+  function aplicarCalidad() {                                      // fija msCuadro y nivelCalidad según la preferencia; rearma el fondo si cambió el nivel
+    if (autoCal.pref !== prefsAnim.calidad) {                      // se eligió otra calidad: 'auto' vuelve a empezar desde arriba
+      autoCal.pref = prefsAnim.calidad;
+      Object.assign(autoCal, { escalon: 0, lentas: 0, rapidas: 0, espera: 15000, desde: performance.now(), subidaEn: -1e9 });
+    }
+    const c = CAL_FIJA[prefsAnim.calidad] || ESCALONES_CAL[autoCal.escalon];
+    msCuadro = c.ms;
+    if (c.nivel !== nivelCalidad) { nivelCalidad = c.nivel; armarParticulas(); }
+  }
+  function reiniciarMedicion(t) { Object.assign(autoCal, { ini: t, n: 0, costo: 0, suma: 0, salto: 0 }); }
+  function pausarMedicion() { autoCal.ini = 0; autoCal.calentar = 3; }   // tras una pausa o un rearmado se descartan los primeros cuadros
+  function medirCalidad(t, costo, intervalo) {
+    if (prefsAnim.calidad !== 'auto') return;
+    if (autoCal.calentar > 0) { autoCal.calentar--; return; }
+    if (!autoCal.ini) { reiniciarMedicion(t); return; }
+    autoCal.n++; autoCal.costo += costo; autoCal.suma += intervalo;
+    if (intervalo > msCuadro * 1.6) autoCal.salto++;               // cuadro que llegó muy tarde (el equipo no da abasto)
+    if (t - autoCal.ini < VENTANA_CAL || autoCal.n < 20) return;
+    const medio = autoCal.costo / autoCal.n, tarde = autoCal.salto / autoCal.n, ritmo = autoCal.suma / autoCal.n / msCuadro;   // ritmo 1 = se logra el objetivo
+    // lento: en promedio los cuadros llegan un 35 % más espaciados que el objetivo, o 1 de cada 4 llega muy tarde, o pintar se come el 40 % del presupuesto
+    const lenta = ritmo > 1.35 || tarde > 0.25 || medio > msCuadro * 0.4;
+    // holgado: se logra casi el ritmo objetivo, casi ningún cuadro llega tarde y pintar usa poco del presupuesto
+    const rapida = ritmo < 1.2 && tarde < 0.1 && medio < msCuadro * 0.15;
+    autoCal.lentas = lenta ? autoCal.lentas + 1 : 0;
+    autoCal.rapidas = rapida ? autoCal.rapidas + 1 : 0;
+    const ult = ESCALONES_CAL.length - 1;
+    if (autoCal.lentas >= 2 && autoCal.escalon < ult) {            // ~4 s seguidos lento → un escalón más liviano
+      if (t - autoCal.subidaEn < 30000) autoCal.espera = Math.min(autoCal.espera * 2, 240000);   // volvió a caer poco después de subir: esperar más antes de reintentar
+      autoCal.escalon++; autoCal.lentas = autoCal.rapidas = 0; autoCal.desde = t; aplicarCalidad(); pausarMedicion(); return;
+    } else if (autoCal.rapidas * VENTANA_CAL >= autoCal.espera && autoCal.escalon > 0 && t - autoCal.desde >= autoCal.espera) {   // mucho rato holgado → subir uno, despacio
+      autoCal.escalon--; autoCal.lentas = autoCal.rapidas = 0; autoCal.desde = autoCal.subidaEn = t; aplicarCalidad(); pausarMedicion(); return;
+    }
+    reiniciarMedicion(t);
+  }
   function bucleCielo(t) {
     rafCielo = requestAnimationFrame(bucleCielo);
-    if (t - ultCielo < 33) return;                                // unos 30 cuadros por segundo bastan
-    const dt = Math.min(64, t - ultCielo); ultCielo = t;
+    const intervalo = t - ultCielo;
+    if (intervalo < msCuadro - 4) return;                         // margen por el temblor de los rAF
+    const dt = Math.min(64, intervalo); ultCielo = t;
+    const t0 = performance.now();
     avanzarVisual(dt, false);
-    pintarCielo(t, dt); pintarEscena(t, dt, false);
+    if (prefsAnim.fondo) pintarCielo(t, dt);
+    if (prefsAnim.paisaje) pintarEscena(t, dt, false);
+    medirCalidad(t, performance.now() - t0, intervalo);
   }
   function reanudarCielo() {
     cancelAnimationFrame(rafCielo);
-    if (!fx) { cx.clearRect(0, 0, cvW, cvH); avanzarVisual(0, true); pintarEscena(performance.now(), 0, true); return; }
-    if (REDUCIDO || document.hidden) { avanzarVisual(0, true); pintarCielo(performance.now(), 0, true); pintarEscena(performance.now(), 0, true); return; }   // sin movimiento: un solo dibujo fijo
+    aplicarCalidad();
+    const ahora = performance.now();
+    if (!fx) { cx.clearRect(0, 0, cvW, cvH); avanzarVisual(0, true); pintarEscena(ahora, 0, true); return; }
+    // Partes que no se animan: un solo dibujo fijo (el cielo de fondo apagado queda transparente: se ve el degradado de la página)
+    const animar = !REDUCIDO && !document.hidden, fondoVivo = animar && prefsAnim.fondo, paisajeVivo = animar && prefsAnim.paisaje;
+    if (!fondoVivo || !paisajeVivo) avanzarVisual(0, true);
+    if (!fondoVivo) { if (prefsAnim.fondo) pintarCielo(ahora, 0, true); else cx.clearRect(0, 0, cvW, cvH); }
+    if (!paisajeVivo) pintarEscena(ahora, 0, true);
+    if (!fondoVivo && !paisajeVivo) return;                        // nada que animar: el bucle queda detenido (cero CPU)
+    ultCielo = ahora - msCuadro; pausarMedicion();                // tras una pausa, la medición empieza de cero
     rafCielo = requestAnimationFrame(bucleCielo);
   }
 
