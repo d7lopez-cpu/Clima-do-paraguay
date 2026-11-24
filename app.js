@@ -339,7 +339,7 @@
     const pEns = pedirEnsamble(c);                       // se pide al mismo tiempo que el pronóstico
     let d;
     try { d = await pedirClima(url); }
-    catch (e) { const v = leerJSON('clima-py-det-' + c.n, null); if (v) return v; throw e; }   // sin internet: último detalle guardado
+    catch (e) { const v = leerJSON('clima-py-det-' + c.n, null); if (v && typeof v === 'object' && v.current && v.hourly && v.daily) return v; throw e; }   // sin internet: último detalle guardado (validado)
     if (!d || !d.current || !d.hourly || !d.daily) throw new ErrorApi('datos');
     conObservacionDetalle(c, d);                         // cerca de un aeropuerto: se usan los valores medidos
     d.proxh = resumirProximaHora(d); delete d.minutely_15;
@@ -902,7 +902,8 @@
   // ============ 6c) COMPARAR CIUDADES ============
   const NOMBRES = CIUDADES.map(c => c.n).sort((a, b) => a.localeCompare(b, 'es'));
   const COLORES_COMP = ['#fbbf24', '#38bdf8', '#f472b6'];
-  let compSel = leerJSON('clima-py-comp', ['Asunción', 'Encarnación', 'Ciudad del Este']).filter(n => porNombre.has(n));
+  const compGuardada = leerJSON('clima-py-comp', null);           // lo guardado puede no ser una lista (almacenamiento corrupto): se valida
+  let compSel = Array.isArray(compGuardada) ? compGuardada.filter(n => typeof n === 'string' && porNombre.has(n)).slice(0, 3) : [];
   if (compSel.length < 2) compSel = ['Asunción', 'Encarnación', 'Ciudad del Este'];
   let tokenComp = 0;
   function pintarSelectsComp() {
