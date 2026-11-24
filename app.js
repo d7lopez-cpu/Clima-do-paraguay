@@ -1350,7 +1350,9 @@
   const multFx = () => (prefsAnim.intensidad || 1) * nivelR();
   const cant = n => Math.round(n * multFx());
   const claveFx = () => [fx ? 1 : 0, prefsAnim.intensidad, nivelR(), Object.keys(prefsAnim.efectos).map(k => prefsAnim.efectos[k] ? 1 : 0).join('')].join(',');
-  const vientoVis = () => (amb.viento || 0) + (amb.tipo === 'tormenta' ? 25 : 0);   // la tormenta siempre trae ráfagas
+  const vientoVis = () => (amb.viento || 0) + (amb.tipo === 'tormenta' ? 25 : 0);   // la tormenta siempre trae ráfagas (inclinan la lluvia y mecen las palmeras)
+  // las hojas, en cambio, siguen al viento real: con tormenta solo un poco más (antes una tormenta sin viento se llenaba de hojas)
+  const vientoHojas = () => (amb.viento || 0) + (amb.tipo === 'tormenta' ? 6 : 0);
   const mesLapacho = () => { const m = new Date().getMonth(); return m >= 6 && m <= 8; };   // julio a septiembre: lapachos en flor
   // Edad de la luna (0 = nueva, 0,5 = llena), con la misma fórmula que el dato «Luna» del detalle
   const edadLuna = () => { const P = 29.530588853; return ((((Date.now() - Date.UTC(2000, 0, 6, 18, 14)) / 86400000) % P + P) % P) / P; };
@@ -1539,7 +1541,7 @@
     eCharcos = efectoActivo('lluvia') ? [[0.04, 0.9, 1], [0.12, 0.95, 0.8], [0.09, 0.84, 0.6], [0.95, 0.88, 0.9], [0.87, 0.95, 0.75]].map(([x, y, k]) => ({ x: eW * x, y: eH * y, rx: Math.min(eW * 0.035, eH * 0.28) * k, ry: eH * 0.017 * (0.7 + k * 0.4) })) : [];
     const nuevoGranizo = g => Object.assign(g, { x: Math.random() * eW, y: -Math.random() * eH * 0.4, vy: 0.3 + Math.random() * 0.2, vx: vientoVis() / 900, r: 1 + Math.random() * 1.3, suelo: yAgua + 3 + Math.random() * (eH - yAgua - 6), reb: 0 });
     eGranizo = part('lluvia') && A.granizo ? Array.from({ length: cant(34) }, () => { const g = nuevoGranizo({ nuevo: nuevoGranizo }); g.y = Math.random() * eH * 0.7; return g; }) : [];
-    eHojas = part('viento') ? Array.from({ length: cant(limitar((vientoVis() - 12) / 25, 0, 1) * 18) }, () => ({ x: Math.random() * eW, y: eH * (0.35 + Math.random() * 0.6), v: 0.6 + Math.random() * 0.7, f: Math.random() * 6.28, a: Math.random() * 6.28, g: (Math.random() - 0.5) * 0.02, l: 1.6 + Math.random() * 1.8 })) : [];
+    eHojas = part('viento') ? Array.from({ length: cant(limitar((vientoHojas() - 12) / 25, 0, 1) * 18) }, () => ({ x: Math.random() * eW, y: eH * (0.35 + Math.random() * 0.6), v: 0.6 + Math.random() * 0.7, f: Math.random() * 6.28, a: Math.random() * 6.28, g: (Math.random() - 0.5) * 0.02, l: 1.6 + Math.random() * 1.8 })) : [];
     ePetalos = part('especiales') && mesLapacho() ? Array.from({ length: cant(10) }, (_, i) => ({ i: i % 3, x: eW * LAPACHOS[i % 3][0], y: eH * (0.5 + Math.random() * 0.3), v: 0.5 + Math.random() * 0.5, f: Math.random() * 6.28 })) : [];
     if (!eTexNiebla) eTexNiebla = texturaNiebla();
     const tw = Math.max(eW * 0.7, eH * 3);
@@ -1640,7 +1642,7 @@
     if (!quieto) latidoRayo(t, dt || 0);
     const simple = !prefsAnim.paisaje || !fx, d = Math.min(window.devicePixelRatio || 1, nivelR() < 0.75 ? 1 : 2);   // con calidad baja, menos píxeles
     if (w !== eW || h !== eH || d !== eD) { eW = w; eH = h; eD = d; ec.width = Math.round(w * d); ec.height = Math.round(h * d); ex.setTransform(d, 0, 0, d, 0, 0); eClave = ''; eEtqSucio = true; vAst.ok = false; eFundido = 0; }
-    const clave = [ambClave, eW, eH, claveFx(), simple ? 1 : 0, amb.granizo ? 1 : 0, Math.round(vientoVis() / 8), mesLapacho() ? 1 : 0].join('|');
+    const clave = [ambClave, eW, eH, claveFx(), simple ? 1 : 0, amb.granizo ? 1 : 0, Math.round(vientoVis() / 8), Math.round(vientoHojas() / 8), mesLapacho() ? 1 : 0].join('|');
     if (eClave !== clave) {
       if (eClave && !quieto && !simple && vEsc.Ph) fotoFundido();      // cambió el clima, la ciudad o las preferencias (no el tamaño): fundido
       eClave = clave; eFirma = ''; armarEscena();
@@ -1892,7 +1894,7 @@
     ex.globalAlpha = 1;
     // hojas y polvo que arrastra el viento
     if (eHojas.length) {
-      const vv = vientoVis(), vel = 0.03 + vv / 450;
+      const vv = vientoHojas(), vel = 0.03 + vv / 450;
       ex.strokeStyle = mezcla(T[2], '#a07c3c', 0.45); ex.lineWidth = 2.2; ex.lineCap = 'round'; ex.beginPath();
       eHojas.forEach(l => {
         if (dt) {
