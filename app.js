@@ -1586,9 +1586,28 @@
       vAst.ok = true;
     }
     const sx = eW * vAst.sx, sy = libreDeEtq(sx, eH * vAst.sy, R), altSol = limitar((yHor - eH * vAst.sy) / aMax, 0, 1), sobre = vAst.so;
+    let refSol = null, refLuna = null, kDor = 0;                   // reflejos en el río y brillo de la hora dorada (se dibujan más abajo)
     if (sobre > 0.01 && (vis || A.tipo === 'nublado' || A.tipo === 'niebla')) {
       const k = limitar(altSol / 0.45, 0, 1);                     // sol bajo = naranja; sol alto = amarillo claro
       const al = (vis ? 1 : A.tipo === 'nublado' ? 0.45 : 0.3) * sobre, col = `255,${Math.round(150 + 86 * k)},${Math.round(80 + 90 * k)}`;
+      refSol = { x: sx, col, a: 0.5 * al, w: R * (1.3 + 1.4 * (1 - k)) };
+      // rayos de sol entre las nubes con el sol bajo (se dibujan antes que las nubes, que los tapan): abanico que gira muy despacio
+      const kr = esp && vis ? sobre * limitar((0.55 - altSol) / 0.3, 0, 1) * (A.tipo === 'parcial' ? 1 : 0.45) * Math.min(1.2, prefsAnim.intensidad) : 0;
+      kDor = esp && vis && A.dorado ? sobre * (1 - k * 0.6) : 0;
+      if (kr > 0.02) {
+        const Lr = Math.hypot(eW, eH) * 0.75, gr = ex.createRadialGradient(sx, sy, R, sx, sy, Lr);
+        gr.addColorStop(0, `rgba(255,${Math.round(190 + 40 * k)},140,${0.06 * kr})`); gr.addColorStop(0.5, `rgba(255,200,140,${0.02 * kr})`); gr.addColorStop(1, 'rgba(255,200,140,0)');
+        ex.save(); ex.globalCompositeOperation = 'lighter'; ex.fillStyle = gr;
+        for (const m of [1, 0.45]) {                                // dos pasadas (ancha y angosta): el borde de cada rayo queda difuso
+          ex.beginPath();
+          for (let i = 0; i < 10; i++) {
+            const a = i / 10 * 6.283 + 0.18 * Math.sin(t / 9000 + i * 1.3), w = (0.05 + 0.03 * Math.sin(t / 3700 + i * 2.3)) * m;
+            ex.moveTo(sx, sy); ex.lineTo(sx + Math.cos(a - w) * Lr, sy + Math.sin(a - w) * Lr); ex.lineTo(sx + Math.cos(a + w) * Lr, sy + Math.sin(a + w) * Lr); ex.closePath();
+          }
+          ex.fill();
+        }
+        ex.restore();
+      }
       const gl = ex.createRadialGradient(sx, sy, 0, sx, sy, R * 5); gl.addColorStop(0, `rgba(${col},${0.55 * al})`); gl.addColorStop(1, `rgba(${col},0)`);
       ex.fillStyle = gl; ex.fillRect(sx - R * 5, sy - R * 5, R * 10, R * 10);
       if (vis && k > 0.7) { ex.save(); ex.globalAlpha = (k - 0.7) / 0.3 * sobre; ex.translate(sx, sy); ex.rotate(t / 9000); ex.fillStyle = 'rgba(255,240,190,0.07)'; for (let i = 0; i < 12; i++) { ex.rotate(0.5236); ex.beginPath(); ex.moveTo(0, 0); ex.lineTo(-R * 0.5, -R * 6.5); ex.lineTo(R * 0.5, -R * 6.5); ex.fill(); } ex.restore(); }
@@ -1600,6 +1619,7 @@
       const gl = ex.createRadialGradient(mx, my, 0, mx, my, R * 4.5); gl.addColorStop(0, `rgba(190,208,255,${0.34 * al * il})`); gl.addColorStop(1, 'rgba(190,208,255,0)');
       ex.fillStyle = gl; ex.fillRect(mx - R * 4.5, my - R * 4.5, R * 9, R * 9);
       dibujarLuna(ex, mx, my, R * 0.85, al);
+      refLuna = { x: mx, col: '222,230,255', a: 0.42 * al * (0.3 + 0.7 * il), w: R * 1.1 };
     }
     // nubes y aves
     if (eNubes.length) {                                          // por capas: las lejanas se tiñen del cielo; medias y cercanas llevan la panza en sombra
@@ -1666,9 +1686,21 @@
     ex.fillStyle = ga; ex.fillRect(0, yAgua, eW, eH - yAgua);
     const brillo = vEsc.br, hAg = eH - yAgua;
     for (let i = 0; i < 26; i++) {
-      const cerca = vis && sobre > 0.3 && altSol > 0 && i % 3 === 0, x = cerca ? sx + Math.sin(i * 7.1 + t / 1800) * eW * 0.04 : (i * 97 + t * 0.012 * (i % 3 + 1)) % eW, y = yAgua + ((i * 37) % 100) / 100 * hAg;
-      ex.fillStyle = `rgba(${brillo},${(cerca ? 0.2 : 0.06) + 0.06 * Math.sin(t / 700 + i)})`; ex.fillRect(x, y, 10 + (i * 13) % 26, 1.6);
+      const x = (i * 97 + t * 0.012 * (i % 3 + 1)) % eW, y = yAgua + ((i * 37) % 100) / 100 * hAg;
+      ex.fillStyle = `rgba(${brillo},${0.06 + 0.06 * Math.sin(t / 700 + i)})`; ex.fillRect(x, y, 10 + (i * 13) % 26, 1.6);
     }
+    // reflejo del sol y de la luna: una columna de destellos que ondula y se ensancha hacia la orilla (la lluvia lo rompe)
+    const reflejo = o => {
+      const a0 = o.a * (1 - A.lluvia * 0.75); if (a0 < 0.01) return;
+      ex.fillStyle = `rgb(${o.col})`;
+      for (let y = yAgua + 1.5, i = 0; y < eH; y += 2.6, i++) {
+        const u = (y - yAgua) / hAg, w = o.w * (0.5 + u * 1.3) * (0.55 + 0.45 * Math.sin(i * 1.9 + t / 520)), dx = Math.sin(i * 0.8 + t / 700) * (1.5 + u * 4);
+        ex.globalAlpha = a0 * (1 - u * 0.55) * (0.5 + 0.5 * Math.sin(i * 2.7 - t / 380)); ex.fillRect(o.x + dx - w / 2, y, w, 1.5);
+      }
+      ex.globalAlpha = 1;
+    };
+    if (refSol) reflejo(refSol);
+    if (refLuna) reflejo(refLuna);
     if (eGotas.length || eOndas.length) {                         // anillos y salpicaduras de la lluvia sobre el río
       if (anim && eGotas.length && Math.random() < A.lluvia * 0.55 * multFx() * dt / 16) eOndas.push({ x: Math.random() * eW, y: yAgua + 6 + Math.random() * (hAg - 10), r: 0, a: 0.5 });
       ex.lineWidth = 1; eOndas = eOndas.filter(o => o.a > 0.02);
@@ -1758,6 +1790,11 @@
           }
         }
       } else eRayo = null;
+    }
+    if (kDor > 0.02) {                                            // hora dorada: un resplandor cálido y suave que baña el cuadro desde el sol
+      const rg = Math.max(eW, eH) * 0.55, gd = ex.createRadialGradient(sx, sy, 0, sx, sy, rg);
+      gd.addColorStop(0, `rgba(255,178,105,${0.2 * kDor})`); gd.addColorStop(0.4, `rgba(255,150,90,${0.07 * kDor})`); gd.addColorStop(1, 'rgba(255,150,90,0)');
+      ex.save(); ex.globalCompositeOperation = 'lighter'; ex.fillStyle = gd; ex.fillRect(Math.max(0, sx - rg), 0, Math.min(eW, sx + rg) - Math.max(0, sx - rg), eH); ex.restore();
     }
     ex.fillStyle = eSombra; ex.fillRect(0, 0, eW, eH * 0.4);   // sombra arriba para que se lean las etiquetas
     if (eFundido > 0) {                                           // la escena anterior se desvanece encima de la nueva
