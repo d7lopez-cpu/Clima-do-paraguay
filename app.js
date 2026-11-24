@@ -1305,7 +1305,7 @@
   const ec = $('escenaCv'), ex = ec.getContext('2d');
   let eW = 0, eH = 0, eD = 1, eClave = '', eFirma = '', eNubes = [], eAves = [], eLuci = [], eEstr = [], eGotas = [], eGranizo = [], eHojas = [], ePetalos = [], eOndas = [], eNiebla = [], eRayo = null, eFugaz = null;
   let eTexNiebla = null, eSprLuci = null, eSombra = null, ultRayoT = -1, reGolpe = 0;
-  let eLuces = [], eViaL = null, eFoto = null, eFundido = 0, eEtq = [], eEtqSucio = true;        // fundido entre escenas · zonas ocupadas por las etiquetas
+  let eLuces = [], eViaL = null, eCharcos = [], eMoj = -1, eFoto = null, eFundido = 0, eEtq = [], eEtqSucio = true;        // fundido entre escenas · zonas ocupadas por las etiquetas
   const vAst = { ok: false, sx: 0, sy: 0, so: 0, mx: 0, my: 0, mf: 0 };   // sol y luna suavizados (no saltan al cambiar de momento del día)
   // Paralaje: el puntero sobre el cuadro (o la inclinación del celular, donde el navegador la da sin pedir permiso) corre un poco
   // cada capa según su distancia: lo lejano casi nada, las palmeras y la orilla lo que más. Nunca con movimiento reducido.
@@ -1505,6 +1505,13 @@
     for (let i = 0; i < 260; i++) { const [x, y] = pto(Math.random()), d = (Math.random() + Math.random() - 1) * lh * 0.13; f.fillRect(x * 4 * eD, (y + d) * 4 * eD, eD * 0.7, eD * 0.7); }
     return c;
   }
+  // ¿Llovió hace poco? 1 si llovió la hora anterior, 0,67 hace dos, 0,33 hace tres; 0 si no (con el pronóstico por horas del detalle)
+  function charcosRecientes(d) {
+    const h = d && d.hourly; if (!h || !Array.isArray(h.time) || !Array.isArray(h.weather_code)) return 0;
+    const ahora = horaAsuncion(), i = h.time.findIndex(x => String(x).startsWith(ahora)); if (i < 1) return 0;
+    for (let j = 1; j <= 3 && i - j >= 0; j++) { const c = h.weather_code[i - j]; if ((c >= 51 && c <= 82) || c >= 95) return 1 - (j - 1) / 3; }
+    return 0;
+  }
   function armarEscena() {
     const A = amb, simple = !prefsAnim.paisaje || !fx, part = g => !simple && efectoActivo(g), yAgua = eH * 0.74;
     const grandes = A.tipo === 'nublado' || A.tipo === 'lluvia' || A.tipo === 'tormenta', abierto = A.tipo === 'despejado' || A.tipo === 'parcial';
@@ -1526,7 +1533,10 @@
       eLuces.push({ x, y: Math.max(techo, yAgua - 2 - Math.random() * eH * 0.04), r: 0.6 + Math.random() * 0.7, c: Math.random() < 0.8 ? 0 : 1, k: i % 3 });
     }
     eEstr = part('estrellas') && abierto ? Array.from({ length: cant(45) }, () => ({ x: Math.random() * eW, y: Math.random() * eH * 0.5, r: 0.4 + Math.random() * 1.1 })) : [];
-    eGotas = part('lluvia') ? Array.from({ length: cant(A.lluvia * 70 * (A.granizo ? 0.6 : 1)) }, () => ({ x: Math.random() * eW, y: Math.random() * eH, l: eH * (0.05 + Math.random() * 0.05), v: 0.6 + Math.random() * 0.5 })) : [];
+    // gotas en dos planos: lejanas (cortas, lentas, tenues) y cercanas (largas y más claras)
+    eGotas = part('lluvia') ? Array.from({ length: cant(A.lluvia * 70 * (A.granizo ? 0.6 : 1)) }, () => { const z = Math.random() < 0.55 ? 0 : 1; return { x: Math.random() * eW, y: Math.random() * eH, l: eH * (0.05 + Math.random() * 0.05) * (z ? 1.15 : 0.6), v: (0.6 + Math.random() * 0.5) * (z ? 1.1 : 0.75), z }; }) : [];
+    // charcos en las orillas (durante la lluvia y un rato después): posiciones fijas dentro de la tierra
+    eCharcos = efectoActivo('lluvia') ? [[0.04, 0.9, 1], [0.12, 0.95, 0.8], [0.09, 0.84, 0.6], [0.95, 0.88, 0.9], [0.87, 0.95, 0.75]].map(([x, y, k]) => ({ x: eW * x, y: eH * y, rx: Math.min(eW * 0.035, eH * 0.28) * k, ry: eH * 0.017 * (0.7 + k * 0.4) })) : [];
     const nuevoGranizo = g => Object.assign(g, { x: Math.random() * eW, y: -Math.random() * eH * 0.4, vy: 0.3 + Math.random() * 0.2, vx: vientoVis() / 900, r: 1 + Math.random() * 1.3, suelo: yAgua + 3 + Math.random() * (eH - yAgua - 6), reb: 0 });
     eGranizo = part('lluvia') && A.granizo ? Array.from({ length: cant(34) }, () => { const g = nuevoGranizo({ nuevo: nuevoGranizo }); g.y = Math.random() * eH * 0.7; return g; }) : [];
     eHojas = part('viento') ? Array.from({ length: cant(limitar((vientoVis() - 12) / 25, 0, 1) * 18) }, () => ({ x: Math.random() * eW, y: eH * (0.35 + Math.random() * 0.6), v: 0.6 + Math.random() * 0.7, f: Math.random() * 6.28, a: Math.random() * 6.28, g: (Math.random() - 0.5) * 0.02, l: 1.6 + Math.random() * 1.8 })) : [];
@@ -1767,6 +1777,27 @@
     ex.fillStyle = T[2];
     ex.beginPath(); ex.moveTo(-12, eH); ex.lineTo(-12, yAgua - eH * 0.05); ex.lineTo(0, yAgua - eH * 0.05); ex.quadraticCurveTo(eW * 0.2, yAgua - eH * 0.02, eW * 0.3, eH); ex.fill();
     ex.beginPath(); ex.moveTo(eW + 12, eH); ex.lineTo(eW + 12, yAgua - eH * 0.04); ex.lineTo(eW, yAgua - eH * 0.04); ex.quadraticCurveTo(eW * 0.84, yAgua - eH * 0.01, eW * 0.72, eH); ex.fill();
+    {                                                               // charcos: reflejan el cielo; con lluvia, anillos que se abren; después se secan
+      const obj = efectoActivo('lluvia') ? Math.max(A.lluvia ? 0.6 + 0.4 * A.lluvia : 0, A.mojado || 0) : 0;
+      eMoj = eMoj < 0 || !anim ? obj : eMoj + (obj - eMoj) * (1 - Math.exp(-dt / 2500));
+      if (eMoj > 0.02 && eCharcos.length) {
+        ex.fillStyle = 'rgba(10,20,15,0.22)'; ex.globalAlpha = eMoj; ex.beginPath();   // tierra mojada alrededor
+        for (const c of eCharcos) { ex.moveTo(c.x + c.rx * 1.35, c.y + c.ry * 0.2); ex.ellipse(c.x, c.y + c.ry * 0.2, c.rx * 1.35, c.ry * 1.6, 0, 0, 6.283); }
+        ex.fill();
+        ex.fillStyle = mezcla(P[2], '#ffffff', 0.12 * kLuz); ex.globalAlpha = 0.55 * eMoj; ex.beginPath();
+        for (const c of eCharcos) { ex.moveTo(c.x + c.rx, c.y); ex.ellipse(c.x, c.y, c.rx, c.ry, 0, 0, 6.283); }
+        ex.fill();
+        ex.strokeStyle = `rgba(${vEsc.br},0.5)`; ex.lineWidth = 1; ex.beginPath();   // brillo en el borde de cada charco
+        for (const c of eCharcos) { ex.moveTo(c.x - c.rx * 0.7, c.y - c.ry * 0.55); ex.ellipse(c.x, c.y, c.rx, c.ry, 0, 3.6, 5.8); }
+        ex.stroke();
+        if (anim && A.lluvia) {
+          ex.strokeStyle = 'rgba(220,235,255,0.6)'; ex.beginPath();
+          eCharcos.forEach((c, j) => { for (let m = 0; m < 2; m++) { const ph = t / 650 + j * 0.37 + m * 0.5, u = ph % 1, n = Math.floor(ph), ox = ((n * 37 + j * 11) % 10 / 10 - 0.5) * c.rx * 1.1, rr = u * c.rx * 0.45; ex.moveTo(c.x + ox + rr, c.y); ex.ellipse(c.x + ox, c.y, rr, rr * 0.35, 0, 0, 6.283); } });
+          ex.globalAlpha = 0.5 * eMoj * A.lluvia; ex.stroke();
+        }
+        ex.globalAlpha = 1;
+      }
+    }
     const vp = efectoActivo('viento') && !simple ? vientoVis() : 0;
     palmaEsc(eW * 0.08, yAgua - eH * 0.04, eH * 0.7, t, T[3], vp); palmaEsc(eW * 0.17, yAgua - eH * 0.01, eH * 0.44, t + 900, T[3], vp);
     palmaEsc(eW * 0.92, yAgua - eH * 0.035, eH * 0.62, t + 400, T[3], vp); palmaEsc(eW * 0.84, yAgua - eH * 0.005, eH * 0.4, t + 1600, T[3], vp);
@@ -1807,11 +1838,25 @@
       });
       ex.globalAlpha = 1;
     }
-    // lluvia
+    // lluvia: la inclinación sigue al viento y va y viene en rachas; con lluvia fuerte pasan cortinas de agua más densas
     if (eGotas.length) {
-      const r = limitar(vientoVis() / 60, 0, 0.5); ex.strokeStyle = 'rgba(205,225,255,0.38)'; ex.lineWidth = 1; ex.beginPath();
-      eGotas.forEach(d => { d.y += d.v * dt * 0.7; d.x += d.v * dt * 0.7 * r; if (d.y > eH) { d.y = -d.l; d.x = Math.random() * eW; } if (d.x > eW) d.x -= eW; ex.moveTo(d.x, d.y); ex.lineTo(d.x - d.l * r, d.y - d.l); });
-      ex.stroke();
+      const rach = 0.5 + 0.5 * Math.sin(t / 2600) * Math.sin(t / 1700 + 1.3), r = limitar(vientoVis() / 60, 0, 0.5) * (0.7 + 0.6 * rach);
+      if (A.lluvia > 0.45) {
+        const ac = 0.07 * (A.lluvia - 0.3) * Math.min(1.3, prefsAnim.intensidad);
+        ex.save(); ex.transform(1, 0, -r, 1, 0, 0);
+        for (let i = 0; i < 2; i++) {
+          const w = eW * (0.16 + i * 0.08), x = ((t * (0.018 + i * 0.01) * (0.5 + r * 2) + i * eW * 0.7) % (eW * 1.5)) - eW * 0.25 + r * eH * 0.5;
+          const gc = ex.createLinearGradient(x, 0, x + w, 0); gc.addColorStop(0, 'rgba(200,214,235,0)'); gc.addColorStop(0.5, `rgba(200,214,235,${ac})`); gc.addColorStop(1, 'rgba(200,214,235,0)');
+          ex.fillStyle = gc; ex.fillRect(x, 0, w, eH);
+        }
+        ex.restore();
+      }
+      ex.lineWidth = 1;
+      for (let z = 0; z < 2; z++) {
+        ex.strokeStyle = z ? 'rgba(210,228,255,0.45)' : 'rgba(195,212,240,0.24)'; ex.beginPath();
+        for (const d of eGotas) if (d.z === z) { d.y += d.v * dt * 0.7; d.x += d.v * dt * 0.7 * r; if (d.y > eH) { d.y = -d.l; d.x = Math.random() * eW; } if (d.x > eW) d.x -= eW; ex.moveTo(d.x, d.y); ex.lineTo(d.x - d.l * r, d.y - d.l); }
+        ex.stroke();
+      }
     }
     // granizo (tormenta con granizo): cae rápido, rebota en las orillas y salpica en el río
     if (eGranizo.length) {
@@ -2095,7 +2140,7 @@
     document.body.classList.toggle('noche', fase === 'noche');
     const lluvia = tipo === 'tormenta' ? 1 : tipo === 'lluvia' ? limitar(0.3 + p / 3, 0.3, 1) : 0;
     const clave = [tipo, Math.round(lluvia * 4)].join(), claveFase = [tipo, fase].join();
-    Object.assign(amb, { tipo, fase, dia, dorado, lluvia, sol: m ? m.sol : null, viento: a.wind_speed_10m || 0, temp: a.temperature_2m, previa: !!vp, granizo: tipo === 'tormenta' && (cod === 96 || cod === 99) });
+    Object.assign(amb, { tipo, fase, dia, dorado, lluvia, sol: m ? m.sol : null, viento: a.wind_speed_10m || 0, temp: a.temperature_2m, previa: !!vp, granizo: tipo === 'tormenta' && (cod === 96 || cod === 99), mojado: vp ? 0 : d ? charcosRecientes(d) : (amb.mojado || 0) });
     const nuevaEstructura = clave !== ambClave, nuevaFase = claveFase !== faseClave;
     if (nuevaEstructura) { ambClave = clave; armarParticulas(); proxRayo = performance.now() + 3000; }   // las nubes y aves solo se vuelven a sortear si cambia el clima, no por el paso del día
     if (nuevaFase) {
