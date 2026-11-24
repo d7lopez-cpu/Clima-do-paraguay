@@ -1932,6 +1932,44 @@
   if ('MutationObserver' in window) new MutationObserver(sincronizarPrevia).observe($('escenaEtq'), { childList: true });
   sincronizarPanel();
 
+  // ============ 6g) DECORACIÓN NAVIDEÑA ============
+  // Del 1 de diciembre al 6 de enero (Reyes), con la fecha de Paraguay. En Paraguay la Navidad es en verano: luces y estrella, sin nieve.
+  // Se elige en el panel de ajustes («Automática / Siempre / Nunca») y se guarda aparte de prefsAnim, en 'clima-py-navidad'.
+  const MODOS_NAVIDAD = ['auto', 'si', 'no'];
+  let modoNavidad = MODOS_NAVIDAD.includes(leer('clima-py-navidad', 'auto')) ? leer('clima-py-navidad', 'auto') : 'auto';
+  function fechaPY() {                                             // { a, m, d } de hoy en Paraguay, sin importar la zona horaria del equipo
+    try {
+      const pt = {}; new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Asuncion', year: 'numeric', month: 'numeric', day: 'numeric' })
+        .formatToParts(new Date()).forEach(x => { pt[x.type] = Number(x.value); });
+      if (pt.year && pt.month && pt.day) return { a: pt.year, m: pt.month, d: pt.day };
+    } catch (_) {}
+    const f = new Date(); return { a: f.getFullYear(), m: f.getMonth() + 1, d: f.getDate() };
+  }
+  const enNavidad = ({ m, d } = fechaPY()) => m === 12 || (m === 1 && d <= 6);
+  const LOGO_NORMAL = 'icono-192.png', LOGO_NAVIDAD = 'icono-navidad.svg';
+  function aplicarNavidad() {
+    const hoy = fechaPY(), activa = modoNavidad === 'si' || (modoNavidad === 'auto' && enNavidad(hoy));
+    document.documentElement.classList.toggle('navidad', activa);
+    const logo = document.querySelector('header .logo'), ico = document.querySelector('link[rel="icon"]');
+    if (logo && !logo.getAttribute('src').endsWith(activa ? LOGO_NAVIDAD : LOGO_NORMAL)) logo.src = activa ? LOGO_NAVIDAD : LOGO_NORMAL;
+    if (ico && !ico.getAttribute('href').endsWith(activa ? LOGO_NAVIDAD : LOGO_NORMAL)) { ico.type = activa ? 'image/svg+xml' : 'image/png'; ico.href = activa ? LOGO_NAVIDAD : LOGO_NORMAL; }
+    const clave = `${hoy.a}-${hoy.m}-${hoy.d}`;
+    $('saludoNavidad').hidden = !activa || leer('clima-py-navidad-saludo', '') === clave;
+    marcarRadio('daNavidad', modoNavidad);
+  }
+  $('saludoCerrar').addEventListener('click', () => {
+    const h = fechaPY(); guardar('clima-py-navidad-saludo', `${h.a}-${h.m}-${h.d}`);   // no vuelve a aparecer hasta mañana
+    $('saludoNavidad').hidden = true;
+  });
+  $$a('input[name="daNavidad"]').forEach(r => r.addEventListener('change', () => {
+    if (!r.checked || !MODOS_NAVIDAD.includes(r.value)) return;
+    modoNavidad = r.value; guardar('clima-py-navidad', modoNavidad); aplicarNavidad();
+  }));
+  $('btnAjustesAnim').addEventListener('click', () => marcarRadio('daNavidad', modoNavidad));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) aplicarNavidad(); });   // por si la página quedó abierta de un día para otro
+  setInterval(aplicarNavidad, 30 * 60e3);
+  aplicarNavidad();
+
   // ============ 7) RESUMEN, LISTA Y DETALLE ============
   function dibujarStats() {
     const con = CIUDADES.filter(c => valor(c) !== null);

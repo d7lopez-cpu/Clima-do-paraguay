@@ -33,6 +33,7 @@
       <button id="btnActualizar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg>Actualizar</button>
     </div>
   </header>
+  <div class="saludo-navidad" id="saludoNavidad" role="status" hidden><span>🎄 ¡Felices fiestas!</span><button type="button" class="btn" id="saludoCerrar" aria-label="Cerrar saludo" title="Cerrar saludo">✕</button></div>
   <div id="lugares" class="lugares" hidden></div>
 
   <section class="escena" id="escena" aria-label="Paisaje del clima actual">
@@ -206,6 +207,16 @@
         <span class="da-ayuda" id="daPreviaEstado" aria-live="polite">Mostrando el clima real.</span>
         <button type="button" class="btn" id="daPreviaVolver">Volver al clima real</button>
       </div>
+    </fieldset>
+
+    <fieldset class="da-grupo">
+      <legend>Decoración navideña</legend>
+      <div class="da-seg">
+        <label><input type="radio" name="daNavidad" value="auto" aria-describedby="daNavidadAyuda"><span>Automática</span></label>
+        <label><input type="radio" name="daNavidad" value="si" aria-describedby="daNavidadAyuda"><span>Siempre</span></label>
+        <label><input type="radio" name="daNavidad" value="no" aria-describedby="daNavidadAyuda"><span>Nunca</span></label>
+      </div>
+      <p class="da-ayuda" id="daNavidadAyuda">Automática: del 1 de diciembre al 6 de enero (Reyes).</p>
     </fieldset>
 
     <div class="da-pie">

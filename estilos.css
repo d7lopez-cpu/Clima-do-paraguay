@@ -587,3 +587,33 @@
   @media (max-width: 820px), (pointer: coarse) { .escena-previa .btn { min-height: 44px; } }
   /* La barra de preferencias pasa a dos líneas si no entra (pantallas muy angostas) */
   @media (max-width: 420px) { .pref { flex-wrap: wrap; max-width: 100%; } }
+
+  /* ============ DECORACIÓN NAVIDEÑA (clase .navidad en <html>; la pone app.js, sección 6g) ============ */
+  /* Navidad paraguaya, en verano: luces de colores, estrella y toques dorado/rojo/verde. Nada de nieve. */
+  :root { --nv-rojo: #e11d48; --nv-verde: #22c55e; --nv-oro: #f5b301; --nv-azul: #38bdf8; }
+  html.navidad header { position: relative; }
+  /* Guirnalda fina sobre el borde inferior del encabezado: dos tiras de luces que se alternan despacio */
+  html.navidad header::before, html.navidad header::after { content: ""; position: absolute; left: 0; right: 0; bottom: -5px; height: 10px; pointer-events: none; background-repeat: repeat-x; }
+  html.navidad header::before {
+    background-image: radial-gradient(circle, var(--nv-rojo) 0 3px, transparent 3.6px), radial-gradient(circle, var(--nv-oro) 0 3px, transparent 3.6px);
+    background-size: 64px 10px; background-position: 8px 50%, 40px 50%; }
+  html.navidad header::after {
+    background-image: radial-gradient(circle, var(--nv-verde) 0 3px, transparent 3.6px), radial-gradient(circle, var(--nv-azul) 0 3px, transparent 3.6px);
+    background-size: 64px 10px; background-position: 24px 50%, 56px 50%; }
+  @media (prefers-reduced-motion: no-preference) {
+    html.navidad header::before { animation: nvBrillo 3.2s ease-in-out infinite alternate; }
+    html.navidad header::after { animation: nvBrillo 3.2s ease-in-out infinite alternate-reverse; }
+    @keyframes nvBrillo { from { opacity: 1; } to { opacity: 0.45; } }
+  }
+  /* Acentos discretos: borde superior de las tarjetas de resumen y subrayado de la pestaña activa */
+  html.navidad .stat { border-top-color: var(--nv-oro); }
+  html.navidad .stat:nth-child(even) { border-top-color: var(--nv-rojo); }
+  html.navidad .pestana.on { box-shadow: inset 0 -3px 0 var(--nv-rojo); }
+  :root[data-tema=claro].navidad .pestana.on { box-shadow: inset 0 -3px 0 var(--nv-oro); }
+  /* Saludo pequeño y descartable */
+  .saludo-navidad { display: flex; align-items: center; gap: 6px; width: max-content; max-width: 100%; margin: -4px 0 12px; padding: 2px 2px 2px 14px; border-radius: 999px;
+    background: #2a1608; color: #fde68a; border: 1px solid #b7791f; font-size: 0.86rem; font-weight: 600; }
+  .saludo-navidad[hidden] { display: none; }
+  .saludo-navidad .btn { border: 0; background: transparent; color: inherit; min-width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center; font-size: 0.85rem; }
+  :root[data-tema=claro] .saludo-navidad { background: #fff7ed; color: #7c2d12; border-color: #ea9a3e; }
+  @media (max-width: 820px), (pointer: coarse) { .saludo-navidad .btn { min-width: 44px; min-height: 44px; } .saludo-navidad { margin-top: 2px; } }
