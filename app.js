@@ -2469,7 +2469,7 @@
   function estallido(fuerza) {
     if (!au || !sonando || au.ctx.state !== 'running' || !hayLugar(8)) return false;
     const ahora = performance.now(); if (ahora - (au.ultEstallido || 0) < 250) return false; au.ultEstallido = ahora;
-    const { ctx, buf } = au, T = ctx.currentTime + 0.02, k = limitar(Number(fuerza) || 0.6, 0.1, 1), sal = salida(au.duckAcentos);
+    const { ctx, buf } = au, T = ctx.currentTime + MARGEN, k = limitar(Number(fuerza) || 0.6, 0.1, 1), sal = salida(au.duckAcentos);
     const s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
     s.buffer = buf; fl.type = 'lowpass'; fl.frequency.setValueAtTime(900, T); fl.frequency.exponentialRampToValueAtTime(120, T + 0.6);
     g.gain.setValueAtTime(0.0001, T); g.gain.exponentialRampToValueAtTime(0.5 * k, T + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, T + 0.7);
@@ -2487,7 +2487,11 @@
   function crearAudio(ctxDado) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!ctxDado && !AC) return null;
-    const ctx = ctxDado || new AC(), master = ctx.createGain(), suave = ctx.createBiquadFilter(), lim = ctx.createDynamicsCompressor();
+    // latencyHint 'playback': el navegador usa un búfer de salida más grande. Unos ms más de retraso (no importa en un paisaje
+    // sonoro) a cambio de que el audio no se corte cuando el celular está ocupado dibujando la animación.
+    let ctxNuevo = ctxDado;
+    if (!ctxNuevo) { try { ctxNuevo = new AC({ latencyHint: 'playback' }); } catch (_) { ctxNuevo = new AC(); } }
+    const ctx = ctxNuevo, master = ctx.createGain(), suave = ctx.createBiquadFilter(), lim = ctx.createDynamicsCompressor();
     master.gain.value = 0; suave.type = 'lowpass'; suave.frequency.value = 16000;
     // Limitador: casi no actúa en la mezcla normal; solo frena los picos (truenos cercanos) para que nunca sature
     lim.threshold.value = -6; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.003; lim.release.value = 0.25;
@@ -2510,19 +2514,34 @@
     }
     for (let i = 0; i < N; i++) ch[i] = i < F ? x[i] * (i / F) + x[N + i] * (1 - i / F) : x[i];
 
+    // Capas que hoy no suenan se DESCONECTAN (después de su fundido de salida): así el navegador deja de calcularlas. Antes las ~15 capas
+    // fijas se procesaban siempre, aunque estuvieran en silencio, y en celulares eso cortaba el audio. revisarDormidos() las conecta y desconecta.
+    const dormidos = [];
+    const dormir = (nodo, destino, params, ambiente) => { dormidos.push({ nodo, destino, params, ambiente, conectado: false, hasta: 0 }); };
+    // Eco barato: 6 filtros peine (retardo con realimentación amortiguada), repartidos entre izquierda y derecha. Reemplaza a los dos
+    // ConvolverNode (respuestas de 1,8 y 1,2 s en estéreo), que eran lo más pesado del sonido en un celular. Mismo nivel de eco (medido).
+    const eco = (t60, corte, nivel) => {
+      const ent = ctx.createGain(), mez = ctx.createChannelMerger(2), sal = ctx.createGain(), pre = ctx.createBiquadFilter();
+      pre.type = 'lowpass'; pre.frequency.value = corte; ent.connect(pre); sal.gain.value = nivel; mez.connect(sal);
+      [0.0297, 0.0371, 0.0411, 0.0437, 0.0533, 0.0617].forEach((d, i) => {
+        const dl = ctx.createDelay(0.1), fb = ctx.createGain(), am = ctx.createBiquadFilter();
+        dl.delayTime.value = d; fb.gain.value = Math.pow(10, -3 * d / t60); am.type = 'lowpass'; am.frequency.value = corte;
+        pre.connect(dl); dl.connect(am); am.connect(fb); fb.connect(dl); am.connect(mez, 0, i % 2);
+      });
+      return { ent, sal };
+    };
     // Un poco de eco de espacio abierto para las aves y las ranas (vuelve por el grupo de acentos: el trueno también lo agacha)
-    const rev = ctx.createConvolver(), irN = Math.round(ctx.sampleRate * 1.8), ir = ctx.createBuffer(2, irN, ctx.sampleRate), revG = ctx.createGain();
-    for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < irN; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irN, 2.6); }
-    rev.buffer = ir; revG.gain.value = 0.6; rev.connect(revG); revG.connect(duckAcentos);
-    const bus = (destino, eco) => { const g = ctx.createGain(); g.gain.value = 0; g.connect(destino); if (eco) { const e = ctx.createGain(); e.gain.value = eco; g.connect(e); e.connect(rev); } return g; };
+    const rev = eco(1.1, 6000, 0.6 * 0.081);
+    const bus = (destino, eco) => { const g = ctx.createGain(); g.gain.value = 0; g.connect(destino); if (eco) { const e = ctx.createGain(); e.gain.value = eco; g.connect(e); e.connect(rev.ent); } return g; };
     const aves = bus(duckAcentos, 0.5), ranas = bus(duckAcentos, 1), gotas = bus(duckCama), busGranizo = bus(duckCama);
+    dormir(rev.sal, duckAcentos, [aves.gain, ranas.gain], true);
 
     // Una capa de ruido filtrado: fuente → filtros → env (envolvente propia: brisa que respira, ráfagas) → g (nivel de la escena)
     // Como el nivel va DESPUÉS de la envolvente, con nivel 0 la capa queda en silencio real.
     const capa = (tipo, f, q, alto) => {
       const s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), hp = ctx.createBiquadFilter(), env = ctx.createGain(), g = ctx.createGain();
       s.buffer = buf; s.loop = true; fl.type = tipo; fl.frequency.value = f; fl.Q.value = q; hp.type = 'highpass'; hp.frequency.value = alto || 20; g.gain.value = 0;
-      s.connect(fl); fl.connect(hp); hp.connect(env); env.connect(g); g.connect(duckCama); s.start(0, Math.random() * 3);
+      s.connect(fl); fl.connect(hp); hp.connect(env); env.connect(g); dormir(g, duckCama, [g.gain], true); s.start(0, Math.random() * 3);
       return { g, fl, env };
     };
     const lfo = (hz, prof, destino) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = hz; g.gain.value = prof; o.connect(g); g.connect(destino); o.start(); };
@@ -2540,7 +2559,7 @@
       s.buffer = buf; s.loop = true; bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 5;
       am.gain.value = 0.5; l.type = 'sawtooth'; l.frequency.value = hz; lg.gain.value = 0.5; l.connect(lg); lg.connect(am.gain);
       sw.gain.value = 0.65; lfo(azar(0.05, 0.12), 0.35, sw.gain);
-      nivel.gain.value = 0; s.connect(bp); bp.connect(am); am.connect(sw); sw.connect(nivel); nivel.connect(duckAcentos); s.start(0, Math.random() * 3); l.start();
+      nivel.gain.value = 0; s.connect(bp); bp.connect(am); am.connect(sw); sw.connect(nivel); dormir(nivel, duckAcentos, [nivel.gain], true); s.start(0, Math.random() * 3); l.start();
       return nivel;
     };
     const cig = [cigarra(4900, 62), cigarra(6200, 77)];
@@ -2552,47 +2571,74 @@
       o.type = 'sine'; o.frequency.value = f; am.gain.value = 0.5; gate.gain.value = 0.5; nivel.gain.value = 0;
       const pu = onda(pulso, 70), gr = onda(grupo, 14);
       pu.pg.connect(am.gain); gr.pg.connect(gate.gain);
-      o.connect(am); am.connect(gate); gate.connect(nivel); nivel.connect(duckAcentos); o.start();
+      o.connect(am); am.connect(gate); gate.connect(nivel); dormir(nivel, duckAcentos, [nivel.gain], true); o.start();
       return { nivel, ritmo: gr.p.frequency, grupo };
     };
     const gri = [grillo(4300, 29, 1.9), grillo(4650, 33, 2.3), grillo(5050, 27, 1.6)];
 
-    // Cada 250 ms: aves, ranas, ráfagas y el trueno de reserva; cada 100 ms: gotas y granizo (repartidos dentro de esos 100 ms con el
-    // reloj del audio, sin temporizadores sueltos). Nada se crea si el contexto no está corriendo (suspendido o interrumpido): sus
-    // sonidos no terminarían nunca y se acumularían.
+    // Un solo reloj cada 200 ms programa por adelantado, con el reloj del AUDIO (no el del temporizador), todo lo que cae en los
+    // próximos ADELANTO s. Antes había dos setInterval (100 y 250 ms) que creaban los sonidos «para ya»: si la página se trababa un
+    // momento (la animación, el celular ocupado), las gotas llegaban a tirones, en ráfagas y con huecos. Ahora cada gota tiene su hora
+    // exacta y un atraso del temporizador de hasta ~0,3 s no se nota. Lo atrasado (tras una pausa larga) se salta, nunca se amontona.
+    // Nada se crea si el contexto no está corriendo (suspendido o interrumpido): sus sonidos no terminarían nunca y se acumularían.
+    const ADELANTO = 0.5;
     const listo = () => sonando && !document.hidden && ctx.state === 'running' && au && au.ctx === ctx;
-    const pulsoLento = () => {
-      if (Math.random() < au.tasaAves * 0.07) llamadaAve();
-      if (Math.random() < au.tasaRanas * 0.12) rana();
-      if (ctx.currentTime >= au.proxRafaga) programarRafaga();
+    // Llegadas con `tasa` por segundo, cada una a su hora en el reloj del audio. Separación al azar entre 0,25 y 1,75 veces la media:
+    // suena irregular pero pareja (un reparto de Poisson puro dejaba huecos de casi 1 s con llovizna, que se oían como cortes)
+    const llegadas = (clave, tasa, sonar, ahora, hasta) => {
+      if (!(tasa > 0)) { au[clave] = 0; return; }
+      let t = Math.max(au[clave] || 0, ahora + 0.05);
+      while (t < hasta) { sonar(t); t += azar(0.25, 1.75) / tasa; }
+      au[clave] = t;
+    };
+    const pulso = () => {
+      const ahora = ctx.currentTime, hasta = ahora + ADELANTO, dt = limitar(ahora - (au.ultPulso || ahora), 0, 0.5);
+      au.ultPulso = ahora;
+      llegadas('proxGota', au.tasaGotas * 25, gota, ahora, hasta);            // ~25 gotas por segundo con lluvia plena
+      llegadas('proxPiedra', au.hayPiedras ? 25 : 0, piedra, ahora, hasta);
+      if (Math.random() < 1 - Math.exp(-au.tasaAves * 0.28 * dt)) llamadaAve();
+      if (Math.random() < 1 - Math.exp(-au.tasaRanas * 0.48 * dt)) rana();
+      if (ahora >= au.proxRafaga) programarRafaga();
       // si el cielo no está dibujando relámpagos (fondo apagado, movimiento reducido…), los truenos llegan solos de vez en cuando
       if (amb.tipo === 'tormenta' && performance.now() - au.ultTrueno > au.esperaTrueno) trueno();
     };
-    const pulsoRapido = () => {
-      if (au.tasaGotas > 0) { const n = Math.round(au.tasaGotas * (1 + Math.random() * 3)); for (let i = 0; i < n; i++) gota(Math.random() * 0.1); }
-      if (au.hayPiedras) { const n = Math.round(azar(1, 4)); for (let i = 0; i < n; i++) piedra(Math.random() * 0.1); }
-    };
-    const intervaloAves = ctxDado ? 0 : setInterval(() => { if (listo()) pulsoLento(); }, 250);
-    const intervaloGotas = ctxDado ? 0 : setInterval(() => { if (listo()) pulsoRapido(); }, 100);
+    const reloj = ctxDado ? 0 : setInterval(() => {
+      if (!au || au.ctx !== ctx) return;
+      if (listo()) pulso(); else au.ultPulso = 0;
+      revisarDormidos();
+    }, 200);
     // Un poco de sala para la música (un eco corto propio: el de las aves pasa por el ambiente, que la música baja)
-    const salaM = ctx.createConvolver(), irM = ctx.createBuffer(2, Math.round(ctx.sampleRate * 1.2), ctx.sampleRate), salaG = ctx.createGain();
-    for (let c = 0; c < 2; c++) { const d = irM.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3); }
-    salaM.buffer = irM; salaG.gain.value = 0.18; musG.connect(salaM); salaM.connect(salaG); salaG.connect(master);
-    return { ctx, offline: !!ctxDado, pulsoLento, pulsoRapido, master, suave, lim, ambG, musG, duckCama, duckAcentos, busTruenos, viento, rafaga, silbido, lluvia, lluviaBajo, cig, gri, aves, ranas, gotas, busGranizo, rev, buf,
-      intervaloAves, intervaloGotas, tasaAves: 0, tasaRanas: 0, tasaGotas: 0, hayPiedras: false, proxRafaga: 0, ultTrueno: performance.now(), esperaTrueno: 15000,
+    const salaM = eco(0.8, 5000, 0.18 * 0.063);
+    musG.connect(salaM.ent); dormir(salaM.sal, master, [musG.gain], false);
+    // iOS «interrumpe» el audio (una llamada, otra app que suena) y no lo reanuda solo: se reintenta al volver y con el próximo toque
+    if (!ctxDado) {
+      ctx.onstatechange = () => { if (ctx.state === 'interrupted' && au && au.ctx === ctx && (sonando || mus.activa) && !document.hidden) ctx.resume().catch(() => {}); };
+      const despertar = () => { if (au && au.ctx === ctx && (sonando || mus.activa) && !document.hidden && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {}); };
+      document.addEventListener('pointerdown', despertar, { capture: true, passive: true });
+      document.addEventListener('keydown', despertar, { capture: true });
+    }
+    return { ctx, offline: !!ctxDado, pulso, dormidos, master, suave, lim, ambG, musG, duckCama, duckAcentos, busTruenos, viento, rafaga, silbido, lluvia, lluviaBajo, cig, gri, aves, ranas, gotas, busGranizo, rev, buf,
+      reloj, panes: new Map(), proxGota: 0, proxPiedra: 0, ultPulso: 0, tasaAves: 0, tasaRanas: 0, tasaGotas: 0, hayPiedras: false, proxRafaga: 0, ultTrueno: performance.now(), esperaTrueno: 15000,
       truenoLibre: 0, truenos: [], truenosTotal: 0, truenosDescartados: 0, fuentes: 0, objetivo: new WeakMap(), escena: null, niveles: {}, solo: null };
   }
 
   // Cuenta los sonidos sueltos vivos (para el tope) y los descuenta cuando terminan
   function vigilar(src) { au.fuentes++; const a = au; src.onended = () => { a.fuentes--; }; return src; }
   const hayLugar = (n) => au && au.fuentes + (n || 1) <= TOPE_FUENTES;
-  function salida(destino) {                                       // un punto al azar del estéreo
+  // Un punto al azar del estéreo. Cada grupo tiene 5 posiciones fijas que se reparten al azar (antes cada gota creaba su propio
+  // StereoPanner: ~25 nodos más por segundo con lluvia, que el navegador tenía que crear, calcular y recoger).
+  function salida(destino) {
     const { ctx } = au; if (!ctx.createStereoPanner) return destino;
-    const p = ctx.createStereoPanner(); p.pan.value = azar(-0.9, 0.9); p.connect(destino); return p;
+    let l = au.panes.get(destino);
+    if (!l) { l = [-0.8, -0.4, 0, 0.4, 0.8].map(x => { const p = ctx.createStereoPanner(); p.pan.value = x + azar(-0.1, 0.1); p.connect(destino); return p; }); au.panes.set(destino, l); }
+    return l[Math.floor(Math.random() * l.length)];
   }
+  // Los sonidos sueltos se programan al menos 50 ms en el futuro: algo programado «para ya» llega tarde al hilo del audio y su
+  // envolvente arranca a la mitad (un clic, un corte)
+  const MARGEN = 0.05;
   // Una nota de ave: un tono que se desliza de f0 a f1 (opcionalmente con vibrato)
   function tono(dest, f0, f1, t0, dur, vol, vib) {
-    const { ctx } = au, T = ctx.currentTime + t0, o = ctx.createOscillator(), g = ctx.createGain();
+    const { ctx } = au, T = ctx.currentTime + MARGEN + t0, o = ctx.createOscillator(), g = ctx.createGain();
     o.type = 'sine'; o.frequency.setValueAtTime(f0, T); o.frequency.exponentialRampToValueAtTime(f1, T + dur);
     if (vib) { const l = ctx.createOscillator(), lg = ctx.createGain(); l.frequency.value = vib.hz; lg.gain.value = vib.prof; l.connect(lg); lg.connect(o.frequency); l.start(T); l.stop(T + dur + 0.05); }
     g.gain.setValueAtTime(0.0001, T); g.gain.exponentialRampToValueAtTime(vol, T + Math.min(0.02, dur / 3)); g.gain.exponentialRampToValueAtTime(0.0001, T + dur);
@@ -2619,7 +2665,7 @@
     if (!hayLugar(10)) return;
     const { ctx } = au, sal = salida(au.ranas), n = Math.round(azar(2, 5)), f = azar(150, 240); let t = 0;
     for (let i = 0; i < n; i++) {
-      const T = ctx.currentTime + t, d = azar(0.1, 0.2), o = ctx.createOscillator(), bp = ctx.createBiquadFilter(), g = ctx.createGain(), mod = ctx.createGain(), am = ctx.createOscillator(), ag = ctx.createGain();
+      const T = ctx.currentTime + MARGEN + t, d = azar(0.1, 0.2), o = ctx.createOscillator(), bp = ctx.createBiquadFilter(), g = ctx.createGain(), mod = ctx.createGain(), am = ctx.createOscillator(), ag = ctx.createGain();
       o.type = 'sawtooth'; o.frequency.setValueAtTime(f * 1.1, T); o.frequency.exponentialRampToValueAtTime(f * 0.8, T + d);
       bp.type = 'bandpass'; bp.frequency.value = f * 3.2; bp.Q.value = 2.5;
       mod.gain.value = 0.5; am.frequency.value = azar(28, 40); ag.gain.value = 0.5; am.connect(ag); ag.connect(mod.gain);
@@ -2629,17 +2675,17 @@
       t += azar(0.17, 0.25);
     }
   }
-  function gota(retraso) {                                         // una gota: un toque corto y apagado
+  function gota(T) {                                               // una gota (a la hora T del reloj del audio): un toque corto y apagado
     if (!au || !hayLugar()) return;
-    const { ctx, buf } = au, T = ctx.currentTime + (retraso || 0), s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    const { ctx, buf } = au, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     s.buffer = buf; f.type = 'bandpass'; f.frequency.value = 1800 + Math.random() * 3200; f.Q.value = 6;
     g.gain.setValueAtTime(0, T); g.gain.linearRampToValueAtTime(0.15 + Math.random() * 0.25, T + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, T + 0.05 + Math.random() * 0.05);
     s.connect(f); f.connect(g); g.connect(salida(au.gotas)); vigilar(s).start(T, Math.random() * 4, 0.12);
   }
   // Granizo: un golpe seco y agudo (piedra sobre chapa o tejas), a veces con un "toc" más grave
-  function piedra(retraso) {
+  function piedra(T) {
     if (!au || !hayLugar()) return;
-    const { ctx, buf } = au, T = ctx.currentTime + (retraso || 0), s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), d = azar(0.012, 0.03);
+    const { ctx, buf } = au, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), d = azar(0.012, 0.03);
     s.buffer = buf; f.type = Math.random() < 0.25 ? 'bandpass' : 'highpass'; f.frequency.value = f.type === 'bandpass' ? azar(700, 1300) : azar(3200, 6500); f.Q.value = 3;
     g.gain.setValueAtTime(0, T); g.gain.linearRampToValueAtTime(azar(0.18, 0.45), T + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, T + d);
     s.connect(f); f.connect(g); g.connect(salida(au.busGranizo)); vigilar(s).start(T, Math.random() * 4, d + 0.02);
@@ -2764,6 +2810,21 @@
     if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(T); else { p.cancelScheduledValues(T); p.setValueAtTime(p.value, T); }
     p.linearRampToValueAtTime(val, T + Math.max(0.02, dur));
   }
+  // Conecta las capas que deben sonar (antes de que empiece su fundido de entrada) y desconecta las que callan, 3,2 s después de que
+  // su objetivo pasó a 0 (los fundidos de salida duran 2,5 s como mucho). Una capa desconectada no le cuesta nada al procesador.
+  function revisarDormidos() {
+    if (!au) return;
+    const ahora = au.ctx.currentTime, obj = p => au.objetivo.get(p) || 0, ambienteOn = obj(au.ambG.gain) > 0;
+    for (const d of au.dormidos) {
+      if (d.params.some(p => obj(p) > 1e-6) && (!d.ambiente || ambienteOn)) {
+        d.hasta = 0;
+        if (!d.conectado) { d.nodo.connect(d.destino); d.conectado = true; }
+      } else if (d.conectado) {
+        if (au.offline || (d.hasta && ahora >= d.hasta)) { try { d.nodo.disconnect(d.destino); } catch (_) { d.nodo.disconnect(); } d.conectado = false; d.hasta = 0; }
+        else if (!d.hasta) d.hasta = ahora + 3.2;
+      }
+    }
+  }
   function mezclar() {                                             // ajusta cada capa a la escena actual con fundidos cruzados
     if (!au) return;
     $('btnSonido').title = describirSonido();
@@ -2796,6 +2857,7 @@
     if (!nv.truenos && au.escena && au.escena.db.truenos !== undefined) soltarAgachado();
     fundir(au.suave.frequency, tipo === 'niebla' ? 2600 : tipo === 'lluvia' || tipo === 'tormenta' ? 9000 : 16000, 2);
     au.escena = e; au.niveles = nv;
+    revisarDormidos();
   }
   // Para pruebas automáticas y la consola: lo que el sonido está haciendo ahora (null si nunca se activó)
   window.climaSonido = Object.freeze({
@@ -2838,7 +2900,7 @@
     // cada 0,1 s del reloj del audio avanzan los sonidos sueltos; en tormenta se pide un trueno a los 4 s (y otro a los 4,5 s, que el
     // anti-rebote debe descartar)
     for (let k = 1; k * 0.1 < seg; k++) off.suspend(+(k * 0.1).toFixed(3)).then(() => {
-      conA(() => { A.pulsoRapido(); if (k % 2 === 0) A.pulsoLento(); if (k === 40 || k === 45) trueno(); });
+      conA(() => { A.pulso(); if (k === 40 || k === 45) trueno(); });
       off.resume();
     });
     const buf = await off.startRendering();
@@ -2855,7 +2917,7 @@
   // queda apagado y coherente (antes seguía en 🔊 sin sonar, y una segunda salida ya no liberaba nada).
   window.addEventListener('pagehide', () => {
     sonando = false; mus.activa = false; clearInterval(mus.temporizador); mus.temporizador = 0;
-    if (au) { clearInterval(au.intervaloAves); clearInterval(au.intervaloGotas); try { au.ctx.close(); } catch (_) {} au = null; }
+    if (au) { clearInterval(au.reloj); try { au.ctx.close(); } catch (_) {} au = null; }
     pintarBotonSonido();
   });
   $('btnSonido').addEventListener('click', async () => {
