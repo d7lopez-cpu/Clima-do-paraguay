@@ -1956,6 +1956,147 @@
   const TOPE_FUENTES = 150;                                        // sonidos sueltos vivos a la vez, como mucho (nada crece sin límite)
   const TRUENO_SEPARACION = 6;                                     // s mínimos entre el comienzo de dos truenos (y nunca dos encimados)
 
+  // ---- Música navideña opcional: una «caja de música» sintetizada (nada se descarga) ----
+  // Solo melodías de dominio público, escritas nota por nota aquí: «Noche de paz» (Gruber, 1818), «Los peces en el río» y
+  // «Campana sobre campana» (villancicos tradicionales, versiones simplificadas) y «Jingle Bells» (Pierpont, 1857). Se alternan en bucle.
+  // Suena solo si la persona la activó (fijarMusicaNavidad(true), preferencia 'clima-py-navidad-musica') Y la decoración navideña
+  // está activa (<html class="navidad">). Con el sonido del clima a la vez, la música queda al frente y el ambiente baja ~10 dB.
+  // Las notas se programan por tandas de ~1,5 s con el reloj del audio (nunca hay más de TOPE_NOTAS sonando).
+  const MUSICA_CLAVE = 'clima-py-navidad-musica', MUSICA_NIVEL = 1.8, TOPE_NOTAS = 48, PAUSA_CANCIONES = 2.5, AMBIENTE_CON_MUSICA = 0.32;   // 0,32 ≈ −10 dB
+  let musicaPedida = leer(MUSICA_CLAVE, 'no') === 'si';
+  const mus = { activa: false, cancion: 0, ev: 0, inicio: 0, temporizador: 0, notasVivas: 0, canciones: 0 };
+  // Notación: «nota+octava:duración en pulsos» (R = silencio); acordes: uno por compás (m = menor).
+  const CANCIONES = [
+    { nombre: 'Noche de paz', bpm: 84, compas: 3,
+      notas: 'G5:1.5 A5:.5 G5:1 E5:3 G5:1.5 A5:.5 G5:1 E5:3 D6:2 D6:1 B5:3 C6:2 C6:1 G5:3 A5:2 A5:1 C6:1.5 B5:.5 A5:1 G5:1.5 A5:.5 G5:1 E5:3 ' +
+        'A5:2 A5:1 C6:1.5 B5:.5 A5:1 G5:1.5 A5:.5 G5:1 E5:3 D6:2 D6:1 F6:1.5 D6:.5 B5:1 C6:3 E6:3 C6:1.5 G5:.5 E5:1 G5:1.5 F5:.5 D5:1 C5:3 R:3',
+      acordes: 'C C C C G G C C F F C C F F C C G G C C C G C C' },
+    { nombre: 'Los peces en el río', bpm: 104, compas: 2,
+      notas: 'A5:.5 A5:.5 A5:.5 A5:.5 Bb5:.5 A5:.5 G5:.5 A5:.5 F5:.5 G5:.5 A5:.5 G5:.5 F5:.5 E5:.5 D5:1 ' +
+        'A5:.5 A5:.5 A5:.5 A5:.5 Bb5:.5 A5:.5 G5:.5 A5:.5 F5:.5 G5:.5 A5:.5 G5:.5 F5:.5 E5:.5 D5:1 ' +
+        'D6:.5 D6:.5 C6:.5 Bb5:.5 A5:1 A5:1 G5:.5 G5:.5 F5:.5 E5:.5 F5:1 A5:1 F5:.5 G5:.5 A5:.5 G5:.5 F5:.5 E5:.5 D5:1 E5:.5 F5:.5 E5:.5 C#5:.5 D5:2',
+      acordes: 'Dm Gm Dm Dm Dm Gm A Dm Gm Dm A Dm Dm Dm A Dm' },
+    { nombre: 'Campana sobre campana', bpm: 100, compas: 2,
+      notas: 'D6:.5 D6:.5 D6:.5 E6:.5 D6:.5 C6:.5 B5:1 B5:.5 B5:.5 B5:.5 C6:.5 B5:.5 A5:.5 G5:1 A5:.5 A5:.5 A5:.5 B5:.5 C6:.5 B5:.5 A5:1 B5:.5 A5:.5 G5:.5 F#5:.5 G5:2 ' +
+        'D6:1.5 B5:.5 D6:1 B5:1 C6:.5 B5:.5 A5:.5 G5:.5 A5:2 D6:1.5 B5:.5 D6:1 B5:1 C6:.5 B5:.5 A5:.5 F#5:.5 G5:2',
+      acordes: 'G G G G D D D G G G C D G G D G' },
+    { nombre: 'Jingle Bells', bpm: 112, compas: 4,
+      notas: 'B5:1 B5:1 B5:2 B5:1 B5:1 B5:2 B5:1 D6:1 G5:1.5 A5:.5 B5:4 C6:1 C6:1 C6:1.5 C6:.5 C6:1 B5:1 B5:1 B5:.5 B5:.5 B5:1 A5:1 A5:1 B5:1 A5:2 D6:2 ' +
+        'B5:1 B5:1 B5:2 B5:1 B5:1 B5:2 B5:1 D6:1 G5:1.5 A5:.5 B5:4 C6:1 C6:1 C6:1.5 C6:.5 C6:1 B5:1 B5:1 B5:.5 B5:.5 D6:1 D6:1 C6:1 A5:1 G5:4',
+      acordes: 'G G G G C G A D G G G G C G D G' }
+  ].map(compilarCancion);
+  // Pasa la notación a eventos [pulso, midi, duración en pulsos, voz] ordenados; 'a' = acompañamiento (bajo y arpegio suave)
+  function compilarCancion(c) {
+    const PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }, midi = n => { const m = /^([A-G])([#b]?)(\d)$/.exec(n); return 12 * (+m[3] + 1) + PC[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0); };
+    const ev = []; let t = 0;
+    for (const tok of c.notas.trim().split(/\s+/)) { const [n, d] = tok.split(':'); if (n !== 'R') ev.push([t, midi(n), +d, 'm']); t += +d; }
+    const patron = { 2: [[0, 0], [1, 7]], 3: [[0, 0], [1, 7], [2, 16]], 4: [[0, 0], [1, 7], [2, 12], [3, 7]] }[c.compas];
+    c.acordes.trim().split(/\s+/).forEach((a, i) => {
+      const raiz = 12 * 5 + PC[a[0]] - (PC[a[0]] > 7 ? 12 : 0), menor = a.endsWith('m');
+      patron.forEach(([p, int]) => ev.push([i * c.compas + p, raiz + (int === 16 ? (menor ? 15 : 16) : int), 1, 'a']));
+    });
+    ev.sort((x, y) => x[0] - y[0]);
+    return { nombre: c.nombre, spb: 60 / c.bpm, largo: Math.max(t, c.acordes.trim().split(/\s+/).length * c.compas), ev };
+  }
+  // Una nota de caja de música: parciales de una lengüeta metálica (1 : 2,76 : 5,4) que se apagan rápido, con un golpe suave
+  function notaCaja(ctx, dest, t, m, dur, voz, alTerminar) {
+    const f = 440 * Math.pow(2, (m - 69) / 12), acomp = voz === 'a', largo = acomp ? 1.8 : 1.4 + Math.min(dur, 2) * 0.35;
+    const vol = (acomp ? 0.055 : 0.12) * (f > 1300 ? 0.75 : 1);
+    const parciales = acomp ? [[1, 1, 1], [2, 0.2, 0.5]] : [[1, 1, 1], [2.76, 0.16, 0.35], [5.4, 0.05, 0.18]];
+    let ultimo = null;
+    for (const [k, a, d] of parciales) {
+      if (f * k > 12000) continue;
+      const o = ctx.createOscillator(), g = ctx.createGain(), fin = t + largo * d;
+      o.type = 'sine'; o.frequency.value = f * k;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol * a, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, fin);
+      o.connect(g); g.connect(dest); o.start(t); o.stop(fin + 0.05); ultimo = o;
+    }
+    if (ultimo && alTerminar) ultimo.onended = alTerminar;
+  }
+  // Recorre las canciones programando lo que cae antes de `hasta` (s del reloj del audio); `e` guarda por dónde va
+  function recorrerMusica(e, hasta, tocar) {
+    for (let guarda = 0; guarda < 2000; guarda++) {
+      const c = CANCIONES[e.cancion], ev = c.ev[e.ev];
+      if (!ev) { e.inicio += c.largo * c.spb + PAUSA_CANCIONES; e.cancion = (e.cancion + 1) % CANCIONES.length; e.ev = 0; e.canciones++; continue; }
+      const t = e.inicio + ev[0] * c.spb;
+      if (t > hasta) return;
+      tocar(t, ev, c);
+      e.ev++;
+    }
+  }
+  function programarMusica() {
+    if (!au || !mus.activa || au.ctx.state !== 'running') return;
+    const ahora = au.ctx.currentTime;
+    recorrerMusica(mus, ahora + 1.5, (t, ev, c) => {
+      if (t < ahora - 0.05 || mus.notasVivas >= TOPE_NOTAS) return;   // notas atrasadas (tras una pausa) o demasiadas: se saltan, sin ráfagas
+      mus.notasVivas++;
+      notaCaja(au.ctx, au.musG, t, ev[1], ev[2] * c.spb, ev[3], () => { mus.notasVivas = Math.max(0, mus.notasVivas - 1); });
+    });
+  }
+  const navidadActiva = () => document.documentElement.classList.contains('navidad');
+  // Enciende o apaga la música según lo pedido y la decoración; mezclar() hace los fundidos (entrada y salida de 1,5 s)
+  function actualizarMusica() {
+    const debe = !!au && musicaPedida && navidadActiva();
+    if (debe && !mus.activa) {
+      mus.activa = true; mus.ev = 0; mus.inicio = au.ctx.currentTime + 0.5;
+      clearInterval(mus.temporizador); mus.temporizador = setInterval(programarMusica, 250); programarMusica();
+    } else if (!debe && mus.activa) {
+      mus.activa = false; clearInterval(mus.temporizador); mus.temporizador = 0;
+      mus.cancion = (mus.cancion + 1) % CANCIONES.length; mus.ev = 0;   // la próxima vez empieza con otra canción
+      if (au && !sonando) setTimeout(() => { if (au && !sonando && !mus.activa) au.ctx.suspend(); }, 3500);
+    }
+    mezclar();
+  }
+  // CONTRATO: el interruptor del panel (sección Navidad) llama a fijarMusicaNavidad(true|false) desde el clic (gesto de la persona,
+  // necesario para crear el AudioContext). Devuelve si la música quedó sonando.
+  async function fijarMusicaNavidad(encendida) {
+    musicaPedida = !!encendida; guardar(MUSICA_CLAVE, musicaPedida ? 'si' : 'no');
+    if (musicaPedida && navidadActiva()) {
+      if (!au) { au = crearAudio(); if (!au) { aviso('Tu navegador no permite reproducir sonido.'); return false; } }
+      try { await au.ctx.resume(); } catch (_) {}
+    }
+    actualizarMusica();
+    return mus.activa;
+  }
+  // Con la preferencia guardada en «sí», la música vuelve con el primer toque o tecla de la visita (el navegador no deja sonar antes)
+  const arrancarMusicaGuardada = () => { if (musicaPedida && navidadActiva() && !mus.activa) fijarMusicaNavidad(true); };
+  document.addEventListener('pointerdown', arrancarMusicaGuardada, { once: true, capture: true });
+  document.addEventListener('keydown', arrancarMusicaGuardada, { once: true, capture: true });
+  // La decoración la maneja la sección 6g: si se apaga o se enciende (p. ej. el 7 de enero), la música la sigue
+  new MutationObserver(() => { if (au && (mus.activa || musicaPedida)) actualizarMusica(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  // Solo para medir: la música sola durante `seg` s en un OfflineAudioContext (48 kHz), con el volumen actual y un limitador igual
+  async function renderizarMusica(seg) {
+    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext, sr = 48000;
+    seg = limitar(Number(seg) || 20, 1, 120);
+    const off = new OAC(2, Math.round(sr * seg), sr), g = off.createGain(), lim = off.createDynamicsCompressor();
+    g.gain.value = gananciaVolumen() * MUSICA_NIVEL;
+    lim.threshold.value = -6; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.003; lim.release.value = 0.25;
+    g.connect(lim); lim.connect(off.destination);
+    const e = { cancion: 0, ev: 0, inicio: 0.1, canciones: 0 }; let notas = 0;
+    recorrerMusica(e, seg, (t, ev, c) => { notas++; notaCaja(off, g, t, ev[1], ev[2] * c.spb, ev[3]); });
+    const buf = await off.startRendering();
+    buf.info = { notas, canciones: e.canciones };
+    return buf;
+  }
+  // Estallido suave para los fuegos artificiales de Año Nuevo: el paisaje puede llamar a climaSonido.estallido(0..1) al estallar
+  // cada uno. Ruido grave y breve + chisporroteo; como mucho 4 por segundo (anti-ráfaga) y solo con el sonido del clima encendido.
+  function estallido(fuerza) {
+    if (!au || !sonando || au.ctx.state !== 'running' || !hayLugar(8)) return false;
+    const ahora = performance.now(); if (ahora - (au.ultEstallido || 0) < 250) return false; au.ultEstallido = ahora;
+    const { ctx, buf } = au, T = ctx.currentTime + 0.02, k = limitar(Number(fuerza) || 0.6, 0.1, 1), sal = salida(au.duckAcentos);
+    const s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = buf; fl.type = 'lowpass'; fl.frequency.setValueAtTime(900, T); fl.frequency.exponentialRampToValueAtTime(120, T + 0.6);
+    g.gain.setValueAtTime(0.0001, T); g.gain.exponentialRampToValueAtTime(0.5 * k, T + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, T + 0.7);
+    s.connect(fl); fl.connect(g); g.connect(sal); vigilar(s).start(T, Math.random() * 4, 0.8);
+    for (let i = 0; i < 5; i++) {                                  // chispas: golpecitos agudos que caen después del estallido
+      const t = T + 0.15 + Math.random() * 0.5, c = ctx.createBufferSource(), h = ctx.createBiquadFilter(), cg = ctx.createGain();
+      c.buffer = buf; h.type = 'highpass'; h.frequency.value = azar(3500, 7000);
+      cg.gain.setValueAtTime(0.0001, t); cg.gain.exponentialRampToValueAtTime(0.12 * k, t + 0.002); cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+      c.connect(h); h.connect(cg); cg.connect(sal); vigilar(c).start(t, Math.random() * 4, 0.05);
+    }
+    return true;
+  }
+
   // ctxDado: un OfflineAudioContext para medir (climaSonido.renderizar); sin él se crea el contexto real que suena
   function crearAudio(ctxDado) {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -1967,7 +2108,10 @@
     master.connect(suave); suave.connect(lim); lim.connect(ctx.destination);
     // Tres grupos: la cama, los acentos y los truenos. Los dos primeros pasan por un "agachador" que mueve el trueno (ducking).
     const duckCama = ctx.createGain(), duckAcentos = ctx.createGain(), busTruenos = ctx.createGain();
-    busTruenos.gain.value = 0; duckCama.connect(master); duckAcentos.connect(master); busTruenos.connect(master);
+    // ambG: todo el sonido del clima (se apaga o baja ~10 dB cuando suena la música navideña); musG: la música
+    const ambG = ctx.createGain(), musG = ctx.createGain();
+    ambG.gain.value = 0; musG.gain.value = 0; ambG.connect(master); musG.connect(master);
+    busTruenos.gain.value = 0; duckCama.connect(ambG); duckAcentos.connect(ambG); busTruenos.connect(ambG);
 
     // Ruido rosa (más grave y natural que el blanco): es la materia prima del viento, la lluvia, las chicharras, el granizo y los truenos
     const N = ctx.sampleRate * 6, F = Math.round(ctx.sampleRate * 0.5), buf = ctx.createBuffer(1, N, ctx.sampleRate), ch = buf.getChannelData(0), x = new Float32Array(N + F);
@@ -2044,7 +2188,11 @@
     };
     const intervaloAves = ctxDado ? 0 : setInterval(() => { if (listo()) pulsoLento(); }, 250);
     const intervaloGotas = ctxDado ? 0 : setInterval(() => { if (listo()) pulsoRapido(); }, 100);
-    return { ctx, offline: !!ctxDado, pulsoLento, pulsoRapido, master, suave, lim, duckCama, duckAcentos, busTruenos, viento, rafaga, silbido, lluvia, lluviaBajo, cig, gri, aves, ranas, gotas, busGranizo, rev, buf,
+    // Un poco de sala para la música (un eco corto propio: el de las aves pasa por el ambiente, que la música baja)
+    const salaM = ctx.createConvolver(), irM = ctx.createBuffer(2, Math.round(ctx.sampleRate * 1.2), ctx.sampleRate), salaG = ctx.createGain();
+    for (let c = 0; c < 2; c++) { const d = irM.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3); }
+    salaM.buffer = irM; salaG.gain.value = 0.18; musG.connect(salaM); salaM.connect(salaG); salaG.connect(master);
+    return { ctx, offline: !!ctxDado, pulsoLento, pulsoRapido, master, suave, lim, ambG, musG, duckCama, duckAcentos, busTruenos, viento, rafaga, silbido, lluvia, lluviaBajo, cig, gri, aves, ranas, gotas, busGranizo, rev, buf,
       intervaloAves, intervaloGotas, tasaAves: 0, tasaRanas: 0, tasaGotas: 0, hayPiedras: false, proxRafaga: 0, ultTrueno: performance.now(), esperaTrueno: 15000,
       truenoLibre: 0, truenos: [], truenosTotal: 0, truenosDescartados: 0, fuentes: 0, objetivo: new WeakMap(), escena: null, niveles: {}, solo: null };
   }
@@ -2233,7 +2381,10 @@
   function mezclar() {                                             // ajusta cada capa a la escena actual con fundidos cruzados
     if (!au) return;
     $('btnSonido').title = describirSonido();
-    fundir(au.master.gain, sonando ? gananciaVolumen() : 0, sonando ? 0.25 : 0.8);   // volumen general: barato (un solo nodo)
+    const musica = mus.activa && !au.offline, algo = sonando || musica;
+    fundir(au.master.gain, algo ? gananciaVolumen() : 0, algo ? 0.25 : 0.8);   // volumen general: barato (un solo nodo)
+    fundir(au.ambG.gain, sonando ? (musica ? AMBIENTE_CON_MUSICA : 1) : 0, 1.5);   // con música, el ambiente queda detrás (~−10 dB)
+    fundir(au.musG.gain, musica ? MUSICA_NIVEL : 0, 1.5);                           // entrada y salida de la música: 1,5 s
     const e = au.solo ? { cama: au.solo, acentos: [], db: { [au.solo]: 0 }, tasaAves: au.solo === 'aves' ? 1 : 0, tasaRanas: au.solo === 'ranas' ? 0.5 : 0 } : escena();
     const { tipo, lluvia: ll } = amb, v = amb.viento || 0, temp = amb.temp === undefined || amb.temp === null ? 25 : amb.temp;
     const lin = c => e.db[c] === undefined ? 0 : Math.pow(10, e.db[c] / 20);   // nivel relativo (1 = referencia, 0 = calla)
@@ -2268,20 +2419,28 @@
       return { sonando, volumen: sonando ? gananciaVolumen() : 0, cama: e.cama, acentos: e.acentos.slice(), audibles: (e.cama === 'calma' ? [] : [e.cama]).concat(e.acentos),
         capas: { ...au.niveles }, ganancias: ganancias(au), ducking: { cama: +au.duckCama.gain.value.toFixed(3), acentos: +au.duckAcentos.gain.value.toFixed(3) },
         truenos: au.truenos.filter(f => f > ahora).length, truenosTotal: au.truenosTotal, truenosDescartados: au.truenosDescartados, fuentesSueltas: au.fuentes,
-        limitador: { umbral: au.lim.threshold.value, ratio: au.lim.ratio.value, reduccion: au.lim.reduction }, contexto: au.ctx.state, descripcion: describirSonido() };
+        limitador: { umbral: au.lim.threshold.value, ratio: au.lim.ratio.value, reduccion: au.lim.reduction }, contexto: au.ctx.state, descripcion: describirSonido(),
+        musica: { pedida: musicaPedida, suena: mus.activa, cancion: CANCIONES[mus.cancion].nombre, notasVivas: mus.notasVivas, canciones: mus.canciones,
+          ambiente: +au.ambG.gain.value.toFixed(3), nivel: +au.musG.gain.value.toFixed(3) } };
     },
     // Solo para medir: deja sonar UNA capa a su nivel de referencia (null vuelve a la escena del clima)
     solo: nombre => { if (au) { au.solo = nombre || null; mezclar(); } },
     // Solo para medir: fabrica el paisaje sonoro del estado actual en un OfflineAudioContext (48 kHz, estéreo) y devuelve el AudioBuffer
     // de `seg` segundos (los primeros ~3,5 s son el fundido de entrada). No toca el sonido real.
-    renderizar: seg => renderizarAmbiente(seg)
+    renderizar: seg => renderizarAmbiente(seg),
+    // Música navideña: encender/apagar (lo mismo que hará el interruptor del panel) y, para medir, su render sin conexión
+    musicaNavidad: encendida => fijarMusicaNavidad(encendida),
+    renderizarMusica: seg => renderizarMusica(seg),
+    canciones: () => CANCIONES.map(c => c.nombre),
+    // Para el paisaje: un estallido suave por cada fuego artificial (fuerza 0 a 1)
+    estallido: fuerza => estallido(fuerza)
   });
   // Ganancias REALES de cada capa en este instante (con fundidos y ducking incluidos), para las pruebas
   function ganancias(A) {
     const r = x => +x.toFixed(4);
     return { master: r(A.master.gain.value), viento: r(A.viento.g.gain.value), rafagas: r(A.rafaga.g.gain.value), lluvia: r(A.lluvia.g.gain.value), lluviaBajo: r(A.lluviaBajo.g.gain.value),
       gotas: r(A.gotas.gain.value), granizo: r(A.busGranizo.gain.value), chicharras: r(A.cig[0].gain.value), grillos: r(A.gri[0].nivel.gain.value), aves: r(A.aves.gain.value),
-      ranas: r(A.ranas.gain.value), truenos: r(A.busTruenos.gain.value), duckCama: r(A.duckCama.gain.value), duckAcentos: r(A.duckAcentos.gain.value) };
+      ranas: r(A.ranas.gain.value), truenos: r(A.busTruenos.gain.value), ambiente: r(A.ambG.gain.value), musica: r(A.musG.gain.value), duckCama: r(A.duckCama.gain.value), duckAcentos: r(A.duckAcentos.gain.value) };
   }
   // Mientras se arma o avanza la versión de prueba, `au` apunta a ella solo durante ese bloque sincrónico (el sonido real no lo ve)
   async function renderizarAmbiente(seg) {
@@ -2300,7 +2459,7 @@
     buf.info = { truenos: A.truenosTotal, descartados: A.truenosDescartados };
     return buf;
   }
-  function visibilidadSonido() { if (au && sonando) { if (document.hidden) au.ctx.suspend(); else au.ctx.resume().catch(() => {}); } }
+  function visibilidadSonido() { if (au && (sonando || mus.activa)) { if (document.hidden) au.ctx.suspend(); else au.ctx.resume().catch(() => {}); } }
   function pintarBotonSonido() {
     const b = $('btnSonido');
     b.textContent = sonando ? '🔊' : '🔈'; b.classList.toggle('on', sonando); b.setAttribute('aria-pressed', sonando);
@@ -2309,7 +2468,7 @@
   // Al salir de la página se libera el audio. Si la página vuelve desde la caché del navegador (atrás/adelante), el botón
   // queda apagado y coherente (antes seguía en 🔊 sin sonar, y una segunda salida ya no liberaba nada).
   window.addEventListener('pagehide', () => {
-    sonando = false;
+    sonando = false; mus.activa = false; clearInterval(mus.temporizador); mus.temporizador = 0;
     if (au) { clearInterval(au.intervaloAves); clearInterval(au.intervaloGotas); try { au.ctx.close(); } catch (_) {} au = null; }
     pintarBotonSonido();
   });
@@ -2318,7 +2477,7 @@
     sonando = !sonando;
     pintarBotonSonido();
     if (sonando) { try { await au.ctx.resume(); } catch (_) {} }
-    if (!sonando) setTimeout(() => { if (!sonando && au) au.ctx.suspend(); }, 3500);
+    if (!sonando) setTimeout(() => { if (!sonando && !mus.activa && au) au.ctx.suspend(); }, 3500);
     mezclar();
     if (sonando) aviso('🔊 ' + describirSonido());
   });
