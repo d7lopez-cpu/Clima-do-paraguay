@@ -1953,10 +1953,11 @@
   const TOPE_FUENTES = 150;                                        // sonidos sueltos vivos a la vez, como mucho (nada crece sin límite)
   const TRUENO_SEPARACION = 6;                                     // s mínimos entre el comienzo de dos truenos (y nunca dos encimados)
 
-  function crearAudio() {
+  // ctxDado: un OfflineAudioContext para medir (climaSonido.renderizar); sin él se crea el contexto real que suena
+  function crearAudio(ctxDado) {
     const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return null;
-    const ctx = new AC(), master = ctx.createGain(), suave = ctx.createBiquadFilter(), lim = ctx.createDynamicsCompressor();
+    if (!ctxDado && !AC) return null;
+    const ctx = ctxDado || new AC(), master = ctx.createGain(), suave = ctx.createBiquadFilter(), lim = ctx.createDynamicsCompressor();
     master.gain.value = 0; suave.type = 'lowpass'; suave.frequency.value = 16000;
     // Limitador: casi no actúa en la mezcla normal; solo frena los picos (truenos cercanos) para que nunca sature
     lim.threshold.value = -6; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.003; lim.release.value = 0.25;
@@ -2023,23 +2024,24 @@
     };
     const gri = [grillo(4300, 29, 1.9), grillo(4650, 33, 2.3), grillo(5050, 27, 1.6)];
 
-    // Cada 250 ms: aves, ranas, ráfagas y el trueno de reserva; cada 100 ms: gotas y granizo. Nada se crea si el contexto
-    // no está corriendo (suspendido o interrumpido): sus sonidos no terminarían nunca y se acumularían.
+    // Cada 250 ms: aves, ranas, ráfagas y el trueno de reserva; cada 100 ms: gotas y granizo (repartidos dentro de esos 100 ms con el
+    // reloj del audio, sin temporizadores sueltos). Nada se crea si el contexto no está corriendo (suspendido o interrumpido): sus
+    // sonidos no terminarían nunca y se acumularían.
     const listo = () => sonando && !document.hidden && ctx.state === 'running' && au && au.ctx === ctx;
-    const intervaloAves = setInterval(() => {
-      if (!listo()) return;
+    const pulsoLento = () => {
       if (Math.random() < au.tasaAves * 0.07) llamadaAve();
       if (Math.random() < au.tasaRanas * 0.12) rana();
       if (ctx.currentTime >= au.proxRafaga) programarRafaga();
       // si el cielo no está dibujando relámpagos (fondo apagado, movimiento reducido…), los truenos llegan solos de vez en cuando
       if (amb.tipo === 'tormenta' && performance.now() - au.ultTrueno > au.esperaTrueno) trueno();
-    }, 250);
-    const intervaloGotas = setInterval(() => {
-      if (!listo()) return;
-      if (au.tasaGotas > 0) { const n = Math.round(au.tasaGotas * (1 + Math.random() * 3)); for (let i = 0; i < n; i++) setTimeout(gota, Math.random() * 100); }
-      if (au.hayPiedras) { const n = Math.round(azar(1, 4)); for (let i = 0; i < n; i++) setTimeout(piedra, Math.random() * 100); }
-    }, 100);
-    return { ctx, master, suave, lim, duckCama, duckAcentos, busTruenos, viento, rafaga, silbido, lluvia, lluviaBajo, cig, gri, aves, ranas, gotas, busGranizo, rev, buf,
+    };
+    const pulsoRapido = () => {
+      if (au.tasaGotas > 0) { const n = Math.round(au.tasaGotas * (1 + Math.random() * 3)); for (let i = 0; i < n; i++) gota(Math.random() * 0.1); }
+      if (au.hayPiedras) { const n = Math.round(azar(1, 4)); for (let i = 0; i < n; i++) piedra(Math.random() * 0.1); }
+    };
+    const intervaloAves = ctxDado ? 0 : setInterval(() => { if (listo()) pulsoLento(); }, 250);
+    const intervaloGotas = ctxDado ? 0 : setInterval(() => { if (listo()) pulsoRapido(); }, 100);
+    return { ctx, offline: !!ctxDado, pulsoLento, pulsoRapido, master, suave, lim, duckCama, duckAcentos, busTruenos, viento, rafaga, silbido, lluvia, lluviaBajo, cig, gri, aves, ranas, gotas, busGranizo, rev, buf,
       intervaloAves, intervaloGotas, tasaAves: 0, tasaRanas: 0, tasaGotas: 0, hayPiedras: false, proxRafaga: 0, ultTrueno: performance.now(), esperaTrueno: 15000,
       truenoLibre: 0, truenos: [], truenosTotal: 0, truenosDescartados: 0, fuentes: 0, objetivo: new WeakMap(), escena: null, niveles: {}, solo: null };
   }
@@ -2090,17 +2092,17 @@
       t += azar(0.17, 0.25);
     }
   }
-  function gota() {                                                // una gota: un toque corto y apagado
+  function gota(retraso) {                                         // una gota: un toque corto y apagado
     if (!au || !hayLugar()) return;
-    const { ctx, buf } = au, T = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    const { ctx, buf } = au, T = ctx.currentTime + (retraso || 0), s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     s.buffer = buf; f.type = 'bandpass'; f.frequency.value = 1800 + Math.random() * 3200; f.Q.value = 6;
     g.gain.setValueAtTime(0, T); g.gain.linearRampToValueAtTime(0.15 + Math.random() * 0.25, T + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, T + 0.05 + Math.random() * 0.05);
     s.connect(f); f.connect(g); g.connect(salida(au.gotas)); vigilar(s).start(T, Math.random() * 4, 0.12);
   }
   // Granizo: un golpe seco y agudo (piedra sobre chapa o tejas), a veces con un "toc" más grave
-  function piedra() {
+  function piedra(retraso) {
     if (!au || !hayLugar()) return;
-    const { ctx, buf } = au, T = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), d = azar(0.012, 0.03);
+    const { ctx, buf } = au, T = ctx.currentTime + (retraso || 0), s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), d = azar(0.012, 0.03);
     s.buffer = buf; f.type = Math.random() < 0.25 ? 'bandpass' : 'highpass'; f.frequency.value = f.type === 'bandpass' ? azar(700, 1300) : azar(3200, 6500); f.Q.value = 3;
     g.gain.setValueAtTime(0, T); g.gain.linearRampToValueAtTime(azar(0.18, 0.45), T + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, T + d);
     s.connect(f); f.connect(g); g.connect(salida(au.busGranizo)); vigilar(s).start(T, Math.random() * 4, d + 0.02);
@@ -2139,7 +2141,7 @@
   // Llega después del relámpago con un retraso según la distancia (unos 0,3 s por km, comprimido: en la realidad son ~3 s por km).
   // Cerca: chasquido seco y retumbo fuerte; lejos: solo un rumor grave, más largo y más bajo.
   function trueno() {
-    if (!au || !sonando || amb.tipo !== 'tormenta' || au.ctx.state !== 'running') return false;
+    if (!au || !sonando || amb.tipo !== 'tormenta' || (au.ctx.state !== 'running' && !au.offline)) return false;
     const { ctx, buf } = au, ahora = ctx.currentTime;
     au.truenos = au.truenos.filter(f => f > ahora);
     if (ahora < au.truenoLibre || au.truenos.length || !hayLugar(4)) { au.truenosDescartados++; return false; }
@@ -2261,13 +2263,40 @@
       if (!au) return null;
       const ahora = au.ctx.currentTime, e = au.escena || { cama: 'calma', acentos: [] };
       return { sonando, volumen: sonando ? gananciaVolumen() : 0, cama: e.cama, acentos: e.acentos.slice(), audibles: (e.cama === 'calma' ? [] : [e.cama]).concat(e.acentos),
-        capas: { ...au.niveles }, ducking: { cama: +au.duckCama.gain.value.toFixed(3), acentos: +au.duckAcentos.gain.value.toFixed(3) },
+        capas: { ...au.niveles }, ganancias: ganancias(au), ducking: { cama: +au.duckCama.gain.value.toFixed(3), acentos: +au.duckAcentos.gain.value.toFixed(3) },
         truenos: au.truenos.filter(f => f > ahora).length, truenosTotal: au.truenosTotal, truenosDescartados: au.truenosDescartados, fuentesSueltas: au.fuentes,
         limitador: { umbral: au.lim.threshold.value, ratio: au.lim.ratio.value, reduccion: au.lim.reduction }, contexto: au.ctx.state, descripcion: describirSonido() };
     },
     // Solo para medir: deja sonar UNA capa a su nivel de referencia (null vuelve a la escena del clima)
-    solo: nombre => { if (au) { au.solo = nombre || null; mezclar(); } }
+    solo: nombre => { if (au) { au.solo = nombre || null; mezclar(); } },
+    // Solo para medir: fabrica el paisaje sonoro del estado actual en un OfflineAudioContext (48 kHz, estéreo) y devuelve el AudioBuffer
+    // de `seg` segundos (los primeros ~3,5 s son el fundido de entrada). No toca el sonido real.
+    renderizar: seg => renderizarAmbiente(seg)
   });
+  // Ganancias REALES de cada capa en este instante (con fundidos y ducking incluidos), para las pruebas
+  function ganancias(A) {
+    const r = x => +x.toFixed(4);
+    return { master: r(A.master.gain.value), viento: r(A.viento.g.gain.value), rafagas: r(A.rafaga.g.gain.value), lluvia: r(A.lluvia.g.gain.value), lluviaBajo: r(A.lluviaBajo.g.gain.value),
+      gotas: r(A.gotas.gain.value), granizo: r(A.busGranizo.gain.value), chicharras: r(A.cig[0].gain.value), grillos: r(A.gri[0].nivel.gain.value), aves: r(A.aves.gain.value),
+      ranas: r(A.ranas.gain.value), truenos: r(A.busTruenos.gain.value), duckCama: r(A.duckCama.gain.value), duckAcentos: r(A.duckAcentos.gain.value) };
+  }
+  // Mientras se arma o avanza la versión de prueba, `au` apunta a ella solo durante ese bloque sincrónico (el sonido real no lo ve)
+  async function renderizarAmbiente(seg) {
+    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext, sr = 48000;
+    seg = limitar(Number(seg) || 8, 1, 30);
+    const off = new OAC(2, Math.round(sr * seg), sr), A = crearAudio(off);
+    const conA = f => { const r = au, s = sonando; au = A; sonando = true; try { f(); } finally { au = r; sonando = s; } };
+    conA(mezclar);
+    // cada 0,1 s del reloj del audio avanzan los sonidos sueltos; en tormenta se pide un trueno a los 4 s (y otro a los 4,5 s, que el
+    // anti-rebote debe descartar)
+    for (let k = 1; k * 0.1 < seg; k++) off.suspend(+(k * 0.1).toFixed(3)).then(() => {
+      conA(() => { A.pulsoRapido(); if (k % 2 === 0) A.pulsoLento(); if (k === 40 || k === 45) trueno(); });
+      off.resume();
+    });
+    const buf = await off.startRendering();
+    buf.info = { truenos: A.truenosTotal, descartados: A.truenosDescartados };
+    return buf;
+  }
   function visibilidadSonido() { if (au && sonando) { if (document.hidden) au.ctx.suspend(); else au.ctx.resume().catch(() => {}); } }
   function pintarBotonSonido() {
     const b = $('btnSonido');
