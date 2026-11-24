@@ -1579,20 +1579,30 @@
     return u => { const v = 1 - u; return [v * v * x + 2 * u * v * (x + s * 0.01) + u * u * tx, v * v * y + 2 * u * v * (y - s * 0.55) + u * u * ty]; };   // punto del tronco (u: 0 pie … 1 copa)
   }
   // ---- Temporada (grupo «especiales») ----
-  const COL_GUIR = ['255,214,150', '255,168,72', '236,96,84', '130,206,140'];   // luces cálidas: blanco cálido, ámbar, rojo y verde suaves
+  const COL_GUIR = ['239,68,68', '251,191,36', '34,197,94', '96,165,250'];   // rojo, dorado, verde y azul (#ef4444 #fbbf24 #22c55e #60a5fa)
+  // Parpadeo encadenado de las luces de Navidad: tres grupos que se atenúan por turno (~0,9 s cada uno, con transición suave);
+  // ninguna se apaga del todo ni destella. `fija` (navidad-quieta, movimiento reducido o escena quieta): todas encendidas.
+  function brilloFoco(j, t, fija) {
+    if (fija) return 1;
+    const ph = (t / 900) % 3, d = Math.abs(((ph - (j % 3) - 0.5) % 3 + 4.5) % 3 - 1.5), off = limitar(1 - d / 0.75, 0, 1);
+    return 1 - 0.68 * off * off * (3 - 2 * off);
+  }
+  function foco(x, y, rx, ry, j, br, noche) {                      // una luz: halo de su color y bombilla
+    const c = j % 4;
+    if (nivelR() >= 0.75) { const h = (rx + 3.5) * 2.2; ex.globalAlpha = br * (0.35 + 0.65 * noche) * Math.min(1.3, prefsAnim.intensidad); ex.drawImage(eSprGuir[c], x - h / 2, y - h / 2, h, h); }
+    ex.globalAlpha = 0.4 + 0.6 * br; ex.fillStyle = `rgb(${COL_GUIR[c]})`; ex.beginPath(); ex.ellipse(x, y, rx, ry, 0, 0, 6.283); ex.fill();
+  }
   function spritesGuirnalda() { return COL_GUIR.map(c => { const k = document.createElement('canvas'); k.width = k.height = 24; const g = k.getContext('2d'), gr = g.createRadialGradient(12, 12, 0, 12, 12, 12); gr.addColorStop(0, `rgba(${c},0.9)`); gr.addColorStop(0.3, `rgba(${c},0.35)`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(0, 0, 24, 24); return k; }); }
-  // Guirnalda colgada entre dos troncos (a y b: funciones de palmaEsc). Las bombillas parpadean como una guirnalda real:
-  // una onda lenta (~7 s) recorre la guirnalda y pares e impares van a destiempo; nunca se apagan del todo ni destellan.
-  // Con `fija` (clase navidad-quieta en <html>, movimiento reducido o escena quieta) quedan encendidas sin parpadear.
-  // De ella cuelgan dos rosetas de ñandutí doradas que se mecen apenas.
-  function guirnalda(a, b, ua, ub, t, noche, cable, i0, fija, kLuz) {
+  // Guirnalda colgada entre dos puntos (a y b: funciones de palmaEsc o del pino), con luces de parpadeo encadenado (brilloFoco).
+  // Con `rosetas`, de ella cuelgan dos rosetas de ñandutí doradas que se mecen apenas (quietas si `fija`).
+  function guirnalda(a, b, ua, ub, t, noche, cable, i0, fija, kLuz, rosetas) {
     const [x1, y1] = a(ua), [x2, y2] = b(ub), cx1 = (x1 + x2) / 2, cy1 = Math.max(y1, y2) + Math.abs(x2 - x1) * 0.28, n = 9;
     const punto = u => { const v = 1 - u; return [v * v * x1 + 2 * u * v * cx1 + u * u * x2, v * v * y1 + 2 * u * v * cy1 + u * u * y2]; };
     ex.strokeStyle = cable; ex.lineWidth = 0.8; ex.beginPath(); ex.moveTo(x1, y1); ex.quadraticCurveTo(cx1, cy1, x2, y2); ex.stroke();
     // rosetas de ñandutí: un hilo, un aro con rayos y un centro
     const rr = Math.max(2.6, eH * 0.02), oro = `rgba(232,196,110,${0.6 + 0.4 * kLuz})`;
     ex.strokeStyle = oro; ex.lineWidth = 0.6;
-    for (const [u, j] of [[0.3, 0], [0.7, 1]]) {
+    if (rosetas) for (const [u, j] of [[0.3, 0], [0.7, 1]]) {
       const [hx, hy] = punto(u), sw = fija ? 0 : Math.sin(t / 1700 + j * 2 + i0) * 0.12, hl = eH * 0.03, rx = hx + Math.sin(sw) * (hl + rr), ry = hy + Math.cos(sw) * (hl + rr);
       ex.beginPath(); ex.moveTo(hx, hy); ex.lineTo(hx + Math.sin(sw) * hl, hy + Math.cos(sw) * hl);
       ex.moveTo(rx + rr, ry); ex.arc(rx, ry, rr, 0, 6.283); ex.moveTo(rx + rr * 0.45, ry); ex.arc(rx, ry, rr * 0.45, 0, 6.283);
@@ -1601,21 +1611,52 @@
     }
     if (!eSprGuir) eSprGuir = spritesGuirnalda();
     for (let i = 1; i < n; i++) {
-      const [x, y0] = punto(i / n), y = y0 + 2.2, c = (i + i0) % 4;
-      const ola = 0.5 + 0.5 * Math.sin(t / 1100 - (i + i0) * 0.85 + (i % 2) * 1.9), br = fija ? 1 : 0.3 + 0.7 * ola * ola * (3 - 2 * ola);
-      ex.globalAlpha = br * (0.3 + 0.7 * noche); ex.drawImage(eSprGuir[c], x - 8, y - 8, 16, 16);   // halo cálido
+      const [x, y0] = punto(i / n), y = y0 + 2.2;
       ex.globalAlpha = 1; ex.fillStyle = cable; ex.fillRect(x - 0.7, y0, 1.4, 1.4);                    // portalámpara
-      ex.globalAlpha = 0.45 + 0.55 * br; ex.fillStyle = `rgb(${COL_GUIR[c]})`; ex.beginPath(); ex.ellipse(x, y + 0.4, 1.25, 1.75, 0, 0, 6.283); ex.fill();   // bombilla
+      foco(x, y + 0.4, Math.max(1.25, eH * 0.009), Math.max(1.75, eH * 0.012), i + i0, brilloFoco(i + i0, t, fija), noche);
     }
     ex.globalAlpha = 1;
   }
-  // Estrella dorada de Navidad: cuatro puntas largas y cuatro cortas; de noche, con un halo que late despacio (fija: no late)
-  function estrellaNavidad(x, y, r, a, halo, t, fija) {
-    const p = fija ? 1 : 1 + 0.1 * Math.sin(t / 2200);
-    if (halo > 0.02) { const gl = ex.createRadialGradient(x, y, 0, x, y, r * 3.4 * p); gl.addColorStop(0, `rgba(255,214,120,${0.45 * halo})`); gl.addColorStop(1, 'rgba(255,214,120,0)'); ex.fillStyle = gl; ex.fillRect(x - r * 3.4 * p, y - r * 3.4 * p, r * 6.8 * p, r * 6.8 * p); }
-    ex.fillStyle = `rgba(255,226,140,${a})`; ex.beginPath();
-    for (let i = 0; i < 16; i++) { const ang = i * Math.PI / 8 - Math.PI / 2, L = i % 4 === 0 ? r * 1.6 * p : i % 2 === 0 ? r * 0.75 : r * 0.22; ex.lineTo(x + Math.cos(ang) * L, y + Math.sin(ang) * L); }
-    ex.closePath(); ex.fill();
+  // Pino de Navidad decorado (geometría de la referencia de diseño, escena de 350×150, con el pie del tronco en (80, 132)):
+  // tres pisos de follaje con degradado y luz lateral, tronco, guirnalda dorada de cuentas, 14 esferas de luz, estrella con brillo
+  // y dos regalos. De noche el follaje se oscurece un poco para no desentonar con el paisaje. Devuelve P(x, y): de la referencia a px.
+  const PINO_PISOS = [[34, 124, 80, 136, 126, 124, 95, 86, 80, 90, 65, 86], [44, 94, 80, 104, 116, 94, 91, 62, 80, 65, 69, 62], [55, 68, 80, 76, 105, 68, 80, 30, 80, 30, 80, 30]];
+  const PINO_FOCOS = [[80, 44], [73, 56], [88, 54], [64, 80], [80, 84], [97, 78], [56, 102], [72, 108], [90, 106], [106, 98], [48, 120], [64, 126], [96, 126], [112, 118]];
+  function pinoNavidad(X, Y, k, t, fija, kLuz, noche) {
+    const P = (x, y) => [X + (x - 80) * k, Y + (y - 132) * k], os = noche * 0.45;
+    const ruta = () => { ex.beginPath(); for (const p of PINO_PISOS) { const [a, b, c, d, e, f, g, h, i, j, l, m] = p; ex.moveTo(...P(a, b)); ex.quadraticCurveTo(...P(c, d), ...P(e, f)); ex.lineTo(...P(g, h)); ex.quadraticCurveTo(...P(i, j), ...P(l, m)); ex.closePath(); } };
+    ex.fillStyle = mezcla('#4a2f1c', '#1a120c', os); ex.fillRect(...P(76, 122), 8 * k, 10 * k);   // tronco
+    const [x0, y0] = P(34, 30), [x1, y1] = P(126, 136);
+    const gv = ex.createLinearGradient(x0, y0, x1, y1); gv.addColorStop(0, mezcla('#23854a', '#0c2a22', os)); gv.addColorStop(1, mezcla('#0b3a20', '#051510', os));
+    ruta(); ex.fillStyle = gv; ex.fill();
+    const gl = ex.createLinearGradient(x0, 0, x1, 0); gl.addColorStop(0, `rgba(63,174,102,${0.55 * (1 - os)})`); gl.addColorStop(0.5, 'rgba(63,174,102,0)');
+    ex.fillStyle = gl; ex.fill();                                                                    // luz lateral
+    ex.strokeStyle = '#fbbf24'; ex.lineWidth = 1.6 * k; ex.lineCap = 'round'; ex.setLineDash([0.1, 3.2 * k]); ex.beginPath();   // guirnalda dorada de cuentas
+    for (const [a, b, c, d, e, f] of [[60, 64, 80, 78, 100, 62], [52, 90, 80, 106, 110, 88], [42, 118, 80, 134, 120, 116]]) { ex.moveTo(...P(a, b)); ex.quadraticCurveTo(...P(c, d), ...P(e, f)); }
+    ex.stroke(); ex.setLineDash([]);
+    if (!eSprGuir) eSprGuir = spritesGuirnalda();
+    PINO_FOCOS.forEach(([x, y], j) => { const [px, py] = P(x, y); foco(px, py, 2.5 * k, 2.5 * k, j, brilloFoco(j, t, fija), noche); });
+    ex.globalAlpha = 1;
+    // regalos al pie
+    const regalo = (x, y, w, h, col, lazo) => { const [a, b] = P(x, y); ex.fillStyle = mezcla(col, '#000000', os * 0.6); ex.fillRect(a, b, w * k, h * k); ex.strokeStyle = '#fde68a'; ex.lineWidth = 1.2 * k; ex.beginPath(); ex.moveTo(a + w * k / 2, b); ex.lineTo(a + w * k / 2, b + h * k); ex.moveTo(a, b + h * k / 2); ex.lineTo(a + w * k, b + h * k / 2); if (lazo) { ex.moveTo(a + w * k / 2, b); ex.quadraticCurveTo(a + w * k / 2 - 5 * k, b - 4 * k, a + w * k / 2 - 6 * k, b - 1 * k); ex.moveTo(a + w * k / 2, b); ex.quadraticCurveTo(a + w * k / 2 + 5 * k, b - 4 * k, a + w * k / 2 + 6 * k, b - 1 * k); } ex.stroke(); };
+    regalo(90, 122, 15, 11, '#b91c1c', true); regalo(56, 125, 12, 8, '#1d4ed8', false);
+    // estrella dorada en la punta: brillo suave (más de noche) que late despacio salvo si `fija`
+    const [sx, sy] = P(80, 27.5), lat = fija ? 1 : 1 + 0.08 * Math.sin(t / 2200), rb = 15 * k * lat * (0.8 + 0.4 * noche);
+    const gs = ex.createRadialGradient(sx, sy, 0, sx, sy, rb); gs.addColorStop(0, `rgba(253,230,138,${0.5 + 0.35 * noche})`); gs.addColorStop(1, 'rgba(253,230,138,0)');
+    ex.fillStyle = gs; ex.fillRect(sx - rb, sy - rb, rb * 2, rb * 2);
+    ex.fillStyle = '#fbbf24'; ex.strokeStyle = '#fff3c4'; ex.lineWidth = 0.8 * k; ex.lineJoin = 'round'; ex.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = (i % 2 ? 3.3 : 8) * k; ex[i ? 'lineTo' : 'moveTo'](sx + Math.cos(a) * r, sy + 1.5 * k + Math.sin(a) * r); }
+    ex.closePath(); ex.fill(); ex.stroke();
+    return P;
+  }
+  // Luces en espiral alrededor de un tronco (tr: función de palmaEsc); las que quedan "detrás" del tronco se ven más tenues
+  function lucesEspiral(tr, t, fija, noche, ancho) {
+    for (let k = 0; k < 13; k++) {
+      const u = 0.06 + k * 0.054, [x, y] = tr(u), fase = u * Math.PI * 9, atras = Math.cos(fase) < 0;
+      if (libreDeEtq(x, y, ancho) !== y) continue;                  // no se dibujan debajo de las etiquetas
+      foco(x + Math.sin(fase) * ancho, y, Math.max(1.4, ancho * 0.42), Math.max(1.4, ancho * 0.42), k + 2, brilloFoco(k + 2, t, fija) * (atras ? 0.5 : 1), noche * (atras ? 0.5 : 1));
+    }
+    ex.globalAlpha = 1;
   }
   // ¿Es Año Nuevo en Paraguay? (31 de diciembre desde las 23:30 hasta la 1:00 del 1 de enero, hora de Asunción). Se consulta cada 15 s.
   function esAnoNuevo() {
@@ -1886,11 +1927,14 @@
     const pa = palmaEsc(eW * 0.08, yAgua - eH * 0.04, eH * 0.7, t, T[3], vp), pb = palmaEsc(eW * 0.17, yAgua - eH * 0.01, eH * 0.44, t + 900, T[3], vp);
     const pc = palmaEsc(eW * 0.92, yAgua - eH * 0.035, eH * 0.62, t + 400, T[3], vp), pd = palmaEsc(eW * 0.84, yAgua - eH * 0.005, eH * 0.4, t + 1600, T[3], vp);
     const navidad = esp && document.documentElement.classList.contains('navidad');
-    if (navidad) {                                                // guirnaldas entre las palmeras de cada orilla y una estrella dorada sobre la palmera chica de la derecha
+    if (navidad) {                                                // Navidad: pino decorado, luces en espiral, guirnaldas (todo bajo «especiales»)
       const cab = mezcla(T[3], '#000000', 0.3), fija = !anim || document.documentElement.classList.contains('navidad-quieta');
-      guirnalda(pa, pb, 0.52, 0.66, t, 1 - kLuz, cab, 0, fija, kLuz); guirnalda(pd, pc, 0.66, 0.52, t + 700, 1 - kLuz, cab, 2, fija, kLuz);
-      const [tx, ty] = pd(1), ys = libreDeEtq(tx + dxO, ty - R * 1.6, R * 0.8);
-      estrellaNavidad(tx, ys, R * 0.5, 0.75 + 0.25 * (1 - kLuz), (1 - kLuz) * (A.tipo === 'niebla' ? 0.4 : A.lluvia ? 0.6 : 1), t, fija);
+      const noche = 1 - kLuz, kP = eH / 200;
+      if (!eSprGuir) eSprGuir = spritesGuirnalda();
+      guirnalda(pd, pc, 0.66, 0.52, t + 700, noche, cab, 2, fija, kLuz, true);                       // orilla derecha: guirnalda con ñandutí
+      lucesEspiral(pa, t, fija, noche, eH * 0.024);                                                  // palmera alta de la izquierda: luces en espiral
+      const P = pinoNavidad(eW * 0.205, eH * 0.885, kP, t, fija, kLuz, noche), ap = P(57, 70);       // pino decorado en la orilla izquierda
+      guirnalda(() => ap, pa, 0, 0.5, t + 300, noche, cab, 5, fija, kLuz, false);                    // guirnalda del pino a la palmera
     }
     ex.translate(-dxO, 0);
     // luciérnagas
