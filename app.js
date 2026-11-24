@@ -1211,8 +1211,10 @@
       // el geocodificador puede devolver un departamento equivocado para una ciudad conocida.
       const existente = CIUDADES.find(c => normalizar(c.n) === normalizar(x.name))
         || [...porNombre.values()].find(c => normalizar(c.n.split(',')[0]) === normalizar(x.name));
-      const n = existente ? existente.n : x.name + (x.admin1 ? ', ' + x.admin1 : '');
-      if (!existente && !porNombre.has(n)) porNombre.set(n, { n, lat: x.latitude, lon: x.longitude, dep: x.admin1 || '', g: 3, extra: true });
+      // El nombre del proveedor se limpia: el detalle, la lista y el mapa lo insertan como HTML (con «<b>» o comillas se inyectaba marcado)
+      const limpio = v => String(v || '').replace(/[<>"'`&\\]/g, '').replace(/\s+/g, ' ').trim();
+      const n = existente ? existente.n : limpio(x.name) + (x.admin1 ? ', ' + limpio(x.admin1) : '');
+      if (!existente && !porNombre.has(n)) porNombre.set(n, { n, lat: x.latitude, lon: x.longitude, dep: limpio(x.admin1), g: 3, extra: true });
       elegir(n);
     }
     caja.hidden = true;
