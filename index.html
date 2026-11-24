@@ -3,76 +3,148 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0b1220">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0a1433">
 <title>Clima PY</title>
 <meta name="description" content="Clima PY: pronóstico y mapa del tiempo de las ciudades de Paraguay">
 <meta name="application-name" content="Clima PY">
 <meta name="apple-mobile-web-app-title" content="Clima PY">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icono-192.png" type="image/png">
+<link rel="icon" href="icono.svg" type="image/svg+xml">
+<link rel="alternate icon" href="icono-192.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script>try{document.documentElement.dataset.tema=localStorage.getItem("clima-py-tema")==="claro"?"claro":"oscuro"}catch(e){}</script>
+<link rel="preload" href="fonts/fraunces-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="estilos.css">
 </head>
 <body>
+<!-- ICONOS:INICIO (generado por scripts/iconos.mjs; no editar a mano) -->
+<svg id="iconos" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+  <symbol id="i-despejado" viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-noche-clara" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
+  <symbol id="i-parcial" viewBox="0 0 24 24"><path d="M9 5.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7zM9 1.5v1.5M3 9H1.5M4.8 4.8l1 1M13.2 4.8l-1 1" style="stroke:var(--ic-2,currentColor)"/><path d="M17 20H9.5a3.2 3.2 0 0 1-.6-6.3 4.2 4.2 0 0 1 8 .9A2.8 2.8 0 0 1 17 20z"/></symbol>
+  <symbol id="i-parcial-noche" viewBox="0 0 24 24"><path d="M11 8.5A4.5 4.5 0 1 1 5.5 3a3.6 3.6 0 0 0 5.5 5.5z" style="stroke:var(--ic-2,currentColor)"/><path d="M17 20H9.5a3.2 3.2 0 0 1-.6-6.3 4.2 4.2 0 0 1 8 .9A2.8 2.8 0 0 1 17 20z"/></symbol>
+  <symbol id="i-nublado" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.6A3.3 3.3 0 0 0 7 18z"/></symbol>
+  <symbol id="i-niebla" viewBox="0 0 24 24"><path d="M5 8h14M3 12h18M5 16h14M8 20h8"/></symbol>
+  <symbol id="i-llovizna" viewBox="0 0 24 24"><path d="M7 14h10a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.6A3.3 3.3 0 0 0 7 14z"/><path d="M9 18v.01M13 18v.01M17 18v.01M11 21v.01M15 21v.01" style="stroke:var(--ic-2,currentColor)"/></symbol>
+  <symbol id="i-lluvia" viewBox="0 0 24 24"><path d="M7 14h10a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.6A3.3 3.3 0 0 0 7 14z"/><path d="M9 17l-1 3M13 17l-1 3M17 17l-1 3" style="stroke:var(--ic-2,currentColor)"/></symbol>
+  <symbol id="i-tormenta" viewBox="0 0 24 24"><path d="M7 13h10a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.6A3.3 3.3 0 0 0 7 13z"/><path d="M13 13l-3 4.5h4l-3 4.5" style="stroke:var(--ic-2,currentColor)"/></symbol>
+  <symbol id="i-granizo" viewBox="0 0 24 24"><path d="M7 14h10a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.6A3.3 3.3 0 0 0 7 14z"/><path d="M9 17.5a1 1 0 1 0 0 2a1 1 0 1 0 0-2zM15 17.5a1 1 0 1 0 0 2a1 1 0 1 0 0-2zM12 20a1 1 0 1 0 0 2a1 1 0 1 0 0-2z" style="stroke:var(--ic-2,currentColor)"/></symbol>
+  <symbol id="i-viento" viewBox="0 0 24 24"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h8"/></symbol>
+  <symbol id="i-calor" viewBox="0 0 24 24"><path d="M10 13.5V5a2 2 0 0 1 4 0v8.5a4 4 0 1 1-4 0zM12 10v6M18 5l2-1M18 9h2"/></symbol>
+  <symbol id="i-frio" viewBox="0 0 24 24"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M10 4.5l2 2 2-2M10 19.5l2-2 2 2"/></symbol>
+  <symbol id="i-amanecer" viewBox="0 0 24 24"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 3v5M9.5 5.5L12 3l2.5 2.5M5 12l1.4 1.4M19 12l-1.4 1.4"/></symbol>
+  <symbol id="i-atardecer" viewBox="0 0 24 24"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 3v5M9.5 5.5L12 8l2.5-2.5M5 12l1.4 1.4M19 12l-1.4 1.4"/></symbol>
+  <symbol id="i-humedad" viewBox="0 0 24 24"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></symbol>
+  <symbol id="i-sensacion" viewBox="0 0 24 24"><path d="M10 13.5V5a2 2 0 0 1 4 0v8.5a4 4 0 1 1-4 0zM12 10v6"/></symbol>
+  <symbol id="i-presion" viewBox="0 0 24 24"><path d="M12 20a8 8 0 1 0 0-16a8 8 0 1 0 0 16zM12 12l3.5-3.5M7.5 12h1M15.5 12h1M12 7.5v1"/></symbol>
+  <symbol id="i-uv" viewBox="0 0 24 24"><path d="M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6zM12 3v2M12 19v2M5.6 5.6L7 7M17 17l1.4 1.4M3 12h2M19 12h2M5.6 18.4L7 17M17 7l1.4-1.4"/></symbol>
+  <symbol id="i-hoja" viewBox="0 0 24 24"><path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14zM5 19l7-7"/></symbol>
+  <symbol id="i-buscar" viewBox="0 0 24 24"><path d="M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14zM20 20l-3.5-3.5"/></symbol>
+  <symbol id="i-ajustes" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M16 5a2 2 0 1 0 0 4a2 2 0 1 0 0-4zM10 15a2 2 0 1 0 0 4a2 2 0 1 0 0-4z"/></symbol>
+  <symbol id="i-ubicacion" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zM12 7.5a2.5 2.5 0 1 0 0 5a2.5 2.5 0 1 0 0-5z"/></symbol>
+  <symbol id="i-sonido" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></symbol>
+  <symbol id="i-silencio" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4zM17 9l4 6M21 9l-4 6"/></symbol>
+  <symbol id="i-animacion" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></symbol>
+  <symbol id="i-avisos" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-tema" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 3v18M12 7h4M12 11h7M12 15h6"/></symbol>
+  <symbol id="i-idioma" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></symbol>
+  <symbol id="i-favorito" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
+  <symbol id="i-favorito-lleno" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" style="fill:currentColor"/></symbol>
+  <symbol id="i-compartir" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></symbol>
+  <symbol id="i-mapa" viewBox="0 0 24 24"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></symbol>
+  <symbol id="i-ciudades" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+  <symbol id="i-comparar" viewBox="0 0 24 24"><path d="M6 20V10M12 20V4M18 20v-7"/></symbol>
+  <symbol id="i-radar" viewBox="0 0 24 24"><path d="M12 12l7-7M21 12a9 9 0 1 1-9-9M17 12a5 5 0 1 1-5-5"/></symbol>
+  <symbol id="i-cerrar" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-clima" viewBox="0 0 24 24"><path d="M9 5.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7zM9 2v1.5M3.5 9H2M5 5l1 1M13 5l-1 1"/><path d="M17 20H9.5a3.2 3.2 0 0 1-.6-6.3 4.2 4.2 0 0 1 8 .9A2.8 2.8 0 0 1 17 20z"/></symbol>
+  <symbol id="i-actualizar" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></symbol>
+  <symbol id="i-instalar" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></symbol>
+  <symbol id="i-mas" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-menos" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-encuadrar" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
+  <symbol id="i-reproducir" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></symbol>
+  <symbol id="i-pausa" viewBox="0 0 24 24"><path d="M9 5.5v13M15 5.5v13"/></symbol>
+  <symbol id="i-ruta" viewBox="0 0 24 24"><path d="M8.5 3 5 21M15.5 3 19 21M12 4v2.5M12 10.5v3M12 17.5V20"/></symbol>
+  <symbol id="i-ojo" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6z"/></symbol>
+  <symbol id="i-aviso" viewBox="0 0 24 24"><path d="M12 4 2.5 20h19zM12 10v4.5M12 17.5v.01"/></symbol>
+  <symbol id="i-dato" viewBox="0 0 24 24"><path d="M3 12h4l2-6 4 12 2-6h6"/></symbol>
+  <symbol id="i-bombilla" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></symbol>
+  <symbol id="i-musica" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0a3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0a3 3 0 0 1 6 0z"/></symbol>
+  <symbol id="i-calendario" viewBox="0 0 24 24"><path d="M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM4 10h16M8.5 3v4M15.5 3v4"/></symbol>
+  <symbol id="i-fuegos" viewBox="0 0 24 24"><path d="M12 9V3M14.1 9.9l4.3-4.3M15 12h6M14.1 14.1l4.3 4.3M12 15v6M9.9 14.1l-4.3 4.3M9 12H3M9.9 9.9 5.6 5.6"/></symbol>
+  <symbol id="i-dia" viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-noche" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
+  <symbol id="i-despejado-noche" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
+  <symbol id="i-temperatura" viewBox="0 0 24 24"><path d="M10 13.5V5a2 2 0 0 1 4 0v8.5a4 4 0 1 1-4 0zM12 10v6"/></symbol>
+  <symbol id="i-aire" viewBox="0 0 24 24"><path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14zM5 19l7-7"/></symbol>
+  <symbol id="i-luna" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
+</svg>
+<!-- ICONOS:FIN -->
 <canvas id="cielo" aria-hidden="true"></canvas>
+<div class="guirnalda" id="guirnalda" aria-hidden="true"></div>
 <div class="contenedor">
 
-  <header>
+  <header class="cabecera">
     <div class="marca">
-      <h1><img class="logo" src="icono-192.png" alt="" width="40" height="40">Clima <span>PY</span></h1>
-      <p class="sub"><span id="subtitulo"></span><span id="estado" class="pill carga">● Cargando…</span></p>
-      <div class="pref"><button id="btnIdioma" class="btn" aria-label="Idioma" title="Idioma / Ñe'ẽ">🌐 ES</button><button id="btnTema" class="btn">☀️</button><button id="btnUnidad" class="btn">°C</button><button id="btnSonido" class="btn" aria-pressed="false" aria-label="Activar el sonido del clima" title="Sonido ambiente según el clima">🔈</button><button id="btnFx" class="btn con-ic" aria-pressed="true" aria-label="Efectos del cielo" title="Efectos del cielo"><span class="i i-destellos" aria-hidden="true"></span></button><button id="btnAjustesAnim" class="btn con-ic" aria-haspopup="dialog" aria-controls="dlgAnim" aria-label="Ajustes de animación" title="Ajustes de animación"><span class="i i-ajustes" aria-hidden="true"></span></button><button id="btnAvisos" class="btn con-ic" aria-pressed="false" aria-label="Avisos de tormenta" title="Avisar de tormentas en tus ciudades favoritas (con la app abierta)"><span class="i i-campana" aria-hidden="true"></span></button><button id="btnInstalar" class="btn con-ic" hidden title="Instalar Clima PY como app"><span class="i i-instalar" aria-hidden="true"></span><span>Instalar</span></button></div>
+      <img class="logo" src="icono.svg" alt="" width="44" height="44">
+      <div class="marca-txt">
+        <h1>Clima PY</h1>
+        <span class="bandera" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="edicion">Edición de fiestas</span>
+      </div>
     </div>
+    <p class="sub"><span id="subtitulo"></span><span id="estado" class="pill carga">Cargando…</span></p>
+    <div class="pref"><button id="btnIdioma" class="btn" aria-label="Idioma" title="Idioma / Ñe'ẽ"><svg class="ic ic-idioma" aria-hidden="true" focusable="false"><use href="#i-idioma"/></svg><span>ES</span></button><button id="btnTema" class="btn" aria-label="Cambiar a modo claro"><svg class="ic ic-tema" aria-hidden="true" focusable="false"><use href="#i-tema"/></svg></button><button id="btnUnidad" class="btn">°C</button><button id="btnSonido" class="btn" aria-pressed="false" aria-label="Activar el sonido del clima" title="Sonido ambiente según el clima"><svg class="ic ic-silencio" aria-hidden="true" focusable="false"><use href="#i-silencio"/></svg></button><button id="btnFx" class="btn" aria-pressed="true" aria-label="Efectos del cielo" title="Efectos del cielo"><svg class="ic ic-animacion" aria-hidden="true" focusable="false"><use href="#i-animacion"/></svg></button><button id="btnAjustesAnim" class="btn" aria-haspopup="dialog" aria-controls="dlgAnim" aria-label="Ajustes de animación" title="Ajustes de animación"><svg class="ic ic-ajustes" aria-hidden="true" focusable="false"><use href="#i-ajustes"/></svg></button><button id="btnAvisos" class="btn" aria-pressed="false" aria-label="Avisos de tormenta" title="Avisar de tormentas en tus ciudades favoritas (con la app abierta)"><svg class="ic ic-avisos" aria-hidden="true" focusable="false"><use href="#i-avisos"/></svg></button><button id="btnInstalar" class="btn" hidden title="Instalar Clima PY como app"><svg class="ic ic-instalar" aria-hidden="true" focusable="false"><use href="#i-instalar"/></svg><span>Instalar</span></button></div>
     <div class="acciones">
-      <input id="buscador" type="search" placeholder="Buscar ciudad o lugar…" aria-label="Buscar ciudad" autocomplete="off">
-      <button id="btnLugar" title="Busca cualquier pueblo o barrio de Paraguay"><span class="i i-buscar" aria-hidden="true"></span>Buscar lugar</button>
-      <button id="btnComparar" title="Comparar dos o tres ciudades"><span class="i i-comparar" aria-hidden="true"></span>Comparar</button>
-      <button id="btnUbicacion" title="Selecciona la ciudad más cercana a ti"><span class="i i-ubicacion" aria-hidden="true"></span>Cerca de mí</button>
-      <button id="btnActualizar"><span class="i i-actualizar" aria-hidden="true"></span>Actualizar</button>
+      <div class="buscador"><svg class="ic ic-buscar" aria-hidden="true" focusable="false"><use href="#i-buscar"/></svg><input id="buscador" type="search" placeholder="Buscar ciudad o lugar…" aria-label="Buscar ciudad" autocomplete="off"></div>
+      <button id="btnLugar" title="Busca cualquier pueblo o barrio de Paraguay"><svg class="ic ic-buscar" aria-hidden="true" focusable="false"><use href="#i-buscar"/></svg><span>Buscar lugar</span></button>
+      <button id="btnComparar" title="Comparar dos o tres ciudades"><svg class="ic ic-comparar" aria-hidden="true" focusable="false"><use href="#i-comparar"/></svg><span>Comparar</span></button>
+      <button id="btnUbicacion" title="Selecciona la ciudad más cercana a ti"><svg class="ic ic-ubicacion" aria-hidden="true" focusable="false"><use href="#i-ubicacion"/></svg><span>Cerca de mí</span></button>
+      <button id="btnActualizar"><svg class="ic ic-actualizar" aria-hidden="true" focusable="false"><use href="#i-actualizar"/></svg><span>Actualizar</span></button>
     </div>
   </header>
-  <div class="saludo-navidad" id="saludoNavidad" role="status" hidden><span>🎄 ¡Felices fiestas!</span><button type="button" class="btn" id="saludoCerrar" aria-label="Cerrar saludo" title="Cerrar saludo"><span class="i i-cerrar" aria-hidden="true"></span></button></div>
+  <div class="saludo-navidad" id="saludoNavidad" role="status" hidden>
+    <img src="logo-navidad.svg" alt="" width="46" height="46">
+    <div class="saludo-txt"><span class="saludo-titulo">Felices fiestas</span><span class="saludo-cuenta" id="saludoCuenta"></span></div>
+    <button type="button" class="btn" id="saludoCerrar" aria-label="Cerrar saludo" title="Cerrar saludo"><svg class="ic ic-cerrar" aria-hidden="true" focusable="false"><use href="#i-cerrar"/></svg></button>
+  </div>
   <div id="lugares" class="lugares" hidden></div>
-
-  <section class="escena" id="escena" aria-label="Paisaje del clima actual">
-    <canvas id="escenaCv" aria-hidden="true"></canvas>
-    <div class="escena-etq" id="escenaEtq"></div>
-    <div class="escena-previa" id="escenaPrevia" role="status" hidden>
-      <span class="ep-txt"><span class="i i-ojo" aria-hidden="true"></span> <span>Vista previa:</span> <b id="epTipo"></b> · <b id="epFase"></b></span>
-      <button type="button" id="epVolver" class="btn">Volver al clima real</button>
-    </div>
-  </section>
 
   <nav class="favs" id="favs" aria-label="Ciudades favoritas" hidden></nav>
 
-  <h2 class="sr-only">Resumen nacional</h2>
-  <section class="stats" id="stats" aria-label="Resumen nacional">
-    <!-- Esqueleto de carga: app.js lo reemplaza al llegar los datos -->
-    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
-    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
-    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
-    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
+  <h2 class="sr-only">Clima de la ciudad elegida</h2>
+  <section class="detalle" id="detalle" aria-busy="true">
+    <div class="detalle-cab" id="detalleCab">
+      <!-- Mientras carga: el ñandutí gira (quieto con «reducir movimiento») y los datos muestran su forma -->
+      <div class="hero hero-carga"><span class="carga-nanduti" aria-hidden="true"></span><p class="carga-txt">Cargando el clima…</p></div>
+    </div>
+    <section class="escena" id="escena" aria-label="Paisaje del clima actual">
+      <canvas id="escenaCv" aria-hidden="true"></canvas>
+      <div class="escena-etq" id="escenaEtq"></div>
+      <div class="escena-previa" id="escenaPrevia" role="status" hidden>
+        <span class="ep-txt"><svg class="ic ic-ojo" aria-hidden="true" focusable="false"><use href="#i-ojo"/></svg> <span>Vista previa:</span> <b id="epTipo"></b> · <b id="epFase"></b></span>
+        <button type="button" id="epVolver" class="btn">Volver al clima real</button>
+      </div>
+    </section>
+    <div class="detalle-cuerpo" id="detalleCuerpo">
+      <div class="datos esqueleto" aria-hidden="true"><div class="dato"><span class="esq esq-ic"></span><b><span class="esq">00000</span></b><small><span class="esq">0000000</span></small></div><div class="dato"><span class="esq esq-ic"></span><b><span class="esq">00000</span></b><small><span class="esq">0000000</span></small></div><div class="dato"><span class="esq esq-ic"></span><b><span class="esq">00000</span></b><small><span class="esq">0000000</span></small></div><div class="dato"><span class="esq esq-ic"></span><b><span class="esq">00000</span></b><small><span class="esq">0000000</span></small></div><div class="dato"><span class="esq esq-ic"></span><b><span class="esq">00000</span></b><small><span class="esq">0000000</span></small></div><div class="dato"><span class="esq esq-ic"></span><b><span class="esq">00000</span></b><small><span class="esq">0000000</span></small></div><div class="dato"><span class="esq esq-ic"></span><b><span class="esq">00000</span></b><small><span class="esq">0000000</span></small></div><div class="dato"><span class="esq esq-ic"></span><b><span class="esq">00000</span></b><small><span class="esq">0000000</span></small></div></div>
+    </div>
   </section>
 
-  <h2 class="sr-only">Clima de la ciudad elegida</h2>
-
-  <section class="tarjeta" id="detalle" aria-busy="true">
-    <!-- Esqueleto de carga con la misma forma que el detalle, para que nada salte al llegar los datos -->
-    <div class="actual esqueleto" aria-hidden="true">
-      <div class="esq esq-icono"></div>
-      <div class="esq-col"><div class="esq esq-titulo"></div><div class="esq esq-linea"></div><div class="esq esq-temp"></div><div class="esq esq-linea esq-larga"></div></div>
-      <div class="datos"><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div></div>
-    </div>
-    <p class="sr-only">Cargando el clima…</p>
+  <h2 class="sr-only">Resumen nacional</h2>
+  <section class="stats" id="stats" aria-label="Resumen nacional">
+    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
+    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
+    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
+    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
   </section>
 
   <section class="tarjeta" id="comparar" hidden aria-label="Comparar ciudades">
     <div class="comp-barra">
-      <h2 class="con-ic"><span class="i i-comparar" aria-hidden="true"></span><span>Comparar ciudades</span></h2>
+      <h2 class="titulo-seccion">Comparar ciudades</h2>
       <div id="compSel" class="comp-sel"></div>
-      <button id="compCerrar" class="btn con-ic" aria-label="Cerrar comparación"><span class="i i-cerrar" aria-hidden="true"></span></button>
+      <button id="compCerrar" class="btn" aria-label="Cerrar comparación"><svg class="ic ic-cerrar" aria-hidden="true" focusable="false"><use href="#i-cerrar"/></svg></button>
     </div>
     <div id="compRes"></div>
   </section>
@@ -83,9 +155,9 @@
       <div class="mapa-barra">
         <div class="capas" id="capas" role="tablist" aria-label="Capa del mapa"></div>
         <div class="zoom">
-          <button id="zMas" aria-label="Acercar"><span class="i i-mas" aria-hidden="true"></span></button>
-          <button id="zMenos" aria-label="Alejar"><span class="i i-menos" aria-hidden="true"></span></button>
-          <button id="zReset" aria-label="Ver todo el país" title="Ver todo el país"><span class="i i-encuadrar" aria-hidden="true"></span></button>
+          <button id="zMas" aria-label="Acercar"><svg class="ic ic-mas" aria-hidden="true" focusable="false"><use href="#i-mas"/></svg></button>
+          <button id="zMenos" aria-label="Alejar"><svg class="ic ic-menos" aria-hidden="true" focusable="false"><use href="#i-menos"/></svg></button>
+          <button id="zReset" aria-label="Ver todo el país" title="Ver todo el país"><svg class="ic ic-encuadrar" aria-hidden="true" focusable="false"><use href="#i-encuadrar"/></svg></button>
         </div>
       </div>
       <div class="mapa-contenedor" id="mapaCont">
@@ -95,15 +167,15 @@
         <div id="tooltip"></div>
       </div>
       <div class="reloj">
-        <button id="hPlay" class="btn" aria-label="Reproducir">▶</button>
+        <button id="hPlay" class="btn" aria-label="Reproducir" aria-pressed="false"><svg class="ic ic-reproducir" aria-hidden="true" focusable="false"><use href="#i-reproducir"/></svg></button>
         <input id="hSlider" type="range" min="0" max="24" step="1" value="0" aria-label="Hora del pronóstico en el mapa">
         <span id="hEtq" aria-live="polite">Ahora</span>
       </div>
       <div class="extras radar-tools">
-        <button id="btnRadar" class="btn con-ic" title="Mostrar u ocultar el radar de lluvia" aria-pressed="false"><span class="i i-radar" aria-hidden="true"></span><span>Radar de lluvia</span></button>
-        <button id="btnRadarPlay" class="btn" title="Pausar la animación del radar" aria-pressed="false" disabled>Ⅱ Pausar</button>
+        <button id="btnRadar" class="btn con-ic" title="Mostrar u ocultar el radar de lluvia" aria-pressed="false"><svg class="ic ic-radar" aria-hidden="true" focusable="false"><use href="#i-radar"/></svg><span>Radar de lluvia</span></button>
+        <button id="btnRadarPlay" class="btn con-ic" title="Pausar la animación del radar" aria-pressed="false" disabled><svg class="ic ic-pausa" aria-hidden="true" focusable="false"><use href="#i-pausa"/></svg><span>Pausar</span></button>
         <label class="radar-opacidad" for="radarOpacidad"><span>Opacidad</span><input id="radarOpacidad" type="range" min="20" max="100" value="78" step="5" disabled><span id="radarOpacidadVal">78%</span></label>
-        <button id="btnRutas" class="btn con-ic" title="Rutas principales (aproximadas)" aria-pressed="false"><span class="i i-ruta" aria-hidden="true"></span><span>Rutas</span></button>
+        <button id="btnRutas" class="btn con-ic" title="Rutas principales (aproximadas)" aria-pressed="false"><svg class="ic ic-ruta" aria-hidden="true" focusable="false"><use href="#i-ruta"/></svg><span>Rutas</span></button>
         <span id="radarEtq" class="ayuda" role="status" aria-live="polite">Radar desactivado</span>
       </div>
       <div class="leyenda"><span id="legIni"></span><div class="grad" id="grad"></div><span id="legFin"></span></div>
@@ -112,7 +184,7 @@
 
     <section class="tarjeta lista-caja" id="seccionLista">
       <div class="lista-wrap">
-        <h2>Ciudades <span id="contador"></span></h2>
+        <h2 class="titulo-seccion">Ciudades <span id="contador"></span></h2>
         <div class="lista-filtros">
           <select id="filtroDep" aria-label="Filtrar por departamento"></select>
           <select id="orden" aria-label="Ordenar ciudades">
@@ -134,21 +206,27 @@
   </footer>
 </div>
 <nav class="barra-nav" aria-label="Ir a una sección">
-  <button data-ir="detalle" class="on"><i><span class="i i-nube" aria-hidden="true"></span></i><span>Clima</span></button>
-  <button data-ir="seccionMapa"><i><span class="i i-mapa" aria-hidden="true"></span></i><span>Mapa</span></button>
-  <button data-ir="seccionLista"><i><span class="i i-lista" aria-hidden="true"></span></i><span>Ciudades</span></button>
-  <button id="navComparar"><i><span class="i i-comparar" aria-hidden="true"></span></i><span>Comparar</span></button>
+  <button data-ir="detalle" class="on"><svg class="ic ic-clima" aria-hidden="true" focusable="false"><use href="#i-clima"/></svg><span>Clima</span></button>
+  <button data-ir="seccionMapa"><svg class="ic ic-mapa" aria-hidden="true" focusable="false"><use href="#i-mapa"/></svg><span>Mapa</span></button>
+  <button data-ir="seccionLista"><svg class="ic ic-ciudades" aria-hidden="true" focusable="false"><use href="#i-ciudades"/></svg><span>Ciudades</span></button>
+  <button id="navComparar"><svg class="ic ic-comparar" aria-hidden="true" focusable="false"><use href="#i-comparar"/></svg><span>Comparar</span></button>
 </nav>
 <div id="aviso" role="status"></div>
 <div id="anuncio" class="sr-only" aria-live="polite"></div>
 
 <dialog id="dlgAnim" class="hoja-anim" aria-labelledby="daTitulo">
   <form method="dialog" class="da-cab">
-    <h2 id="daTitulo" class="con-ic"><span class="i i-ajustes" aria-hidden="true"></span><span>Ajustes de animación</span></h2>
-    <button class="btn da-cerrar" value="cerrar" aria-label="Cerrar" title="Cerrar"><span class="i i-cerrar" aria-hidden="true"></span></button>
+    <h2 id="daTitulo">Ajustes</h2>
+    <button class="btn da-cerrar" value="cerrar" aria-label="Cerrar" title="Cerrar"><svg class="ic ic-cerrar" aria-hidden="true" focusable="false"><use href="#i-cerrar"/></svg></button>
   </form>
+  <div class="da-pestanas" role="tablist" aria-label="Secciones de ajustes">
+    <button type="button" role="tab" id="daTabAnim" aria-controls="daPanelAnim" aria-selected="true" data-da="Anim">Animación</button>
+    <button type="button" role="tab" id="daTabSonido" aria-controls="daPanelSonido" aria-selected="false" tabindex="-1" data-da="Sonido">Sonido</button>
+    <button type="button" role="tab" id="daTabNavidad" aria-controls="daPanelNavidad" aria-selected="false" tabindex="-1" data-da="Navidad">Navidad</button>
+  </div>
   <div class="da-cuerpo">
     <p class="da-reducido" id="daReducido" hidden>Tu dispositivo pide reducir el movimiento: la animación se muestra quieta.</p>
+    <div class="da-panel" id="daPanelAnim" role="tabpanel" aria-labelledby="daTabAnim">
 
     <fieldset class="da-grupo">
       <legend>General</legend>
@@ -179,21 +257,15 @@
     <fieldset class="da-grupo">
       <legend>Efectos</legend>
       <div class="da-efectos" id="daEfectos">
-        <label><input type="checkbox" data-efecto="lluvia"><span aria-hidden="true">🌧️</span><span>Lluvia y granizo</span></label>
-        <label><input type="checkbox" data-efecto="nubes"><span aria-hidden="true">☁️</span><span>Nubes</span></label>
-        <label><input type="checkbox" data-efecto="estrellas"><span aria-hidden="true">✨</span><span>Estrellas y luna</span></label>
-        <label><input type="checkbox" data-efecto="rayos"><span aria-hidden="true">⚡</span><span>Relámpagos</span></label>
-        <label><input type="checkbox" data-efecto="niebla"><span aria-hidden="true">🌫️</span><span>Niebla</span></label>
-        <label><input type="checkbox" data-efecto="fauna"><span aria-hidden="true">🐦</span><span>Aves y luciérnagas</span></label>
-        <label><input type="checkbox" data-efecto="viento"><span aria-hidden="true">🍃</span><span>Viento</span></label>
-        <label class="da-ancho"><input type="checkbox" data-efecto="especiales"><span aria-hidden="true">🌈</span><span>Efectos especiales <small>(arcoíris, estrellas fugaces, calor, lapachos)</small></span></label>
+        <label><input type="checkbox" data-efecto="lluvia"><svg class="ic ic-lluvia" aria-hidden="true" focusable="false"><use href="#i-lluvia"/></svg><span>Lluvia y granizo</span></label>
+        <label><input type="checkbox" data-efecto="nubes"><svg class="ic ic-nublado" aria-hidden="true" focusable="false"><use href="#i-nublado"/></svg><span>Nubes</span></label>
+        <label><input type="checkbox" data-efecto="estrellas"><svg class="ic ic-animacion" aria-hidden="true" focusable="false"><use href="#i-animacion"/></svg><span>Estrellas y luna</span></label>
+        <label><input type="checkbox" data-efecto="rayos"><svg class="ic ic-tormenta" aria-hidden="true" focusable="false"><use href="#i-tormenta"/></svg><span>Relámpagos</span></label>
+        <label><input type="checkbox" data-efecto="niebla"><svg class="ic ic-niebla" aria-hidden="true" focusable="false"><use href="#i-niebla"/></svg><span>Niebla</span></label>
+        <label><input type="checkbox" data-efecto="fauna"><svg class="ic ic-hoja" aria-hidden="true" focusable="false"><use href="#i-hoja"/></svg><span>Aves y luciérnagas</span></label>
+        <label><input type="checkbox" data-efecto="viento"><svg class="ic ic-viento" aria-hidden="true" focusable="false"><use href="#i-viento"/></svg><span>Viento</span></label>
+        <label class="da-ancho"><input type="checkbox" data-efecto="especiales"><svg class="ic ic-despejado" aria-hidden="true" focusable="false"><use href="#i-despejado"/></svg><span>Efectos especiales <small>(arcoíris, estrellas fugaces, calor, lapachos)</small></span></label>
       </div>
-    </fieldset>
-
-    <fieldset class="da-grupo">
-      <legend>Sonido</legend>
-      <label class="da-vol" for="daVolumen"><span>Volumen</span><input type="range" id="daVolumen" min="0" max="100" step="5" aria-describedby="daVolAyuda"><output id="daVolumenVal" for="daVolumen">60%</output></label>
-      <p class="da-ayuda" id="daVolAyuda">El sonido se enciende con el botón 🔈 de arriba.</p>
     </fieldset>
 
     <fieldset class="da-grupo">
@@ -201,26 +273,37 @@
       <p class="da-ayuda">Mira cómo se vería otro clima u otro momento del día. No cambia el pronóstico.</p>
       <div class="da-sub" id="daTipoEtq">Clima</div>
       <div class="da-chips" role="radiogroup" aria-labelledby="daTipoEtq">
-        <label><input type="radio" name="daTipo" value="despejado"><span>☀️ Despejado</span></label>
-        <label><input type="radio" name="daTipo" value="parcial"><span>⛅ Parcialmente nublado</span></label>
-        <label><input type="radio" name="daTipo" value="nublado"><span>☁️ Nublado</span></label>
-        <label><input type="radio" name="daTipo" value="lluvia"><span>🌧️ Lluvia</span></label>
-        <label><input type="radio" name="daTipo" value="tormenta"><span>⛈️ Tormenta</span></label>
-        <label><input type="radio" name="daTipo" value="niebla"><span>🌫️ Niebla</span></label>
+        <label><input type="radio" name="daTipo" value="despejado"><span><svg class="ic ic-despejado" aria-hidden="true" focusable="false"><use href="#i-despejado"/></svg><span>Despejado</span></span></label>
+        <label><input type="radio" name="daTipo" value="parcial"><span><svg class="ic ic-parcial" aria-hidden="true" focusable="false"><use href="#i-parcial"/></svg><span>Parcialmente nublado</span></span></label>
+        <label><input type="radio" name="daTipo" value="nublado"><span><svg class="ic ic-nublado" aria-hidden="true" focusable="false"><use href="#i-nublado"/></svg><span>Nublado</span></span></label>
+        <label><input type="radio" name="daTipo" value="lluvia"><span><svg class="ic ic-lluvia" aria-hidden="true" focusable="false"><use href="#i-lluvia"/></svg><span>Lluvia</span></span></label>
+        <label><input type="radio" name="daTipo" value="tormenta"><span><svg class="ic ic-tormenta" aria-hidden="true" focusable="false"><use href="#i-tormenta"/></svg><span>Tormenta</span></span></label>
+        <label><input type="radio" name="daTipo" value="niebla"><span><svg class="ic ic-niebla" aria-hidden="true" focusable="false"><use href="#i-niebla"/></svg><span>Niebla</span></span></label>
       </div>
       <div class="da-sub" id="daFaseEtq">Momento del día</div>
       <div class="da-chips" role="radiogroup" aria-labelledby="daFaseEtq">
-        <label><input type="radio" name="daFase" value="amanecer"><span>🌅 Amanecer</span></label>
-        <label><input type="radio" name="daFase" value="dia"><span>☀️ Día</span></label>
-        <label><input type="radio" name="daFase" value="atardecer"><span>🌇 Atardecer</span></label>
-        <label><input type="radio" name="daFase" value="noche"><span>🌙 Noche</span></label>
+        <label><input type="radio" name="daFase" value="amanecer"><span><svg class="ic ic-amanecer" aria-hidden="true" focusable="false"><use href="#i-amanecer"/></svg><span>Amanecer</span></span></label>
+        <label><input type="radio" name="daFase" value="dia"><span><svg class="ic ic-despejado" aria-hidden="true" focusable="false"><use href="#i-despejado"/></svg><span>Día</span></span></label>
+        <label><input type="radio" name="daFase" value="atardecer"><span><svg class="ic ic-atardecer" aria-hidden="true" focusable="false"><use href="#i-atardecer"/></svg><span>Atardecer</span></span></label>
+        <label><input type="radio" name="daFase" value="noche"><span><svg class="ic ic-noche-clara" aria-hidden="true" focusable="false"><use href="#i-noche-clara"/></svg><span>Noche</span></span></label>
       </div>
       <div class="da-previa-pie">
         <span class="da-ayuda" id="daPreviaEstado" aria-live="polite">Mostrando el clima real.</span>
         <button type="button" class="btn" id="daPreviaVolver">Volver al clima real</button>
       </div>
     </fieldset>
+    </div>
+    <div class="da-panel" id="daPanelSonido" role="tabpanel" aria-labelledby="daTabSonido" hidden>
+    <fieldset class="da-grupo">
+      <legend>Sonido</legend>
+      <label class="da-vol" for="daVolumen"><span>Volumen</span><input type="range" id="daVolumen" min="0" max="100" step="5" aria-describedby="daVolAyuda"><output id="daVolumenVal" for="daVolumen">60%</output></label>
+      <p class="da-ayuda" id="daVolAyuda">El sonido se enciende con el botón de sonido de arriba.</p>
+    </fieldset>
 
+
+    </div>
+    <div class="da-panel" id="daPanelNavidad" role="tabpanel" aria-labelledby="daTabNavidad" hidden>
+    <div class="da-nv-intro"><img src="icono-navidad.svg" alt="" width="44" height="44"><span>Decoración de fiestas del 1 de diciembre al 6 de enero. Todo es opcional.</span></div>
     <fieldset class="da-grupo">
       <legend>Decoración navideña</legend>
       <div class="da-seg">
@@ -230,6 +313,15 @@
       </div>
       <p class="da-ayuda" id="daNavidadAyuda">Automática: del 1 de diciembre al 6 de enero (Reyes).</p>
     </fieldset>
+    <fieldset class="da-grupo da-lista">
+      <legend>Detalles</legend>
+        <label class="da-interr"><span class="da-interr-txt"><svg class="ic ic-bombilla" aria-hidden="true" focusable="false"><use href="#i-bombilla"/></svg><span><span class="da-interr-tit">Luces que parpadean</span><small>Parpadeo suave y encadenado de la guirnalda</small></span></span><input type="checkbox" id="daNvParpadeo" role="switch"></label>
+        <label class="da-interr"><span class="da-interr-txt"><svg class="ic ic-musica" aria-hidden="true" focusable="false"><use href="#i-musica"/></svg><span><span class="da-interr-tit">Música navideña</span><small>Caja de música suave mientras la app está abierta</small></span></span><input type="checkbox" id="daNvMusica" role="switch"></label>
+        <label class="da-vol da-vol-musica" for="daVolMusica"><span>Volumen de la música</span><input type="range" id="daVolMusica" min="0" max="100" step="5"><output id="daVolMusicaVal" for="daVolMusica">60%</output></label>
+        <label class="da-interr"><span class="da-interr-txt"><svg class="ic ic-calendario" aria-hidden="true" focusable="false"><use href="#i-calendario"/></svg><span><span class="da-interr-tit">Cuenta regresiva</span><small>Días que faltan para Navidad y Año Nuevo</small></span></span><input type="checkbox" id="daNvCuenta" role="switch"></label>
+        <label class="da-interr"><span class="da-interr-txt"><svg class="ic ic-fuegos" aria-hidden="true" focusable="false"><use href="#i-fuegos"/></svg><span><span class="da-interr-tit">Fuegos artificiales en Año Nuevo</span><small>En el paisaje, la noche del 31 y el 1 de enero</small></span></span><input type="checkbox" id="daNvFuegos" role="switch"></label>
+    </fieldset>
+    </div>
 
     <div class="da-pie">
       <button type="button" class="btn" id="daRestablecer">Restablecer valores predeterminados</button>

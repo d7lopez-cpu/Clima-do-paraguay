@@ -18,15 +18,15 @@
   // ============ 2) CAPAS DEL MAPA ============
   // Cada capa dice qué dato mostrar, en qué rango y con qué colores.
   const CAPAS = {
-    temp: { icono: '🌡️', nombre: 'Temperatura', campo: 'temperature_2m', min: 5, max: 40, dec: 0, corto: '°', largo: '°C',
-      color: v => escalaTemp(v), alto: '🔥 Más calurosa', bajo: '❄️ Más fría' },
-    humedad: { icono: '💧', nombre: 'Humedad', campo: 'relative_humidity_2m', min: 20, max: 100, dec: 0, corto: '%', largo: '%',
-      color: v => `hsl(${Math.round(45 + norm(v, 20, 100) * 170)}, 75%, 55%)`, alto: '💧 Más húmeda', bajo: '🏜️ Más seca' },
-    viento: { icono: '💨', nombre: 'Viento', campo: 'wind_speed_10m', min: 0, max: 40, dec: 0, corto: ' km/h', largo: ' km/h',
-      color: v => `hsl(${Math.round(165 + norm(v, 0, 40) * 135)}, 75%, 55%)`, alto: '💨 Más ventosa', bajo: '🍃 Más calma' },
-    lluvia: { icono: '🌧️', nombre: 'Lluvia', campo: 'precipitation', min: 0, max: 4, dec: 1, corto: ' mm', largo: ' mm',
+    temp: { icono: 'sensacion', nombre: 'Temperatura', campo: 'temperature_2m', min: 5, max: 40, dec: 0, corto: '°', largo: '°C',
+      color: v => escalaTemp(v), alto: ['calor', 'Más calurosa'], bajo: ['frio', 'Más fría'] },
+    humedad: { icono: 'humedad', nombre: 'Humedad', campo: 'relative_humidity_2m', min: 20, max: 100, dec: 0, corto: '%', largo: '%',
+      color: v => `hsl(${Math.round(45 + norm(v, 20, 100) * 170)}, 75%, 55%)`, alto: ['humedad', 'Más húmeda'], bajo: ['despejado', 'Más seca'] },
+    viento: { icono: 'viento', nombre: 'Viento', campo: 'wind_speed_10m', min: 0, max: 40, dec: 0, corto: ' km/h', largo: ' km/h',
+      color: v => `hsl(${Math.round(165 + norm(v, 0, 40) * 135)}, 75%, 55%)`, alto: ['viento', 'Más ventosa'], bajo: ['hoja', 'Más calma'] },
+    lluvia: { icono: 'lluvia', nombre: 'Lluvia', campo: 'precipitation', min: 0, max: 4, dec: 1, corto: ' mm', largo: ' mm',
       color: v => { const x = norm(v, 0, 4); return `hsl(210, ${Math.round(18 + x * 67)}%, ${Math.round(68 - x * 30)}%)`; },
-      alto: '🌧️ Más lluvia', bajo: '☀️ Más seca' }
+      alto: ['lluvia', 'Más lluvia'], bajo: ['despejado', 'Más seca'] }
   };
   // Escala de temperatura: azul (frío) → verde agua (templado) → amarillo → naranja → rojo (calor)
   const PARADAS_TEMP = [[5, '#3b6cf6'], [12, '#38bdf8'], [19, '#5eead4'], [25, '#fde047'], [30, '#fb923c'], [35, '#ef4444'], [40, '#be123c']];
@@ -95,21 +95,34 @@
   })();
 
   // ============ 4) FUNCIONES AUXILIARES ============
+  // Íconos: sprite <svg id="iconos"> de index.html (lo genera scripts/iconos.mjs). Sin emojis en ninguna parte de la interfaz.
+  const icono = (n, cl) => `<svg class="ic ic-${n}${cl ? ' ' + cl : ''}" aria-hidden="true" focusable="false"><use href="#i-${n}"/></svg>`;
   const CODIGOS = {
-    0: ['☀️', '🌙', 'Despejado'], 1: ['🌤️', '🌙', 'Mayormente despejado'], 2: ['⛅', '☁️', 'Parcialmente nublado'],
-    3: ['☁️', '☁️', 'Nublado'], 45: ['🌫️', '🌫️', 'Niebla'], 48: ['🌫️', '🌫️', 'Niebla con escarcha'],
-    51: ['🌦️', '🌧️', 'Llovizna leve'], 53: ['🌦️', '🌧️', 'Llovizna'], 55: ['🌧️', '🌧️', 'Llovizna fuerte'],
-    56: ['🌧️', '🌧️', 'Llovizna helada'], 57: ['🌧️', '🌧️', 'Llovizna helada fuerte'],
-    61: ['🌧️', '🌧️', 'Lluvia leve'], 63: ['🌧️', '🌧️', 'Lluvia'], 65: ['🌧️', '🌧️', 'Lluvia fuerte'],
-    66: ['🌧️', '🌧️', 'Lluvia helada'], 67: ['🌧️', '🌧️', 'Lluvia helada fuerte'],
-    71: ['🌨️', '🌨️', 'Nieve leve'], 73: ['🌨️', '🌨️', 'Nieve'], 75: ['🌨️', '🌨️', 'Nieve fuerte'], 77: ['🌨️', '🌨️', 'Granizo fino'],
-    80: ['🌦️', '🌧️', 'Chubascos leves'], 81: ['🌧️', '🌧️', 'Chubascos'], 82: ['⛈️', '⛈️', 'Chubascos fuertes'],
-    85: ['🌨️', '🌨️', 'Chubascos de nieve'], 86: ['🌨️', '🌨️', 'Chubascos de nieve fuertes'],
-    95: ['⛈️', '⛈️', 'Tormenta'], 96: ['⛈️', '⛈️', 'Tormenta con granizo'], 99: ['⛈️', '⛈️', 'Tormenta fuerte con granizo']
+    0: 'Despejado', 1: 'Mayormente despejado', 2: 'Parcialmente nublado', 3: 'Nublado', 45: 'Niebla', 48: 'Niebla con escarcha',
+    51: 'Llovizna leve', 53: 'Llovizna', 55: 'Llovizna fuerte', 56: 'Llovizna helada', 57: 'Llovizna helada fuerte',
+    61: 'Lluvia leve', 63: 'Lluvia', 65: 'Lluvia fuerte', 66: 'Lluvia helada', 67: 'Lluvia helada fuerte',
+    71: 'Nieve leve', 73: 'Nieve', 75: 'Nieve fuerte', 77: 'Granizo fino',
+    80: 'Chubascos leves', 81: 'Chubascos', 82: 'Chubascos fuertes', 85: 'Chubascos de nieve', 86: 'Chubascos de nieve fuertes',
+    95: 'Tormenta', 96: 'Tormenta con granizo', 99: 'Tormenta fuerte con granizo'
   };
+  // Código WMO → nombre del ícono (0–1 despejado, 2 parcial, 3 nublado, 45–48 niebla, 51–57 llovizna, 61–67 y 80–82 lluvia,
+  // 71–77 y 85–86 frío (nieve, rarísima en Paraguay), 95 tormenta, 96–99 granizo); de noche, luna en vez de sol
+  function nombreIcono(c, esDia) {
+    const noche = esDia === 0;
+    if (c <= 1) return noche ? 'noche-clara' : 'despejado';
+    if (c === 2) return noche ? 'parcial-noche' : 'parcial';
+    if (c === 3) return 'nublado';
+    if (c === 45 || c === 48) return 'niebla';
+    if (c >= 51 && c <= 57) return 'llovizna';
+    if ((c >= 61 && c <= 67) || (c >= 80 && c <= 82)) return 'lluvia';
+    if ((c >= 71 && c <= 77) || c === 85 || c === 86) return 'frio';
+    if (c === 95) return 'tormenta';
+    if (c >= 96 && c <= 99) return 'granizo';
+    return 'sensacion';
+  }
   function clima(codigo, esDia) {
-    const c = CODIGOS[codigo] || ['🌡️', '🌡️', 'Sin datos'];
-    return { emoji: esDia === 0 ? c[1] : c[0], texto: c[2] };
+    const t = CODIGOS[codigo], n = t ? nombreIcono(codigo, esDia) : 'sensacion';
+    return { icono: n, svg: icono(n, 'ic-clima'), texto: t || 'Sin datos' };
   }
   const dirViento = g => esNumero(g) ? ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'][Math.round(g / 45) % 8] : '';
   const fmtHora = f => f.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -447,8 +460,8 @@
     const s = e.s, km = Math.round(e.km), lugar = `aeropuerto de ${escObs(s.nombre)} (${escObs(s.id)})`;
     const usada = !!(a && a.obs && a.obs.id === s.id);
     let txt = usada
-      ? `📡 <b>Dato medido</b> (temperatura, humedad, viento y presión) en el ${lugar}, a ${km} km, hace ${haceTxt(s.t)}: ${grados(s.temp)}${UT()}.`
-      : `📡 <b>Referencia real:</b> el ${lugar}, a ${km} km, midió ${grados(s.temp)}${UT()} hace ${haceTxt(s.t)}.`;
+      ? `${icono('dato')}<b>Dato medido</b> (temperatura, humedad, viento y presión) en el ${lugar}, a ${km} km, hace ${haceTxt(s.t)}: ${grados(s.temp)}${UT()}.`
+      : `${icono('dato')}<b>Referencia real:</b> el ${lugar}, a ${km} km, midió ${grados(s.temp)}${UT()} hace ${haceTxt(s.t)}.`;
     if (esNumero(s.dif)) txt += usada ? ` El modelo calculaba ${grados(s.modelo)}${UT()} (${difTxt(s.dif)}).` : ` En ese punto el modelo calculaba ${grados(s.modelo)}${UT()} (${difTxt(s.dif)}).`;
     const v = estaciones.filter(x => esNumero(x.dif));
     if (v.length >= 3) {
@@ -635,7 +648,7 @@
       const v = valor(c);
       pts += `<circle class="punto${sel ? ' sel' : ''}" cx="${X(sx)}" cy="${Y(sy)}" r="${u(sel ? rpx * 1.35 : rpx)}" fill="${colorValor(v)}"/>`;
       if (c.n === hover && !sel) pts += `<circle class="anillo" cx="${X(sx)}" cy="${Y(sy)}" r="${u(rpx + 5)}"/>`;
-      pts += `<circle class="zona" data-ciudad="${c.n}" cx="${X(sx)}" cy="${Y(sy)}" r="${u(Math.max(rpx + 3, 11))}"/>`;
+      pts += `<circle class="zona" data-ciudad="${escObs(c.n)}" cx="${X(sx)}" cy="${Y(sy)}" r="${u(Math.max(rpx + 3, 11))}"/>`;
     });
 
     // 2) Etiquetas: se prueban por prioridad y solo se dibuja la que cabe sin pisar nada
@@ -788,8 +801,8 @@
     let html = '';
     if (ciudad) {
       const c = porNombre.get(ciudad.dataset.ciudad), d = datos[c.n];
-      const w = d ? clima(d.weather_code, d.is_day).emoji + ' ' : '';
-      html = `<b>${c.n}</b> · ${nombreDep(c.dep)}<br>${w}${d ? grados(d.temperature_2m) + UT() : 'sin datos'}`;
+      const w = d ? clima(d.weather_code, d.is_day).svg + ' ' : '';
+      html = `<b>${escObs(c.n)}</b> · ${nombreDep(c.dep)}<br>${w}${d ? grados(d.temperature_2m) + UT() : 'sin datos'}`;
       if (capaId !== 'temp' && valor(c) !== null) html += ` · ${capa().nombre.toLowerCase()} ${fmt(valor(c), true)}`;
     } else if (dep) {
       const p = promedioDep(dep.dataset.dep);
@@ -815,13 +828,13 @@
   // Cartelito sobre el mapa con la ciudad elegida
   function pintarChip() {
     const c = porNombre.get(seleccionada), d = datos[c.n];
-    $('chipSel').textContent = d ? `${clima(d.weather_code, d.is_day).emoji} ${c.n} · ${grados(d.temperature_2m)}` : c.n;
+    $('chipSel').innerHTML = d ? `${clima(d.weather_code, d.is_day).svg}<span>${escObs(c.n)} · ${grados(d.temperature_2m)}</span>` : `<span>${escObs(c.n)}</span>`;
   }
 
   // Capas del mapa (botones) y leyenda de colores
   function pintarCapas() {
     $('capas').innerHTML = Object.entries(CAPAS).map(([id, c]) =>
-      `<button class="capa${id === capaId ? ' on' : ''}" role="tab" aria-selected="${id === capaId}" data-capa="${id}">${c.icono} ${c.nombre}</button>`).join('');
+      `<button class="capa${id === capaId ? ' on' : ''}" role="tab" aria-selected="${id === capaId}" data-capa="${id}">${icono(c.icono)}<span>${c.nombre}</span></button>`).join('');
     const c = capa(), paradas = [];
     for (let i = 0; i <= 14; i++) paradas.push(c.color(c.min + (c.max - c.min) * i / 14));
     $('grad').style.background = `linear-gradient(90deg, ${paradas.join(',')})`;
@@ -881,7 +894,8 @@
     refrescarVistas();
   }
   let relojMapa = null;
-  function pararReloj() { clearInterval(relojMapa); relojMapa = null; $('hPlay').textContent = '▶'; $('hPlay').setAttribute('aria-label', 'Reproducir'); }
+  function botonReloj(on) { const b = $('hPlay'); b.innerHTML = icono(on ? 'pausa' : 'reproducir'); b.setAttribute('aria-pressed', String(on)); b.setAttribute('aria-label', on ? 'Pausar' : 'Reproducir'); }
+  function pararReloj() { clearInterval(relojMapa); relojMapa = null; botonReloj(false); }
   $('hSlider').addEventListener('input', async e => {
     pararReloj();
     if (+e.target.value > 0) {
@@ -892,7 +906,7 @@
   });
   $('hPlay').addEventListener('click', async () => {
     if (relojMapa) { pararReloj(); return; }
-    $('hPlay').textContent = '⏸'; $('hPlay').setAttribute('aria-label', 'Pausar');
+    botonReloj(true);
     $('hEtq').textContent = 'Cargando…';
     if (!(await asegurarHoras())) { irAHora(0); pararReloj(); return; }
     if (horaMapa >= 24) irAHora(0);
@@ -910,7 +924,7 @@
     $('compSel').innerHTML = [0, 1, 2].map(i =>
       `<select data-i="${i}" aria-label="Ciudad ${i + 1}" style="border-left:4px solid ${COLORES_COMP[i]}">` +
       (i === 2 ? `<option value="">— ninguna —</option>` : '') +
-      CIUDADES.map(c => c.n).sort((x, y) => x.localeCompare(y, 'es')).map(n => `<option${n === compSel[i] ? ' selected' : ''}>${n}</option>`).join('') + `</select>`).join('');
+      CIUDADES.map(c => c.n).sort((x, y) => x.localeCompare(y, 'es')).map(n => `<option${n === compSel[i] ? ' selected' : ''}>${escObs(n)}</option>`).join('') + `</select>`).join('');
   }
   function graficoComp(items) {
     const W = 600, H = 190, X0 = 34, X1 = W - 10, Y0 = 14, Y1 = H - 26;
@@ -937,9 +951,9 @@
     const num = (v, u) => esNumero(v) ? Math.round(v) + u : '--';
     $('compRes').innerHTML = `${graficoComp(items)}
       <div class="comp-tabla"><table>
-        <thead><tr><th></th>${items.map(x => `<th scope="col"><span class="comp-punto" style="background:${x.col}"></span>${x.c.n}</th>`).join('')}</tr></thead>
+        <thead><tr><th></th>${items.map(x => `<th scope="col"><span class="comp-punto" style="background:${x.col}"></span>${escObs(x.c.n)}</th>`).join('')}</tr></thead>
         <tbody>
-          ${fila('Ahora', d => { const w = clima(d.current.weather_code, d.current.is_day); return `${w.emoji} ${w.texto}`; })}
+          ${fila('Ahora', d => { const w = clima(d.current.weather_code, d.current.is_day); return `<span class="con-ic">${w.svg}<span>${w.texto}</span></span>`; })}
           ${fila('Temperatura', d => `<b>${grados(d.current.temperature_2m) + UT()}</b>`)}
           ${fila('Sensación', d => grados(d.current.apparent_temperature) + UT())}
           ${fila('Máx. / mín. hoy', d => `${grados(d.daily.temperature_2m_max[0])} / ${grados(d.daily.temperature_2m_min[0])}`)}
@@ -948,7 +962,7 @@
           ${fila('Prob. de lluvia hoy', d => num(d.daily.precipitation_probability_max[0], '%'))}
           ${fila('Índice UV (máx. hoy)', d => num(d.daily.uv_index_max[0], ''))}
           ${fila('Presión', d => num(d.current.pressure_msl, ' hPa'))}
-          ${fila('Mañana', d => { const w = clima(d.daily.weather_code[1], 1); return `${w.emoji} ${grados(d.daily.temperature_2m_max[1])} / ${grados(d.daily.temperature_2m_min[1])}`; })}
+          ${fila('Mañana', d => { const w = clima(d.daily.weather_code[1], 1); return `<span class="con-ic">${w.svg}<span>${grados(d.daily.temperature_2m_max[1])} / ${grados(d.daily.temperature_2m_min[1])}</span></span>`; })}
         </tbody></table></div>
       ${items.some(x => !x.d) ? '<p class="ayuda">No se pudo cargar alguna ciudad. Prueba de nuevo en un momento.</p>' : ''}`;
   }
@@ -993,7 +1007,7 @@
     $('btnRadar').setAttribute('aria-pressed', String(activo));
     $('btnRadarPlay').disabled = !activo;
     radarOpacidad.disabled = !activo;
-    $('btnRadarPlay').textContent = radarPausado ? '▶ Reanudar' : 'Ⅱ Pausar';
+    $('btnRadarPlay').innerHTML = icono(radarPausado ? 'reproducir' : 'pausa') + `<span>${radarPausado ? 'Reanudar' : 'Pausar'}</span>`;
     $('btnRadarPlay').setAttribute('aria-pressed', String(radarPausado));
   }
   function pararAnimacionRadar() { if (radarTimer) clearInterval(radarTimer); radarTimer = null; }
@@ -1161,7 +1175,7 @@
       }
       const cerrar = document.createElement('button');
       cerrar.type = 'button'; cerrar.className = 'btn';
-      cerrar.dataset.lugar = 'x'; cerrar.textContent = '✕';
+      cerrar.dataset.lugar = 'x'; cerrar.innerHTML = icono('cerrar'); cerrar.setAttribute('aria-label', 'Cerrar');
       caja.appendChild(cerrar);
       caja._r = r.slice(0, 10);
     } catch (e) {
@@ -1173,7 +1187,7 @@
       caja.appendChild(msg);
       const cerrar = document.createElement('button');
       cerrar.type = 'button'; cerrar.className = 'btn';
-      cerrar.dataset.lugar = 'x'; cerrar.textContent = '✕';
+      cerrar.dataset.lugar = 'x'; cerrar.innerHTML = icono('cerrar'); cerrar.setAttribute('aria-label', 'Cerrar');
       caja.appendChild(cerrar);
     }
   }
@@ -1224,7 +1238,6 @@
   function pintarTema() {
     const claro = leer('clima-py-tema', 'oscuro') === 'claro';
     document.documentElement.dataset.tema = claro ? 'claro' : 'oscuro';
-    $('btnTema').textContent = claro ? '🌙' : '☀️';
     $('btnTema').setAttribute('aria-label', claro ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro');
   }
   $('btnTema').addEventListener('click', () => {
@@ -2052,7 +2065,7 @@
     const fase = { amanecer: 'Amanecer', dia: 'Día', atardecer: 'Atardecer', noche: 'Noche' }[amb.fase] ? amb.fase : 'dia';
     const tx = [['ubicacion', seleccionada], [(tc === 'despejado' || tc === 'parcial') && deNoche ? tc + '-noche' : tc, w.texto], [fase, { amanecer: 'Amanecer', dia: 'Día', atardecer: 'Atardecer', noche: 'Noche' }[fase]]];
     if (vigiaEtq) vigiaEtq.disconnect();
-    caja.textContent = ''; tx.forEach(([ic, s]) => { const e = document.createElement('span'); e.dataset.icono = ic; e.textContent = s; caja.appendChild(e); if (vigiaEtq) vigiaEtq.observe(e); });
+    caja.textContent = ''; tx.forEach(([ic, s]) => { const e = document.createElement('span'); e.dataset.icono = ic; e.innerHTML = icono(ic); e.append(s); caja.appendChild(e); if (vigiaEtq) vigiaEtq.observe(e); });
     eEtqSucio = true;
   }
   // Barra de navegación del celular
@@ -2829,7 +2842,7 @@
   function visibilidadSonido() { if (au && (sonando || mus.activa)) { if (document.hidden) au.ctx.suspend(); else au.ctx.resume().catch(() => {}); } }
   function pintarBotonSonido() {
     const b = $('btnSonido');
-    b.textContent = sonando ? '🔊' : '🔈'; b.classList.toggle('on', sonando); b.setAttribute('aria-pressed', sonando);
+    b.innerHTML = icono(sonando ? 'sonido' : 'silencio'); b.classList.toggle('on', sonando); b.setAttribute('aria-pressed', sonando);
     b.setAttribute('aria-label', sonando ? 'Silenciar el sonido del clima' : 'Activar el sonido del clima');
   }
   // Al salir de la página se libera el audio. Si la página vuelve desde la caché del navegador (atrás/adelante), el botón
@@ -2846,7 +2859,7 @@
     if (sonando) { try { await au.ctx.resume(); } catch (_) {} }
     if (!sonando) setTimeout(() => { if (!sonando && !mus.activa && au) au.ctx.suspend(); }, 3500);
     mezclar();
-    if (sonando) aviso('🔊 ' + describirSonido());
+    if (sonando) aviso(describirSonido());
   });
   $('btnFx').addEventListener('click', () => {
     fx = !fx; guardar('clima-py-fx', fx ? '1' : '0');
@@ -2901,6 +2914,7 @@
     $$a('[data-efecto]').forEach(c => { c.checked = p.efectos[c.dataset.efecto] !== false; });
     const v = Math.round(p.volumen * 100);
     $('daVolumen').value = v; $('daVolumenVal').textContent = v + '%'; $('daVolumen').setAttribute('aria-valuetext', v + '%');
+    $('daVolMusica').value = v; $('daVolMusicaVal').textContent = v + '%'; $('daVolMusica').setAttribute('aria-valuetext', v + '%');
     dlgAnim.classList.toggle('apagada', !fx);
     sincronizarPrevia();
   }
@@ -2908,6 +2922,24 @@
   function salirPrevia() { if (prefsAnim.vistaPrevia) { cambiarAnim({ vistaPrevia: null }); anunciar('Volviste al clima real.'); } }
 
   $('daReducido').hidden = !REDUCIDO;
+  const daTabs = [...$$a('.da-pestanas [role=tab]')];
+  function elegirDaTab(id, enfocar) {
+    daTabs.forEach(b => {
+      const on = b.dataset.da === id;
+      b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; $('daPanel' + b.dataset.da).hidden = !on;
+      if (on && enfocar) b.focus();
+    });
+  }
+  daTabs.forEach(b => b.addEventListener('click', () => elegirDaTab(b.dataset.da)));
+  $$a('.da-pestanas')[0].addEventListener('keydown', e => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const i = daTabs.findIndex(b => b.getAttribute('aria-selected') === 'true'), n = daTabs.length;
+    const j = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + n) % n;
+    elegirDaTab(daTabs[j].dataset.da, true);
+  });
+  // abrir el panel directamente en una pestaña (lo usan las pruebas y la consola)
+  window.climaPanel = Object.freeze({ abrir: id => { $('btnAjustesAnim').click(); elegirDaTab(id || 'Anim'); } });
   $('btnAjustesAnim').addEventListener('click', () => {
     sincronizarPanel();
     if (typeof dlgAnim.showModal === 'function') dlgAnim.showModal(); else dlgAnim.setAttribute('open', '');
@@ -2921,11 +2953,12 @@
   $$a('input[name="daIntensidad"]').forEach(r => r.addEventListener('change', () => { if (r.checked) cambiarAnim({ intensidad: Number(r.value) }); }));
   $$a('input[name="daCalidad"]').forEach(r => r.addEventListener('change', () => { if (r.checked) cambiarAnim({ calidad: r.value }); }));
   $$a('[data-efecto]').forEach(c => c.addEventListener('change', () => cambiarAnim({ efectos: { [c.dataset.efecto]: c.checked } })));
-  $('daVolumen').addEventListener('input', e => {
+  // Volumen general (sonido del clima y música navideña): dos deslizadores, uno en «Sonido» y otro en «Navidad», siempre iguales
+  ['daVolumen', 'daVolMusica'].forEach(id => $(id).addEventListener('input', e => {
     const v = Math.round(Number(e.target.value)) || 0;
-    $('daVolumenVal').textContent = v + '%'; e.target.setAttribute('aria-valuetext', v + '%');
+    ['daVolumen', 'daVolMusica'].forEach(x => { $(x).value = v; $(x).setAttribute('aria-valuetext', v + '%'); $(x + 'Val').textContent = v + '%'; });
     fijarPrefAnim({ volumen: limitar(v / 100, 0, 1) });
-  });
+  }));
   function elegirPrevia() {
     const t = dlgAnim.querySelector('input[name="daTipo"]:checked'), f = dlgAnim.querySelector('input[name="daFase"]:checked');
     cambiarAnim({ vistaPrevia: { tipo: t ? t.value : amb.tipo, fase: f ? f.value : amb.fase } });
@@ -2958,16 +2991,62 @@
     const f = new Date(); return { a: f.getFullYear(), m: f.getMonth() + 1, d: f.getDate() };
   }
   const enNavidad = ({ m, d } = fechaPY()) => m === 12 || (m === 1 && d <= 6);
-  const LOGO_NORMAL = 'icono-192.png', LOGO_NAVIDAD = 'icono-navidad.svg';
+  const LOGO_NORMAL = 'icono.svg', LOGO_NAVIDAD = 'icono-navidad.svg';
+  // Preferencias de la temporada (panel ⚙️, pestaña Navidad), cada una en su clave: 'si' | 'no'
+  const prefNv = (clave, base) => leer('clima-py-navidad-' + clave, base) === 'si';
+  const fijarPrefNv = (clave, si) => guardar('clima-py-navidad-' + clave, si ? 'si' : 'no');
+  // Cuenta regresiva del saludo: hasta Navidad (25-dic), luego hasta Año Nuevo; el 1-ene, «¡Feliz Año Nuevo!»
+  function textoCuenta({ a, m, d }) {
+    const dias = (y, mm, dd) => Math.round((Date.UTC(y, mm - 1, dd) - Date.UTC(a, m - 1, d)) / 864e5);
+    const falta = (n, que) => n === 1 ? `Falta 1 día para ${que}` : `Faltan ${n} días para ${que}`;
+    if (m === 1 && d === 1) return '¡Feliz Año Nuevo!';
+    if (m === 1) return '';
+    if (m === 12 && d === 25) return '¡Feliz Navidad!';
+    if (m === 12 && d > 25) return falta(dias(a + 1, 1, 1), 'Año Nuevo');
+    return falta(dias(a, 12, 25), 'Navidad');
+  }
+  // Guirnalda del borde superior: cable en festones (4 en celular, más en pantallas anchas) con bombillas de 4 colores en
+  // tres grupos que se encienden por turnos (estilos.css; quietas con html.navidad-quieta o «reducir movimiento»)
+  // y tres rosetas de ñandutí doradas colgando de hilos finos.
+  const COLORES_LUZ = ['#ef4444', '#fbbf24', '#22c55e', '#60a5fa'];
+  let anchoGuirnalda = 0;
+  function armarGuirnalda() {
+    const caja = $('guirnalda'), W = document.documentElement.clientWidth;
+    if (!document.documentElement.classList.contains('navidad')) { caja.textContent = ''; anchoGuirnalda = 0; return; }
+    if (W === anchoGuirnalda) return;
+    anchoGuirnalda = W;
+    const F = W < 600 ? 4 : W < 1000 ? 6 : 8, an = W / F, f = n => n.toFixed(1);
+    let cable = '', focos = ['', '', ''];
+    for (let k = 0; k < F; k++) {
+      const x0 = k * an, x1 = x0 + an, cx = (x0 + x1) / 2;
+      cable += `M${f(x0)} 6Q${f(cx)} 44 ${f(x1)} 6`;
+      for (let j = 1; j <= 5; j++) {
+        const t = j / 6, x = (1 - t) ** 2 * x0 + 2 * (1 - t) * t * cx + t * t * x1, y = (1 - t) ** 2 * 6 + 2 * (1 - t) * t * 44 + t * t * 6;
+        const i = k * 5 + j, c = COLORES_LUZ[i % 4];
+        focos[i % 3] += `<circle cx="${f(x)}" cy="${f(y + 7)}" r="7" fill="${c}" opacity=".28"/><rect x="${f(x - 3.5)}" y="${f(y + 1.5)}" width="7" height="10.5" rx="3.5" fill="${c}"/><rect x="${f(x - 2)}" y="${f(y - 0.5)}" width="4" height="3" rx="1" fill="#1f3326"/>`;
+      }
+    }
+    const adornos = [0.12, 0.5, 0.88].map((p, k) => { const x = W * p, largo = [26, 40, 28][k], tam = [22, 26, 22][k];
+      return `<line x1="${f(x)}" y1="20" x2="${f(x)}" y2="${20 + largo}" stroke="rgba(253,230,138,.6)" stroke-width="1"/><image href="logo-nanduti-hilos.svg" x="${f(x - tam / 2)}" y="${20 + largo}" width="${tam}" height="${tam}"/>`; }).join('');
+    caja.innerHTML = `<svg width="${W}" height="80" viewBox="0 0 ${W} 80"><path d="${cable}" fill="none" stroke="#3f5a3a" stroke-width="1.6"/>${adornos}` +
+      focos.map((g, n) => `<g class="focos f${n}">${g}</g>`).join('') + '</svg>';
+  }
+  window.addEventListener('resize', () => { clearTimeout(armarGuirnalda.t); armarGuirnalda.t = setTimeout(armarGuirnalda, 200); });
   function aplicarNavidad() {
-    const hoy = fechaPY(), activa = modoNavidad === 'si' || (modoNavidad === 'auto' && enNavidad(hoy));
-    document.documentElement.classList.toggle('navidad', activa);
+    const hoy = fechaPY(), activa = modoNavidad === 'si' || (modoNavidad === 'auto' && enNavidad(hoy)), raiz = document.documentElement;
+    raiz.classList.toggle('navidad', activa);
+    raiz.classList.toggle('navidad-quieta', !prefNv('parpadeo', 'si'));
+    raiz.classList.toggle('sin-fuegos', !prefNv('fuegos', 'si'));
     const logo = document.querySelector('header .logo'), ico = document.querySelector('link[rel="icon"]');
     if (logo && !logo.getAttribute('src').endsWith(activa ? LOGO_NAVIDAD : LOGO_NORMAL)) logo.src = activa ? LOGO_NAVIDAD : LOGO_NORMAL;
-    if (ico && !ico.getAttribute('href').endsWith(activa ? LOGO_NAVIDAD : LOGO_NORMAL)) { ico.type = activa ? 'image/svg+xml' : 'image/png'; ico.href = activa ? LOGO_NAVIDAD : LOGO_NORMAL; }
-    const clave = `${hoy.a}-${hoy.m}-${hoy.d}`;
+    if (ico && !ico.getAttribute('href').endsWith(activa ? LOGO_NAVIDAD : LOGO_NORMAL)) ico.href = activa ? LOGO_NAVIDAD : LOGO_NORMAL;
+    const clave = `${hoy.a}-${hoy.m}-${hoy.d}`, cuenta = prefNv('cuenta', 'si') ? textoCuenta(hoy) : '';
     $('saludoNavidad').hidden = !activa || leer('clima-py-navidad-saludo', '') === clave;
+    $('saludoCuenta').textContent = cuenta; $('saludoCuenta').hidden = !cuenta;
+    armarGuirnalda();
     marcarRadio('daNavidad', modoNavidad);
+    $('daNvParpadeo').checked = prefNv('parpadeo', 'si'); $('daNvCuenta').checked = prefNv('cuenta', 'si');
+    $('daNvFuegos').checked = prefNv('fuegos', 'si'); $('daNvMusica').checked = prefNv('musica', 'no');
   }
   $('saludoCerrar').addEventListener('click', () => {
     const h = fechaPY(); guardar('clima-py-navidad-saludo', `${h.a}-${h.m}-${h.d}`);   // no vuelve a aparecer hasta mañana
@@ -2977,14 +3056,24 @@
     if (!r.checked || !MODOS_NAVIDAD.includes(r.value)) return;
     modoNavidad = r.value; guardar('clima-py-navidad', modoNavidad); aplicarNavidad();
   }));
-  $('btnAjustesAnim').addEventListener('click', () => marcarRadio('daNavidad', modoNavidad));
+  [['daNvParpadeo', 'parpadeo'], ['daNvCuenta', 'cuenta'], ['daNvFuegos', 'fuegos']].forEach(([id, clave]) =>
+    $(id).addEventListener('change', e => { fijarPrefNv(clave, e.target.checked); aplicarNavidad(); }));
+  // Música navideña: la toca la sección de sonido (climaSonido.musicaNavidad); el clic es el gesto que el navegador pide
+  $('daNvMusica').addEventListener('change', async e => {
+    const si = e.target.checked;
+    if (window.climaSonido && window.climaSonido.musicaNavidad) {
+      const suena = await window.climaSonido.musicaNavidad(si);
+      if (si && !suena && !document.documentElement.classList.contains('navidad')) aviso('La música suena cuando la decoración navideña está activa.');
+    } else fijarPrefNv('musica', si);
+  });
+  $('btnAjustesAnim').addEventListener('click', () => aplicarNavidad());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) aplicarNavidad(); });   // por si la página quedó abierta de un día para otro
   setInterval(aplicarNavidad, 30 * 60e3);
   aplicarNavidad();
 
   // ============ 7) RESUMEN, LISTA Y DETALLE ============
   // Íconos de los controles: el set propio de estilos.css (scripts/iconos.mjs). La estrella se llena sola con la clase .on.
-  const ICONO_ESTRELLA = '<span class="i i-estrella" aria-hidden="true"></span>';
+  const iconoEstrella = on => icono(on ? 'favorito-lleno' : 'favorito');
   // Microinteracciones: las animaciones están en estilos.css (sección 19, con los tokens --d-*) y no corren con
   // «reducir movimiento». Aquí solo se ponen y quitan las clases que las disparan.
   function animarEntrada(el) {                                     // el bloque entra suave (cambio de ciudad o de pestaña)
@@ -3008,16 +3097,16 @@
     const prom = con.reduce((s, x) => s + valor(x), 0) / con.length;
     const conLluvia = CIUDADES.filter(x => datos[x.n] && datos[x.n].precipitation > 0);
     const secas = CIUDADES.filter(x => datos[x.n] && esNumero(datos[x.n].precipitation) && datos[x.n].precipitation === 0).length;
-    const tarjeta = (titulo, v, sub, ir, color) =>
-      `<${ir ? 'button' : 'div'} class="stat"${ir ? ` data-ir="${ir}"` : ''}><small>${titulo}</small><b${color ? ` style="color:${color}"` : ''}>${v}</b><span>${sub}</span></${ir ? 'button' : 'div'}>`;
+    const tarjeta = ([ic, titulo], v, sub, ir, color) =>
+      `<${ir ? 'button' : 'div'} class="stat"${ir ? ` data-ir="${escObs(ir)}"` : ''}><small>${icono(ic)}<span>${titulo}</span></small><b${color ? ` style="color:${color}"` : ''}>${v}</b><span>${sub}</span></${ir ? 'button' : 'div'}>`;
     $('stats').innerHTML =
-      tarjeta(`Promedio · ${c.nombre.toLowerCase()}`, c.dec ? prom.toFixed(c.dec) + c.largo : Math.round(prom * 10) / 10 + c.largo, `${con.length} ciudades`, '', paraTexto(colorValor(prom))) +
-      tarjeta(c.alto, fmt(valor(alta), true), alta.n, alta.n, paraTexto(colorValor(valor(alta)))) +
+      tarjeta([c.icono, `Promedio · ${c.nombre.toLowerCase()}`], c.dec ? prom.toFixed(c.dec) + c.largo : Math.round(prom * 10) / 10 + c.largo, `${con.length} ciudades`, '', paraTexto(colorValor(prom))) +
+      tarjeta(c.alto, fmt(valor(alta), true), escObs(alta.n), alta.n, paraTexto(colorValor(valor(alta)))) +
       (capaId === 'lluvia'
-        ? tarjeta('☀️ Sin lluvia ahora', secas, 'ciudades secas', '', '')
-        : tarjeta(c.bajo, fmt(valor(baja), true), baja.n, baja.n, paraTexto(colorValor(valor(baja))))) +
-      (conLluvia.length ? tarjeta('🌧️ Con lluvia ahora', conLluvia.length, 'ej.: ' + conLluvia[0].n, conLluvia[0].n, '')
-                        : tarjeta('🌧️ Con lluvia ahora', 0, 'ninguna ciudad', '', ''));
+        ? tarjeta(['despejado', 'Sin lluvia ahora'], secas, 'ciudades secas', '', '')
+        : tarjeta(c.bajo, fmt(valor(baja), true), escObs(baja.n), baja.n, paraTexto(colorValor(valor(baja))))) +
+      (conLluvia.length ? tarjeta(['lluvia', 'Con lluvia ahora'], conLluvia.length, 'ej.: ' + escObs(conLluvia[0].n), conLluvia[0].n, '')
+                        : tarjeta(['lluvia', 'Con lluvia ahora'], 0, 'ninguna ciudad', '', ''));
     if (!statsVistas) { statsVistas = true; animarCascada($('stats')); }
   }
   $('stats').addEventListener('click', e => {
@@ -3046,17 +3135,17 @@
     const fila = c => {
       const d = datos[c.n], x = valor(c), fav = favoritas.has(c.n);
       return `<div class="item${c.n === seleccionada ? ' activo' : ''}" role="listitem">
-        <button class="item-main" data-ciudad="${c.n}">
-          <span class="nom"><span class="e">${d ? clima(d.weather_code, d.is_day).emoji : '⏳'}</span> ${c.n}<small>${nombreDep(c.dep)}</small></span>
+        <button class="item-main" data-ciudad="${escObs(c.n)}">
+          ${d ? clima(d.weather_code, d.is_day).svg : '<span class="ic ic-espera" aria-hidden="true"></span>'}<span class="nom">${escObs(c.n)}<small>${nombreDep(c.dep)}</small></span>
           <span class="t" style="color:${x === null ? 'var(--suave)' : paraTexto(colorValor(x))}">${fmt(x)}</span>
         </button>
-        <button class="estrella${fav ? ' on' : ''}" data-fav="${c.n}" aria-label="${fav ? 'Quitar ' + c.n + ' de favoritas' : 'Marcar ' + c.n + ' como favorita'}">${ICONO_ESTRELLA}</button>
+        <button class="estrella${fav ? ' on' : ''}" data-fav="${escObs(c.n)}" aria-label="${escObs(fav ? 'Quitar ' + c.n + ' de favoritas' : 'Marcar ' + c.n + ' como favorita')}" aria-pressed="${fav}">${iconoEstrella(fav)}</button>
       </div>`;
     };
     const cont = $('lista'), scroll = cont.scrollTop;
     $('contador').textContent = `(${lista.length})`;
     cont.innerHTML = lista.length
-      ? (favs.length ? '<div class="sep">★ Favoritas</div>' + favs.map(fila).join('') : '') +
+      ? (favs.length ? '<div class="sep">' + icono('favorito-lleno') + '<span>Favoritas</span></div>' + favs.map(fila).join('') : '') +
         (resto.length && (favs.length || resumida) ? `<div class="sep">${tituloResto}</div>` : '') + resto.map(fila).join('') +
         (resto.length < todas.length ? '<button class="btn ver-todas" id="verTodas">Ver todas las ciudades</button>' : '')
       : '<div class="vacio">No hay ciudades con ese filtro.<br><button class="btn" id="quitarFiltros">Quitar filtros</button></div>';
@@ -3094,14 +3183,14 @@
     dibujarLista();
     pintarFavs();
     const b = document.querySelector('#detalle .estrella');
-    if (b && b.dataset.fav === n) { b.classList.toggle('on', favoritas.has(n)); b.setAttribute('aria-pressed', String(favoritas.has(n))); }   // el ícono cambia solo con .on (estilos.css)
+    if (b && b.dataset.fav === n) { b.classList.toggle('on', favoritas.has(n)); b.setAttribute('aria-pressed', String(favoritas.has(n))); b.innerHTML = iconoEstrella(favoritas.has(n)); }
   }
 
   // --- Detalle de la ciudad elegida ---
   // La cabecera (nombre, temperatura, datos) se arma igual con datos parciales o completos
   function luna() {
     const P = 29.530588853, e = (((Date.now() - Date.UTC(2000, 0, 6, 18, 14)) / 86400000) % P + P) % P, i = Math.round(e / P * 8) % 8;
-    return { e: ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘'][i], ilum: Math.round((1 - Math.cos(2 * Math.PI * e / P)) / 2 * 100),
+    return { ilum: Math.round((1 - Math.cos(2 * Math.PI * e / P)) / 2 * 100),
       t: ['Luna nueva', 'Creciente', 'Cuarto creciente', 'Gibosa creciente', 'Luna llena', 'Gibosa menguante', 'Cuarto menguante', 'Menguante'][i] };
   }
   const cacheAire = new Map();
@@ -3115,8 +3204,8 @@
   }
   function textoAire(v) {
     if (!v || !esNumero(v.aqi)) return '--';
-    const a = v.aqi, [t, e] = a <= 50 ? ['Buena', '🟢'] : a <= 100 ? ['Moderada', '🟡'] : a <= 150 ? ['Dañina para sensibles', '🟠'] : a <= 200 ? ['Dañina', '🔴'] : a <= 300 ? ['Muy dañina', '🟣'] : ['Peligrosa', '🟤'];
-    return `${e} ${Math.round(a)} · ${t}`;
+    const a = v.aqi, t = a <= 50 ? 'Buena' : a <= 100 ? 'Moderada' : a <= 150 ? 'Dañina para sensibles' : a <= 200 ? 'Dañina' : a <= 300 ? 'Muy dañina' : 'Peligrosa';
+    return `${Math.round(a)} · ${t}`;
   }
   function llenarAire(c) {
     const poner = t => { const el = document.querySelector('#aireDato b'); if (el && seleccionada === c.n) el.textContent = t; };
@@ -3124,48 +3213,52 @@
     if (g) poner(textoAire(g.v));
     cargarAire(c).then(v => poner(textoAire(v))).catch(() => poner('--'));
   }
+  // Cabecera: ciudad, temperatura grande (Fraunces), estado y máx/mín/sensación. Con datos parciales (solo el clima actual)
+  // ya muestra lo que se sabe; `error`: no se pudo cargar el pronóstico.
   function htmlCabecera(c, a, d, error) {
-    const L = luna();
-    const w = a ? clima(a.weather_code, a.is_day) : (error ? { emoji: '⚠️', texto: 'Sin datos por ahora' } : { emoji: '⏳', texto: 'Cargando…' });
-    const t = a ? a.temperature_2m : null;
-    const fav = favoritas.has(c.n);
-    const esq = x => d ? x : '<span class="esq">0000</span>';
-    const dato = (titulo, v) => `<div class="dato"><small>${titulo}</small><b>${d ? v : '<span class="esq">0000000</span>'}</b></div>`;
-    const alertasHtml = d ? alertas(a, d).map(t2 => `<span class="alerta">${t2}</span>`).join('') : '';
+    const w = a ? clima(a.weather_code, a.is_day) : { svg: error ? icono('aviso', 'ic-clima') : '', texto: error ? 'Sin datos por ahora' : 'Cargando…' };
+    const t = a ? a.temperature_2m : null, fav = favoritas.has(c.n), n = escObs(c.n);
+    const mm = [];
+    if (d) mm.push(`<span>Máx ${grados(d.daily.temperature_2m_max[0])}</span>`, `<span>Mín ${grados(d.daily.temperature_2m_min[0])}</span>`);
+    if (a && esNumero(a.apparent_temperature)) mm.push(`<span>Sensación ${grados(a.apparent_temperature)}</span>`);
     return `
-      <div class="actual">
-        <div class="icono-grande" aria-hidden="true">${w.emoji}</div>
-        <div>
-          <div class="ciudad-fila">
-            <span class="ciudad-nombre">${c.n}</span>
-            <button class="estrella${fav ? ' on' : ''}" data-fav="${c.n}" aria-label="Favorita" aria-pressed="${fav}">${ICONO_ESTRELLA}</button>
-            ${d ? `<button class="btn con-ic" data-compartir="1" aria-label="Compartir el clima de esta ciudad"><span class="i i-compartir" aria-hidden="true"></span><span>Compartir</span></button>` : ''}
-            ${d && !navigator.share ? `<button class="btn" data-compartir="wa" aria-label="Enviar el clima por WhatsApp">WhatsApp</button>` : ''}
-          </div>
-          <div class="dep-nombre">${c.dep === 'Asunción' ? 'Capital del país' : 'Departamento ' + c.dep}</div>
-          <div class="temp-fila">
-            <span class="temp-grande" style="color:${esNumero(t) ? paraTexto(capaTemp(t)) : 'inherit'}">${esNumero(t) ? Math.round(aU(t)) + '°' + UT() : '--'}</span>
-            <span class="minmax">${d ? `↑ ${grados(d.daily.temperature_2m_max[0])} ↓ ${grados(d.daily.temperature_2m_min[0])}` : ''}</span>
-          </div>
-          <div class="estado">${w.texto}</div>
-          ${d && d.rangoDia && d.rangoDia.max[0] ? `<div class="rango-prob" title="Rango del 10 % al 90 % de las simulaciones de 4 modelos">Máx. probable ${Math.round(aU(d.rangoDia.max[0][0])) === Math.round(aU(d.rangoDia.max[0][1])) ? grados(d.rangoDia.max[0][0]) + ' (muy segura)' : grados(d.rangoDia.max[0][0]) + '–' + grados(d.rangoDia.max[0][1])}</div>` : ''}
+      <div class="hero">
+        <div class="ciudad-fila">
+          <h3 class="ciudad-nombre">${n}</h3>
+          <button class="estrella${fav ? ' on' : ''}" data-fav="${n}" aria-label="Favorita" aria-pressed="${fav}">${iconoEstrella(fav)}</button>
         </div>
-        <div class="datos">
-          ${dato('Sensación térmica', d ? grados(a.apparent_temperature) + UT() : '')}
-          ${dato('Humedad', d && esNumero(a.relative_humidity_2m) ? a.relative_humidity_2m + '%' : '--')}
-          ${dato('Viento', d && esNumero(a.wind_speed_10m) ? Math.round(a.wind_speed_10m) + ' km/h ' + dirViento(a.wind_direction_10m) : '--')}
-          ${dato('Presión', d && esNumero(a.pressure_msl) ? Math.round(a.pressure_msl) + ' hPa' : '--')}
-          ${dato('Lluvia ahora', d && esNumero(a.precipitation) ? a.precipitation + ' mm' : '--')}
-          ${dato('Índice UV (máx. hoy)', d && esNumero(d.daily.uv_index_max[0]) ? Math.round(d.daily.uv_index_max[0]) : '--')}
-          ${dato('Amanecer', d ? '🌅 ' + String(d.daily.sunrise[0]).slice(11) : '')}
-          ${dato('Atardecer', d ? '🌇 ' + String(d.daily.sunset[0]).slice(11) : '')}
-          ${dato('Luna', d ? `${L.e} ${L.t} · ${L.ilum}%` : '')}
-          ${d ? `<div class="dato" id="aireDato"><small>Calidad del aire</small><b>…</b></div>` : ''}
-        </div>
-      </div>
+        <div class="dep-nombre">${icono('ubicacion')}<span>${c.dep === 'Asunción' ? 'Capital del país' : 'Departamento ' + escObs(c.dep)}</span></div>
+        <div class="temp-grande">${esNumero(t) ? Math.round(aU(t)) + '°<span class="unidad">' + UT() + '</span>' : (a || error ? '--' : '<span class="esq">00°</span>')}</div>
+        <div class="estado">${w.svg}<span>${w.texto}</span></div>
+        <div class="minmax">${mm.join('<i aria-hidden="true">·</i>')}</div>
+        ${d && d.rangoDia && d.rangoDia.max[0] ? `<div class="rango-prob" title="Rango del 10 % al 90 % de las simulaciones de 4 modelos">Máx. probable ${Math.round(aU(d.rangoDia.max[0][0])) === Math.round(aU(d.rangoDia.max[0][1])) ? grados(d.rangoDia.max[0][0]) + ' (muy segura)' : grados(d.rangoDia.max[0][0]) + '–' + grados(d.rangoDia.max[0][1])}</div>` : ''}
+        ${d ? `<div class="hero-acciones"><button class="btn con-ic" data-compartir="1" aria-label="Compartir el clima de esta ciudad">${icono('compartir')}<span>Compartir</span></button>${!navigator.share ? `<button class="btn" data-compartir="wa" aria-label="Enviar el clima por WhatsApp">WhatsApp</button>` : ''}</div>` : ''}
+      </div>`;
+  }
+  // Cuerpo: avisos, datos y verificación con aeropuertos. Los datos del clima actual (humedad, viento, lluvia, presión) salen
+  // de datos[c.n] si el pronóstico todavía no llegó o no se pudo cargar (sin internet): así no se ven «--» teniendo el dato.
+  function htmlDatos(c, a, d, error) {
+    const L = luna(), falta = d || error ? '--' : '<span class="esq">0000000</span>';
+    const v = (hay, val) => hay ? val : falta;
+    const dato = (ic, titulo, val, id) => `<div class="dato"${id ? ` id="${id}"` : ''}>${icono(ic)}<b>${val}</b><small>${titulo}</small></div>`;
+    const alertasHtml = d ? alertas(a, d).map(x => `<div class="alerta${x.fuerte ? ' fuerte' : ''}">${icono(x.ic)}<span>${x.t}</span></div>`).join('') : '';
+    return `
       ${alertasHtml ? `<div class="alertas">${alertasHtml}</div>` : ''}
+      <div class="datos">
+        ${dato('sensacion', 'Sensación térmica', v(a && esNumero(a.apparent_temperature), a && grados(a.apparent_temperature) + UT()))}
+        ${dato('humedad', 'Humedad', v(a && esNumero(a.relative_humidity_2m), a && a.relative_humidity_2m + '%'))}
+        ${dato('viento', 'Viento', v(a && esNumero(a.wind_speed_10m), a && Math.round(a.wind_speed_10m) + ' km/h ' + dirViento(a.wind_direction_10m)))}
+        ${dato('presion', 'Presión', v(a && esNumero(a.pressure_msl), a && Math.round(a.pressure_msl) + ' hPa'))}
+        ${dato('lluvia', 'Lluvia ahora', v(a && esNumero(a.precipitation), a && a.precipitation + ' mm'))}
+        ${dato('uv', 'Índice UV (máx. hoy)', v(d && esNumero(d.daily.uv_index_max[0]), d && Math.round(d.daily.uv_index_max[0])))}
+        ${dato('amanecer', 'Amanecer', v(!!d, d && String(d.daily.sunrise[0]).slice(11)))}
+        ${dato('atardecer', 'Atardecer', v(!!d, d && String(d.daily.sunset[0]).slice(11)))}
+        ${dato('luna', 'Luna', `${L.t} · ${L.ilum}%`)}
+        ${d ? dato('hoja', 'Calidad del aire', '…', 'aireDato') : ''}
+      </div>
       ${d ? htmlObs(c, a) : ''}`;
   }
+  function pintarPartes(cab, cuerpo) { $('detalleCab').innerHTML = cab; $('detalleCuerpo').innerHTML = cuerpo; }
   const capaTemp = t => CAPAS.temp.color(t);
 
   // ---- Lluvia en la próxima hora (datos cada 15 min) ----
@@ -3198,14 +3291,14 @@
     const r = [];
     const calorExtremo = esNumero(a.apparent_temperature) && a.apparent_temperature >= UMBRAL_CALOR_EXTREMO;
     const frioIntenso = esNumero(a.temperature_2m) && a.temperature_2m <= UMBRAL_FRIO_INTENSO;
-    if (calorExtremo) r.push('🔥 Calor extremo: hidrátate y evita el sol en las horas centrales del día');
-    else if (esNumero(a.apparent_temperature) && a.apparent_temperature >= 35) r.push('🥵 Sensación térmica muy alta: hidrátate y evita el sol del mediodía');
-    if (frioIntenso) r.push('🥶 Frío intenso: abrígate bien');
-    else if (esNumero(a.apparent_temperature) && a.apparent_temperature <= 5) r.push('🥶 Sensación de frío intenso: abrígate bien');
+    if (calorExtremo) r.push({ ic: 'calor', fuerte: 1, t: 'Calor extremo: hidrátate y evita el sol en las horas centrales del día' });
+    else if (esNumero(a.apparent_temperature) && a.apparent_temperature >= 35) r.push({ ic: 'calor', t: 'Sensación térmica muy alta: hidrátate y evita el sol del mediodía' });
+    if (frioIntenso) r.push({ ic: 'frio', fuerte: 1, t: 'Frío intenso: abrígate bien' });
+    else if (esNumero(a.apparent_temperature) && a.apparent_temperature <= 5) r.push({ ic: 'frio', t: 'Sensación de frío intenso: abrígate bien' });
     const px = d.proxh;
     if (px && Date.now() - px.t < 20 * 60000) {                    // solo si el dato es reciente (20 min)
-      if (px.k === 0) r.push(`🌧️ Está lloviendo ahora (unos ${px.mm} mm en la próxima hora)`);
-      else if (px.k > 0) r.push(`🌦️ Lluvia en unos ${px.k * 15} min (unos ${px.mm} mm en la próxima hora)`);
+      if (px.k === 0) r.push({ ic: 'lluvia', t: `Está lloviendo ahora (unos ${px.mm} mm en la próxima hora)` });
+      else if (px.k > 0) r.push({ ic: 'llovizna', t: `Lluvia en unos ${px.k * 15} min (unos ${px.mm} mm en la próxima hora)` });
     }
     const uvMax = d.daily.uv_index_max[0];
     if (esNumero(uvMax) && uvMax >= 3) {
@@ -3215,27 +3308,27 @@
         d.hourly.time.forEach((h, k) => { if (String(h).startsWith(hoy) && d.hourly.uv_index[k] >= 3) hs.push(+String(h).slice(11, 13)); });
         if (hs.length) tramo = ` entre las ${String(Math.min(...hs)).padStart(2, '0')}:00 y las ${String(Math.max(...hs) + 1).padStart(2, '0')}:00`;
       }
-      r.push(`☀️ UV ${NIVEL_UV(uvMax)} hoy (${Math.round(uvMax)}): usa protector solar${tramo}${uvMax >= 8 ? ', gorra y busca sombra' : ''}`);
+      r.push({ ic: 'uv', fuerte: uvMax >= 8, t: `UV ${NIVEL_UV(uvMax)} hoy (${Math.round(uvMax)}): usa protector solar${tramo}${uvMax >= 8 ? ', gorra y busca sombra' : ''}` });
     }
-    if ([95, 96, 99].includes(a.weather_code)) r.push('⛈️ Tormenta eléctrica en la zona ahora');
-    if (esNumero(a.wind_speed_10m) && a.wind_speed_10m >= UMBRAL_VIENTO_FUERTE) r.push(`💨 Viento fuerte: ${Math.round(a.wind_speed_10m)} km/h`);
-    else if (esNumero(a.wind_speed_10m) && a.wind_speed_10m >= 40) r.push('💨 Viento fuerte');
+    if ([95, 96, 99].includes(a.weather_code)) r.push({ ic: 'tormenta', fuerte: 1, t: 'Tormenta eléctrica en la zona ahora' });
+    if (esNumero(a.wind_speed_10m) && a.wind_speed_10m >= UMBRAL_VIENTO_FUERTE) r.push({ ic: 'viento', fuerte: 1, t: `Viento fuerte: ${Math.round(a.wind_speed_10m)} km/h` });
+    else if (esNumero(a.wind_speed_10m) && a.wind_speed_10m >= 40) r.push({ ic: 'viento', t: 'Viento fuerte' });
     const i = horaInicio(d);
     const prox = d.hourly.precipitation_probability.slice(i, i + 4).filter(esNumero);
-    if (prox.length && Math.max(...prox) >= 70) r.push('🌧️ Alta probabilidad de lluvia en las próximas horas');
+    if (prox.length && Math.max(...prox) >= 70) r.push({ ic: 'lluvia', t: 'Alta probabilidad de lluvia en las próximas horas' });
     return r;
   }
 
   function pintarPrevio(c) {
-    $('detalle').innerHTML = htmlCabecera(c, datos[c.n] || null, null);
+    pintarPartes(htmlCabecera(c, datos[c.n] || null, null), htmlDatos(c, datos[c.n] || null, null));
     if (datos[c.n]) ambiente(datos[c.n]);
   }
   function pintarErrorDetalle(c, e) {
     const msg = e && e.tipo === 'limite'
       ? 'Open-Meteo recibió demasiadas consultas. Espera un minuto e inténtalo de nuevo.'
-      : 'No se pudo cargar el pronóstico de ' + c.n + '. Revisa tu conexión.';
-    $('detalle').innerHTML = htmlCabecera(c, datos[c.n] || null, null, true).replace(/<span class="esq">[^<]*<\/span>/g, '--') +
-      `<div class="vacio">⚠️ ${msg}<br><button class="btn" id="reintentar">Reintentar</button></div>`;
+      : 'No se pudo cargar el pronóstico de ' + escObs(c.n) + '. Revisa tu conexión.';
+    pintarPartes(htmlCabecera(c, datos[c.n] || null, null, true), htmlDatos(c, datos[c.n] || null, null, true) +
+      `<div class="vacio">${icono('aviso')}<span>${msg}</span><button class="btn" id="reintentar">Reintentar</button></div>`);
     $('reintentar').addEventListener('click', () => { if (hayDatos) dibujarDetalle(); else actualizarTodo(true); });
   }
 
@@ -3243,7 +3336,7 @@
     const c = porNombre.get(seleccionada);
     const mi = ++tokenDetalle;
     const previo = detalleActual && detalleActual.c.n === c.n;
-    if (!previo) { pintarPrevio(c); animarEntrada($('detalle')); }   // enseguida se ve la ciudad elegida, con lo que ya sabemos
+    if (!previo) { pintarPrevio(c); animarEntrada($('detalleCab')); animarEntrada($('detalleCuerpo')); }   // enseguida se ve la ciudad elegida, con lo que ya sabemos
     $('detalle').setAttribute('aria-busy', 'true');
     try {
       const d = await cargarDetalle(c);
@@ -3267,11 +3360,13 @@
 
   function pintarDetalle() {
     const { c, d } = detalleActual;
-    $('detalle').innerHTML = htmlCabecera(c, d.current, d) + `
+    pintarPartes(htmlCabecera(c, d.current, d), htmlDatos(c, d.current, d) + `
+      <div class="pronostico-caja">
       <div class="pestanas" role="tablist" aria-label="Vista del pronóstico">
         ${PESTANAS.map(([id, txt]) => `<button class="pestana${pestana === id ? ' on' : ''}" data-tab="${id}" id="tab-${id}" role="tab" aria-controls="pronostico" aria-selected="${pestana === id}" tabindex="${pestana === id ? 0 : -1}">${txt}</button>`).join('')}
       </div>
-      <div id="pronostico" role="tabpanel" aria-labelledby="tab-${pestana}">${htmlPronostico(d)}</div>`;
+      <div id="pronostico" role="tabpanel" aria-labelledby="tab-${pestana}">${htmlPronostico(d)}</div>
+      </div>`);
     llenarAire(c);
   }
   const PESTANAS = [['horas', 'Próximas horas'], ['grafico', 'Gráfico 24 h'], ['dias', 'Próximos días']];
@@ -3351,8 +3446,8 @@
       return '<div class="fila-scroll">' + d.hourly.time.slice(inicio, inicio + 24).map((h, i) => {
         const k = inicio + i;
         const w = clima(d.hourly.weather_code[k], d.hourly.is_day[k]);
-        return `<div class="mini"><div>${String(h).slice(11, 16)}</div><div class="e">${w.emoji}</div>
-          <b>${grados(d.hourly.temperature_2m[k])}</b><div class="lluvia">💧${d.hourly.precipitation_probability[k] ?? 0}%</div></div>`;
+        return `<div class="mini"><div>${String(h).slice(11, 16)}</div>${w.svg}
+          <b>${grados(d.hourly.temperature_2m[k])}</b><div class="lluvia">${icono('humedad')}${d.hourly.precipitation_probability[k] ?? 0}%</div></div>`;
       }).join('') + '</div>';
     }
     if (pestana === 'grafico') return graficoHoras(d, inicio);
@@ -3370,10 +3465,10 @@
       const izqI = rMx && rMn ? Math.max(0, (rMn[0] - minG) / rango * 100) : 0, anchoI = rMx && rMn ? Math.max(6, (rMx[1] - rMn[0]) / rango * 100) : 0;
       const inc = rMx && rMn ? `<i class="inc" style="left:${izqI.toFixed(0)}%;width:${Math.min(anchoI, 100 - izqI).toFixed(0)}%"></i>` : '';
       const tip = rMx && rMn ? ` title="Máxima probable ${grados(rMx[0])} a ${grados(rMx[1])} · mínima probable ${grados(rMn[0])} a ${grados(rMn[1])}"` : '';
-      return `<div class="mini"${tip}><div>${i === 0 ? 'Hoy' : nombres[fecha.getDay()] + ' ' + fecha.getDate()}</div><div class="e">${w.emoji}</div>
+      return `<div class="mini"${tip}><div>${i === 0 ? 'Hoy' : nombres[fecha.getDay()] + ' ' + fecha.getDate()}</div>${w.svg}
         <b>${grados(mx)}</b> <span style="color:var(--suave)">${grados(mn)}</span>
         <div class="barra-rango">${inc}<i style="left:${izq.toFixed(0)}%;width:${Math.min(ancho, 100 - izq).toFixed(0)}%"></i></div>
-        <div class="lluvia">💧${d.daily.precipitation_probability_max[i] ?? 0}%</div></div>`;
+        <div class="lluvia">${icono('humedad')}${d.daily.precipitation_probability_max[i] ?? 0}%</div></div>`;
     }).join('') + '</div>';
   }
 
@@ -3431,7 +3526,7 @@
     caja.innerHTML = lista.map(c => {
       const d = datos[c.n];
       return `<button class="fav-chip${c.n === seleccionada ? ' activo' : ''}" data-ciudad="${escObs(c.n)}" aria-label="${escObs(c.n)}: ${d ? grados(d.temperature_2m) + ', ' + clima(d.weather_code, d.is_day).texto : 'sin datos'}">` +
-        `<span class="e">${d ? clima(d.weather_code, d.is_day).emoji : '⏳'}</span><b>${escObs(c.n)}</b><small>${d ? grados(d.temperature_2m) : '--'}</small></button>`;
+        `${d ? clima(d.weather_code, d.is_day).svg : '<span class="ic ic-espera" aria-hidden="true"></span>'}<b>${escObs(c.n)}</b><small>${d ? grados(d.temperature_2m) : '--'}</small></button>`;
     }).join('');
   }
   $('favs').addEventListener('click', e => { const b = e.target.closest('[data-ciudad]'); if (b) elegir(b.dataset.ciudad, { zoom: true }); });
@@ -3576,7 +3671,7 @@
       else { clase = 'ok'; texto = `En vivo · actualizado ${hora}`; }
     }
     el.className = 'pill ' + clase;
-    el.textContent = '● ' + texto;
+    el.textContent = texto;
   }
 
   let reintentoAuto = 0;
@@ -3651,7 +3746,7 @@
     if (permiso === 'default') permiso = await Notification.requestPermission();
     if (permiso !== 'granted') { aviso('Los avisos están bloqueados: actívalos en los permisos del navegador.'); return; }
     avisosOn = true; guardar('clima-py-avisos', '1'); pintarAvisos();
-    aviso(favoritas.size ? 'Te avisaré si hay tormenta en tus favoritas mientras la app esté abierta.' : 'Activados. Marca ciudades con ★ para recibir avisos de ellas.');
+    aviso(favoritas.size ? 'Te avisaré si hay tormenta en tus favoritas mientras la app esté abierta.' : 'Activados. Marca tus ciudades favoritas para recibir avisos de ellas.');
   });
   async function avisarTormentas() {
     if (!avisosOn || !('Notification' in window) || Notification.permission !== 'granted') return;
@@ -3661,10 +3756,10 @@
       const a = datos[n];
       if (!a || ![95, 96, 99].includes(a.weather_code) || Date.now() - (hechos[n] || 0) < 3 * 3600 * 1000) continue;   // un aviso por ciudad cada 3 h
       hechos[n] = Date.now();
-      const opc = { body: `${tr(clima(a.weather_code, a.is_day).texto)} · ${grados(a.temperature_2m)}`, icon: 'icono-192.png', tag: 'tormenta-' + n };
+      const opc = { body: `${tr(clima(a.weather_code, a.is_day).texto)} · ${grados(a.temperature_2m)}`, icon: 'icono-192.png', badge: 'icono-192.png', tag: 'tormenta-' + n };
       try {
         const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
-        if (reg) await reg.showNotification(tr('⛈️ Tormenta en ' + n), opc); else new Notification(tr('⛈️ Tormenta en ' + n), opc);
+        if (reg) await reg.showNotification(tr('Tormenta en ' + n), opc); else new Notification(tr('Tormenta en ' + n), opc);
       } catch (e) { /* si no se puede mostrar, se ignora */ }
     }
     guardar('clima-py-avisados', JSON.stringify(hechos));
@@ -3692,7 +3787,7 @@
     const estado = $('estado');
     if (estado && ultimaOk) {
       estado.className = 'pill error';
-      estado.textContent = '● Sin conexión · usando datos guardados';
+      estado.textContent = 'Sin conexión · usando datos guardados';
     }
   });
   window.addEventListener('online', () => {
@@ -3706,12 +3801,12 @@
   let idioma = leer('clima-py-idioma', 'es') === 'gn' ? 'gn' : 'es';
   const GN = {
     // --- pantalla principal ---
-    "● Cargando…": "● Eha'ãrõ…", "● Sin conexión · usando datos guardados": "● Ndaipóri internet · oñemoĩ marandu oñeñongatúva",
-    "📲 Instalar": "📲 Emoĩ", "Instalar": "Emoĩ", "Radar de lluvia": "Radar ama rehegua", "Rutas": "Tape", "Buscar lugar": "Eheka tenda", "Comparar": "Ñembojoja", "Cerca de mí": "Che ag̃ui", "Actualizar": "Mbopyahu",
-    "Cargando el clima…": "Oñembyaty ára marandu…", "⚖️ Comparar ciudades": "⚖️ Ñembojoja táva",
+     "Sin conexión · usando datos guardados": "Ndaipóri internet · oñemoĩ marandu oñeñongatúva",
+     "Instalar": "Emoĩ", "Radar de lluvia": "Radar ama rehegua", "Rutas": "Tape", "Buscar lugar": "Eheka tenda", "Comparar": "Ñembojoja", "Cerca de mí": "Che ag̃ui", "Actualizar": "Mbopyahu",
+    "Cargando el clima…": "Oñembyaty ára marandu…", 
     "Usa Ctrl + rueda para hacer zoom": "Eipuru Ctrl + rueda embotuicha térã emomichĩ hag̃ua",
-    "Ahora": "Ko'ág̃a", "📡 Radar de lluvia": "📡 Radar ama rehegua", "Ⅱ Pausar": "Ⅱ Mbopyta", "Pausar": "Mbopyta", "▶ Reanudar": "▶ Eñepyrũ jey",
-    "Reproducir": "Emboguata", "🛣️ Rutas": "🛣️ Tape", "Radar desactivado": "Radar oñemboyke", "Radar sin datos": "Radar ndaipóri marandu",
+    "Ahora": "Ko'ág̃a",   "Pausar": "Mbopyta", "Reanudar": "Eñepyrũ jey",
+    "Reproducir": "Emboguata",  "Radar desactivado": "Radar oñemboyke", "Radar sin datos": "Radar ndaipóri marandu",
     "Conectando con el radar…": "Ojejoaju radar ndive…",
     "Ctrl + rueda o pellizca para zoom · arrastra para mover · toca un departamento para filtrar · con zoom se ven los distritos":
       "Ctrl + rueda térã pellizca embotuicha hag̃ua · egueru emongu'e hag̃ua · epoko peteĩ departamento emoĩporã hag̃ua · embotuicha vove ojehecha umi distrito",
@@ -3735,14 +3830,14 @@
     "Cambiar a modo claro": "Emoambue modo hesakãme", "Cambiar a modo oscuro": "Emoambue modo pytũme", "Temperatura de las próximas 24 horas": "Hakuha 24 aravo oúva",
     // --- capas, resumen y lista ---
     "Temperatura": "Hakuha", "Humedad": "Humedad", "Viento": "Yvytu", "Lluvia": "Ama",
-    "🔥 Más calurosa": "🔥 Hakuvéva", "❄️ Más fría": "❄️ Ro'yvéva", "💧 Más húmeda": "💧 Humedad ijyvatevéva", "🏜️ Más seca": "🏜️ Ipiruvéva",
-    "💨 Más ventosa": "💨 Yvytu hatãvéva", "🍃 Más calma": "🍃 Kirirĩvéva", "🌧️ Más lluvia": "🌧️ Ama hetavéva", "☀️ Más seca": "☀️ Ipiruvéva",
-    "🌧️ Con lluvia ahora": "🌧️ Oky ko'ág̃a", "☀️ Sin lluvia ahora": "☀️ Ndaipóri ama ko'ág̃a", "ciudades secas": "táva ndaipóri ama", "ninguna ciudad": "ni peteĩ táva",
-    "★ Favoritas": "★ Jeporavopyre", "Todas": "Opavave", "Ciudades principales": "Táva tuichavéva", "Ver todas las ciudades": "Ehecha opaite táva", "No hay ciudades con ese filtro.": "Ndaipóri táva ko filtro ndive.", "Quitar filtros": "Emboguete filtro",
+    "Más calurosa": "Hakuvéva", "Más fría": "Ro'yvéva", "Más húmeda": "Humedad ijyvatevéva", "Más seca": "Ipiruvéva",
+    "Más ventosa": "Yvytu hatãvéva", "Más calma": "Kirirĩvéva", "Más lluvia": "Ama hetavéva", 
+    "Con lluvia ahora": "Oky ko'ág̃a", "Sin lluvia ahora": "Ndaipóri ama ko'ág̃a", "ciudades secas": "táva ndaipóri ama", "ninguna ciudad": "ni peteĩ táva",
+    "Favoritas": "Jeporavopyre", "Todas": "Opavave", "Ciudades principales": "Táva tuichavéva", "Ver todas las ciudades": "Ehecha opaite táva", "No hay ciudades con ese filtro.": "Ndaipóri táva ko filtro ndive.", "Quitar filtros": "Emboguete filtro",
     "Sin datos": "Ndaipóri marandu", "sin datos": "ndaipóri marandu", "Sin datos por ahora": "Ndaipóri marandu ko'ág̃a", "Cargando…": "Eha'ãrõ…", "Buscando…": "Ojeheka…", "Reintentar": "Eha'ã jey",
     "Hoy": "Ko árape", "Mañana": "Ko'ẽrõ", "— ninguna —": "— mba'eve —",
     // --- momentos del día ---
-    "🌅 Amanecer": "🌅 Ko'ẽmbota", "☀️ Día": "☀️ Ára", "🌇 Atardecer": "🌇 Ka'aru", "🌙 Noche": "🌙 Pyhare",
+       
     // --- ajustes de animación (lo demás del panel queda en español) ---
     "Día": "Ára", "Noche": "Pyhare", "Nubes": "Arai", "Estrellas y luna": "Mbyja ha jasy", "Lluvia y granizo": "Ama ha ama itá", "Aves y luciérnagas": "Guyra ha mua",
     // --- estado del cielo ---
@@ -3768,13 +3863,13 @@
     "Dato medido": "Ojemedíva", "Referencia real:": "Techaukaha añete:",
     "Probabilidad básica de Open-Meteo (no se pudo consultar el ensamble de modelos).": "Ama ikatuha Open-Meteo-gua (ndaikatúi ojehecha modelo ensamble).",
     // --- avisos del clima ---
-    "🥵 Sensación térmica muy alta: hidrátate y evita el sol del mediodía": "🥵 Ñandu hakuha ijyvate: eñemboy ha ekañy kuarahy mbytépe guive",
-    "🔥 Calor extremo: hidrátate y evita el sol en las horas centrales del día": "🔥 Hakuha tuichaiterei: eñemboy ha ekañy kuarahy mbytépe guive",
-    "🥶 Frío intenso: abrígate bien": "🥶 Ro'y hatã: eñemoĩ porã ao",
-    "📤 Compartir": "📤 Compartir", "Compartir el clima de esta ciudad": "Compartir el clima de esta ciudad", "WhatsApp": "WhatsApp", "Enviar el clima por WhatsApp": "Enviar el clima por WhatsApp",
+    "Sensación térmica muy alta: hidrátate y evita el sol del mediodía": "Ñandu hakuha ijyvate: eñemboy ha ekañy kuarahy mbytépe guive",
+    "Calor extremo: hidrátate y evita el sol en las horas centrales del día": "Hakuha tuichaiterei: eñemboy ha ekañy kuarahy mbytépe guive",
+    "Frío intenso: abrígate bien": "Ro'y hatã: eñemoĩ porã ao",
+    "Compartir": "Compartir", "Compartir el clima de esta ciudad": "Compartir el clima de esta ciudad", "WhatsApp": "WhatsApp", "Enviar el clima por WhatsApp": "Enviar el clima por WhatsApp",
     "Enlace copiado": "Enlace copiado", "No se pudo copiar el enlace": "No se pudo copiar el enlace",
-    "🥶 Sensación de frío intenso: abrígate bien": "🥶 Ñandu ro'y hatã: eñemoĩ porã ao", "💨 Viento fuerte": "💨 Yvytu hatã",
-    "🌧️ Alta probabilidad de lluvia en las próximas horas": "🌧️ Ikatupyry ama aravo oúvape", "⛈️ Tormenta eléctrica en la zona ahora": "⛈️ Aratiri oĩ ko'ág̃a ko henda",
+    "Sensación de frío intenso: abrígate bien": "Ñandu ro'y hatã: eñemoĩ porã ao", "Viento fuerte": "Yvytu hatã",
+    "Alta probabilidad de lluvia en las próximas horas": "Ikatupyry ama aravo oúvape", "Tormenta eléctrica en la zona ahora": "Aratiri oĩ ko'ág̃a ko henda",
     // --- sonido ---
     "Tormenta: lluvia fuerte, viento y truenos": "Aratiri: ama hatã, yvytu ha aratiri pu", "Lluvia: gotas sobre las hojas y aves lejanas": "Ama: ama ho'a ogue ári ha guyra mombyry",
     "Noche de lluvia: gotas y ranas": "Pyhare ama: ama ho'a ha ju'i", "Niebla: sonido amortiguado y brisa suave": "Arai yvýpe: pu mbegue ha yvytu mbegue",
@@ -3793,7 +3888,7 @@
     "No se pudo actualizar el clima. Revisa tu conexión.": "Ndaikatúi oñemopyahu ára. Ehecha nde internet.", "Este navegador no permite notificaciones.": "Ko navegador ndohejái notificación.",
     "Avisos de tormenta desactivados.": "Ñemomarandu aratiri rehegua oñemboyke.", "Los avisos están bloqueados: actívalos en los permisos del navegador.": "Umi ñemomarandu oñemboyke: emoñepyrũ jey navegador permiso-pe.",
     "Te avisaré si hay tormenta en tus favoritas mientras la app esté abierta.": "Chemomarandu aratiri oĩ vove nde táva jeporavopyre-pe app ojeipe'a aja.",
-    "Activados. Marca ciudades con ★ para recibir avisos de ellas.": "Oñemoñepyrũ. Emarka táva ★ reheve ehupyty hag̃ua ñemomarandu.",
+    
     "Sin conexión a internet. Se conservarán los últimos datos guardados.": "Ndaipóri internet. Oñeñongatu hína umi marandu ipahaitéva.",
     "Conexión recuperada. Actualizando el clima…": "Internet ou jey. Oñemopyahu ára…", "Clima": "Ára", "Idioma": "Ñe'ẽ", "y": "ha", "Cerrar": "Emboty", "Buscar": "Eheka", "Ciudad": "Táva", "Departamento": "Departamento",
     "Mapa de calor": "Mapa hakuha", "Capas": "Capa", "Promedio": "Promedio", "Humedad relativa": "Humedad", "Radar": "Radar",
@@ -3806,9 +3901,9 @@
   const SUB = x => traducir(x);
   // Frases completas con datos variables (se aplican al texto entero)
   const GN_PATRONES = [
-    [/^(● )?En vivo · actualizado (.+)$/, m => `${m[1] || ''}Ko'ág̃agua · ojemopyahu ${m[2]}`],
-    [/^(● )?Datos de hace (\d+) min$/, m => `${m[1] || ''}Marandu ${m[2]} min ohasámava`],
-    [/^(● )?Sin conexión · datos de las (.+)$/, m => `${m[1] || ''}Ndaipóri internet · marandu ${m[2]}-gua`],
+    [/^En vivo · actualizado (.+)$/, m => `Ko'ág̃agua · ojemopyahu ${m[1]}`],
+    [/^Datos de hace (\d+) min$/, m => `Marandu ${m[1]} min ohasámava`],
+    [/^Sin conexión · datos de las (.+)$/, m => `Ndaipóri internet · marandu ${m[1]}-gua`],
     [/^Todo el país \((\d+)\)$/, m => `Tetã tuichakue (${m[1]})`],
     [/^(\d+) ciudades · (\d+) departamentos$/, m => `${m[1]} táva · ${m[2]} departamento`],
     [/^Promedio · (.+)$/, m => `Promedio · ${CAPA_GN[m[1]] || m[1]}`],
@@ -3816,12 +3911,12 @@
     [/^ej\.: (.+)$/, m => `techapyrã: ${m[1]}`],
     [/^Máx\. probable (.+?)( \(muy segura\))?$/, m => `Ijyvatevéva ikatúva ${m[1]}${m[2] ? ' (katuete)' : ''}`],
     [/^Máxima probable (.+?) a (.+?) · mínima probable (.+?) a (.+)$/, m => `Ijyvatevéva ikatúva ${m[1]} guive ${m[2]} peve · iguyvevéva ikatúva ${m[3]} guive ${m[4]} peve`],
-    [/^☀️ UV (extremo|muy alto|alto|moderado) hoy \((\d+)\): usa protector solar(?: entre las (\d+):00 y las (\d+):00)?(, gorra y busca sombra)?$/,
-      m => `☀️ UV ${NIVEL_UV_GN[m[1]]} ko árape (${m[2]}): eipuru protector solar${m[3] ? ` ${m[3]}:00 guive ${m[4]}:00 peve` : ''}${m[5] ? ', gorra ha eheka sombra' : ''}`],
-    [/^🌧️ Está lloviendo ahora \(unos (.+?) mm en la próxima hora\)$/, m => `🌧️ Oky ko'ág̃a (${m[1]} mm jerére peteĩ aravo oúvape)`],
-    [/^🌦️ Lluvia en unos (\d+) min \(unos (.+?) mm en la próxima hora\)$/, m => `🌦️ Ama oúta ${m[1]} min jerére (${m[2]} mm jerére peteĩ aravo oúvape)`],
-    [/^💨 Viento fuerte: (\d+) km\/h$/, m => `💨 Yvytu hatã: ${m[1]} km/h`],
-    [/^⛈️ Tormenta en (.+)$/, m => `⛈️ Aratiri ${m[1]}-pe`],
+    [/^UV (extremo|muy alto|alto|moderado) hoy \((\d+)\): usa protector solar(?: entre las (\d+):00 y las (\d+):00)?(, gorra y busca sombra)?$/,
+      m => `UV ${NIVEL_UV_GN[m[1]]} ko árape (${m[2]}): eipuru protector solar${m[3] ? ` ${m[3]}:00 guive ${m[4]}:00 peve` : ''}${m[5] ? ', gorra ha eheka sombra' : ''}`],
+    [/^Está lloviendo ahora \(unos (.+?) mm en la próxima hora\)$/, m => `Oky ko'ág̃a (${m[1]} mm jerére peteĩ aravo oúvape)`],
+    [/^Lluvia en unos (\d+) min \(unos (.+?) mm en la próxima hora\)$/, m => `Ama oúta ${m[1]} min jerére (${m[2]} mm jerére peteĩ aravo oúvape)`],
+    [/^Viento fuerte: (\d+) km\/h$/, m => `Yvytu hatã: ${m[1]} km/h`],
+    [/^Tormenta en (.+)$/, m => `Aratiri ${m[1]}-pe`],
     [/^Radar observado · (.*?) · fotograma (\d+)\/(\d+)$/, m => `Radar ojehecháva · ${SUB(m[1])} · ra'ãnga ${m[2]}/${m[3]}`],
     [/^La ciudad más cercana es (.+), a (\d+) km\.$/, m => `Pe táva ag̃uĩvéva ha'e ${m[1]}, ${m[2]} km-pe.`],
     [/^Ciudad más cercana: (.+) \(a (\d+) km\)$/, m => `Táva ag̃uĩvéva: ${m[1]} (${m[2]} km-pe)`],
@@ -3937,7 +4032,7 @@
   const TITULO_ES = document.title, DESC_META = document.querySelector('meta[name=description]'), DESC_ES = DESC_META ? DESC_META.content : '';
   function aplicarIdioma() {
     document.documentElement.lang = idioma === 'gn' ? 'gn' : 'es';
-    $('btnIdioma').textContent = '🌐 ' + (idioma === 'gn' ? 'GN' : 'ES');
+    $('btnIdioma').innerHTML = icono('idioma') + `<span>${idioma === 'gn' ? 'GN' : 'ES'}</span>`;
     if (idioma === 'gn') {
       traducirArbol(document.body); vigilarIdioma();
       document.title = 'Clima PY: ára marandu ha mapa Paraguái táva-gua';
