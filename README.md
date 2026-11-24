@@ -14,9 +14,11 @@ Se puede instalar en el celular como una app (desde el menú del navegador: *Agr
 - **Probabilidad de lluvia con ensambles** de 4 modelos (ECMWF, GFS, ICON y GEM) y rango probable de temperatura.
 - **Compartir** el clima de una ciudad (menú del celular, copiar enlace o WhatsApp), con enlace directo a esa ciudad.
 - **Avisos** en el detalle: calor extremo (sensación ≥ 38 °C), frío intenso (≤ 5 °C) y viento fuerte (≥ 50 km/h), además de UV, lluvia y tormenta.
-- **Paisaje y cielo animados** que cambian con el clima y la hora de la ciudad elegida: lluvia, granizo, viento con hojas y palmeras que se mecen, niebla en capas, relámpagos, luna con su fase real, estrellas fugaces, arcoíris, ondas de calor y lapachos en flor (julio a septiembre). Con sonido opcional (🔈): chicharras en verano, grillos, ráfagas, lluvia, granizo y truenos.
-- **Ajustes de animación (⚙️):** qué efectos ver, intensidad, calidad (automática, alta o ahorro de batería), fondo y paisaje por separado, volumen y una **vista previa** para ver cualquier clima y momento del día. Se guardan en el navegador de cada persona. La calidad automática baja sola si el equipo va lento.
-- **Decoración navideña** automática del 1 de diciembre al 6 de enero (logo festivo, guirnalda de luces y saludo), configurable en ⚙️ (Automática / Siempre / Nunca). Sin nieve: en Paraguay la Navidad es en verano.
+- **Paisaje y cielo animados** que cambian con el clima y la hora de la ciudad elegida, con transiciones suaves: nubes en capas con profundidad, reflejos del sol y la luna en el río, luces de la ciudad de noche, Vía Láctea, lluvia con charcos, granizo, viento con hojas y palmeras que se mecen, niebla, relámpagos, luna con su fase real, estrellas fugaces, arcoíris, ondas de calor y lapachos en flor (julio a septiembre).
+- **Sonido ambiente opcional** con una mezcla limpia (un fondo y como mucho dos detalles, volumen parejo entre climas, limitador): chicharras en verano, grillos, aves, ranas, viento, lluvia, granizo y truenos.
+- **Ajustes (botón de ajustes):** pestañas Animación, Sonido y Navidad: qué efectos ver, intensidad, calidad (automática, alta o ahorro de batería), fondo y paisaje por separado, volumen y una **vista previa** para ver cualquier clima y momento del día. Se guardan en el navegador de cada persona.
+- **Navidad** automática del 1 de diciembre al 6 de enero (o siempre/nunca): logo ñandutí festivo, guirnalda de luces que parpadean (se puede dejar fija), saludo con cuenta regresiva, pino decorado y palmeras con luces en el paisaje, **música navideña opcional** (caja de música sintetizada con melodías de dominio público) y fuegos artificiales en Año Nuevo. Sin nieve: en Paraguay la Navidad es en verano.
+- **Diseño «Cristal guaraní»:** modo oscuro por defecto, el **ñandutí** como logo y como detalle, tipografía Fraunces + Inter (incluidas, con las letras del guaraní) y un set de íconos propio: la interfaz no usa emojis.
 - Radar de lluvia, comparación de ciudades, favoritas, "cerca de mí", tema claro/oscuro y °C/°F.
 
 ## Cómo funciona
@@ -41,7 +43,9 @@ En vez de que cada visitante consulte cientos de ciudades a Open-Meteo, un proce
 | `app.js` | El código de la app |
 | `geo.js` | Datos geográficos: departamentos, distritos, países vecinos y ciudades (`GEO`) |
 | `sw.js` | Service worker: permite abrir la app sin internet (`geo.js` sale primero del caché y se renueva en segundo plano) |
-| `fonts/` | Fuente Inter propia (licencia OFL): subconjunto latino y las letras del guaraní ĩ ũ ẽ ỹ |
+| `fonts/` | Fuentes propias Fraunces e Inter (licencia OFL): subconjunto latino y las letras del guaraní ĩ ũ ẽ ỹ |
+| `icono.svg`, `logo-nanduti*.svg`, `logo-navidad.svg`, `icono-*.png` | Logo ñandutí y sus variantes (normal y navideña, para la app instalada y el navegador) |
+| `scripts/iconos.mjs` | Genera el set de íconos SVG de la interfaz dentro de `index.html`, entre `<!-- ICONOS:INICIO -->` y `<!-- ICONOS:FIN -->` (para cambiar un ícono, edita este script y córrelo: `node scripts/iconos.mjs`) |
 | `scripts/simplificar-geo.mjs` | Aligera los mapas de `geo.js` sin deformar los bordes compartidos (ver abajo) |
 | `manifest.webmanifest` | Nombre e íconos para instalar la app |
 | `scripts/actualizar_clima.py` | Descarga el clima de todas las ciudades (solo usa Python estándar) |
