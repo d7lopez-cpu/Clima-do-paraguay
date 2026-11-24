@@ -1305,6 +1305,8 @@
   const ec = $('escenaCv'), ex = ec.getContext('2d');
   let eW = 0, eH = 0, eD = 1, eClave = '', eFirma = '', eNubes = [], eAves = [], eLuci = [], eEstr = [], eGotas = [], eGranizo = [], eHojas = [], ePetalos = [], eOndas = [], eNiebla = [], eRayo = null, eFugaz = null;
   let eTexNiebla = null, eSprLuci = null, eSombra = null, ultRayoT = -1, reGolpe = 0;
+  let eFoto = null, eFundido = 0, eEtq = [], eEtqSucio = true;        // fundido entre escenas · zonas ocupadas por las etiquetas
+  const vAst = { ok: false, sx: 0, sy: 0, so: 0, mx: 0, my: 0, mf: 0 };   // sol y luna suavizados (no saltan al cambiar de momento del día)
   const hexA = s => [1, 3, 5].map(i => parseInt(s.slice(i, i + 2), 16));
   const mezcla = (a, b, k) => { const x = hexA(a), y = hexA(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
   // colores de la tierra: [colinas lejanas, colinas cercanas, orilla, palmeras]
@@ -1346,7 +1348,8 @@
   }
 
   // ---- Transición suave entre momentos del día ----
-  // En vez de saltar de un color a otro, cada cuadro se acerca un poco al color objetivo (unos 3 s en total).
+  // En vez de saltar de un color a otro, cada cuadro se acerca un poco al color objetivo (unos 2 s en total).
+  // Lo que se vuelve a sortear (nubes, gotas, hojas…) no salta: se funde con el último cuadro de la escena anterior (fotoFundido).
   const vEsc = { Ph: null, Th: null, cc: '255,255,255', br: '255,255,255', esc: [0.85, 0, 1, 0, 0, 0, 1, 0, 0], crudo: null };
   const aHex = a => '#' + a.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
   const aRgb = x => String(x).split(',').map(Number);
@@ -1370,7 +1373,7 @@
   }
   function aRgbHex(h) { return hexA(h); }
   function avanzarVisual(dt, quieto) {
-    const o = objetivosVisuales(), c = vEsc.crudo, k = quieto || !c ? 1 : 1 - Math.exp(-dt / 1100);
+    const o = objetivosVisuales(), c = vEsc.crudo, k = quieto || !c ? 1 : 1 - Math.exp(-dt / 650);   // ~2 s hasta el color nuevo
     const mover = (cur, obj) => obj.map((v, i) => cur && k < 1 && cur[i] !== undefined ? (Array.isArray(v) ? mezA(cur[i], v, k) : cur[i] + (v - cur[i]) * k) : (Array.isArray(v) ? v.slice() : v));
     const n = { P: mover(c && c.P, o.P), T: mover(c && c.T, o.T), cc: mover(c && c.cc, o.cc), br: mover(c && c.br, o.br), esc: mover(c && c.esc, o.esc) };
     vEsc.crudo = n;
@@ -1440,6 +1443,26 @@
     return c;
   }
 
+  // Fundido entre escenas: se guarda el último cuadro y se lo dibuja encima, cada vez más transparente, durante ~1,4 s
+  function fotoFundido() {
+    if (!eFoto) eFoto = document.createElement('canvas');
+    if (eFoto.width !== ec.width || eFoto.height !== ec.height) { eFoto.width = ec.width; eFoto.height = ec.height; }
+    const g = eFoto.getContext('2d'); g.clearRect(0, 0, eFoto.width, eFoto.height); g.drawImage(ec, 0, 0); eFundido = 1;
+  }
+  // Rectángulos (en px del cuadro) que tapan las etiquetas: el sol, la luna y la estrella se corren hacia abajo para no quedar debajo.
+  // Se miden solo cuando cambian (texto nuevo, tamaño o fuente), nunca en cada cuadro.
+  const vigiaEtq = 'ResizeObserver' in window ? new ResizeObserver(() => { eEtqSucio = true; }) : null;
+  function zonasEtq() {
+    if (!eEtqSucio) return eEtq;
+    eEtqSucio = false; eEtq = [];
+    const r0 = ec.getBoundingClientRect(), caja = $('escenaEtq');
+    if (caja && r0.width) for (const e of caja.children) { const r = e.getBoundingClientRect(); if (r.width) eEtq.push([r.left - r0.left - 4, r.top - r0.top - 4, r.right - r0.left + 4, r.bottom - r0.top + 4]); }
+    return eEtq;
+  }
+  function libreDeEtq(x, y, r) {                                  // la altura más alta, desde y hacia abajo, en la que un disco de radio r no toca ninguna etiqueta
+    for (const [a, b, c, d] of zonasEtq()) if (x + r > a && x - r < c && y + r > b && y - r < d) y = d + r;
+    return y;
+  }
   function armarEscena() {
     const A = amb, simple = !prefsAnim.paisaje || !fx, part = g => !simple && efectoActivo(g);
     const grandes = A.tipo === 'nublado' || A.tipo === 'lluvia' || A.tipo === 'tormenta', abierto = A.tipo === 'despejado' || A.tipo === 'parcial';
@@ -1496,9 +1519,12 @@
     if (!w || !h) return;
     if (!quieto) latidoRayo(t, dt || 0);
     const simple = !prefsAnim.paisaje || !fx, d = Math.min(window.devicePixelRatio || 1, nivelR() < 0.75 ? 1 : 2);   // con calidad baja, menos píxeles
-    if (w !== eW || h !== eH || d !== eD) { eW = w; eH = h; eD = d; ec.width = Math.round(w * d); ec.height = Math.round(h * d); ex.setTransform(d, 0, 0, d, 0, 0); eClave = ''; }
+    if (w !== eW || h !== eH || d !== eD) { eW = w; eH = h; eD = d; ec.width = Math.round(w * d); ec.height = Math.round(h * d); ex.setTransform(d, 0, 0, d, 0, 0); eClave = ''; eEtqSucio = true; vAst.ok = false; eFundido = 0; }
     const clave = [ambClave, eW, eH, claveFx(), simple ? 1 : 0, amb.granizo ? 1 : 0, Math.round(vientoVis() / 8), mesLapacho() ? 1 : 0].join('|');
-    if (eClave !== clave) { eClave = clave; eFirma = ''; armarEscena(); }
+    if (eClave !== clave) {
+      if (eClave && !quieto && !simple && vEsc.Ph) fotoFundido();      // cambió el clima, la ciudad o las preferencias (no el tamaño): fundido
+      eClave = clave; eFirma = ''; armarEscena();
+    }
     if (!vEsc.Ph) avanzarVisual(0, true);
     if (simple && !quieto) {                                      // paisaje apagado: un cuadro quieto que se repinta solo si cambian los colores (o cada minuto, por el sol)
       const firma = vEsc.Ph.join() + vEsc.Th[0] + Math.floor(Date.now() / 60000);
@@ -1529,7 +1555,13 @@
     }
     // sol y luna: recorren un arco según la hora (el sol sale, sube, baja y se pone; la luna sale al caer la noche)
     const R = eH * 0.075, yHor = eH * 0.62, aMax = eH * 0.44, S = ast && ast.sol, L = ast && ast.luna;
-    const sx = S ? eW * S.x : eW * 0.72, sy = S ? yHor - S.alt * aMax : eH * 0.22, altSol = S ? S.alt : 1, sobre = S ? S.f : A.fase === 'noche' ? 0 : 1;
+    {                                                               // posición objetivo de sol y luna; se acercan a ella en ~1,5 s (al cambiar de hora en la vista previa no saltan)
+      const k = anim && vAst.ok ? 1 - Math.exp(-dt / 500) : 1, ir = (c, v) => { vAst[c] += (v - vAst[c]) * k; };
+      ir('sx', S ? S.x : 0.72); ir('sy', S ? (yHor - S.alt * aMax) / eH : 0.22); ir('so', S ? S.f : A.fase === 'noche' ? 0 : 1);
+      ir('mx', L ? L.x : 0.5); ir('my', L ? (yHor - L.alt * aMax) / eH : yHor / eH); ir('mf', L ? L.f : 0);
+      vAst.ok = true;
+    }
+    const sx = eW * vAst.sx, sy = libreDeEtq(sx, eH * vAst.sy, R), altSol = limitar((yHor - eH * vAst.sy) / aMax, 0, 1), sobre = vAst.so;
     if (sobre > 0.01 && (vis || A.tipo === 'nublado' || A.tipo === 'niebla')) {
       const k = limitar(altSol / 0.45, 0, 1);                     // sol bajo = naranja; sol alto = amarillo claro
       const al = (vis ? 1 : A.tipo === 'nublado' ? 0.45 : 0.3) * sobre, col = `255,${Math.round(150 + 86 * k)},${Math.round(80 + 90 * k)}`;
@@ -1538,9 +1570,9 @@
       if (vis && k > 0.7) { ex.save(); ex.globalAlpha = (k - 0.7) / 0.3 * sobre; ex.translate(sx, sy); ex.rotate(t / 9000); ex.fillStyle = 'rgba(255,240,190,0.07)'; for (let i = 0; i < 12; i++) { ex.rotate(0.5236); ex.beginPath(); ex.moveTo(0, 0); ex.lineTo(-R * 0.5, -R * 6.5); ex.lineTo(R * 0.5, -R * 6.5); ex.fill(); } ex.restore(); }
       ex.fillStyle = mezcla('#ffb982', '#fff6cf', k); ex.globalAlpha = al; ex.beginPath(); ex.arc(sx, sy, R, 0, 6.283); ex.fill(); ex.globalAlpha = 1;
     }
-    if (efectoActivo('estrellas') && L && L.f > 0.01 && kLuna > 0.01 && A.tipo !== 'lluvia' && A.tipo !== 'tormenta') {
-      const mx = eW * L.x, my = yHor - L.alt * aMax;
-      const il = (1 - Math.cos(2 * Math.PI * edadLuna())) / 2, al = (A.tipo === 'niebla' ? 0.4 : A.tipo === 'nublado' ? 0.6 : 1) * kLuna * L.f;
+    if (efectoActivo('estrellas') && L && vAst.mf > 0.01 && kLuna > 0.01 && A.tipo !== 'lluvia' && A.tipo !== 'tormenta') {
+      const mx = eW * vAst.mx, my = Math.min(yHor, libreDeEtq(mx, eH * vAst.my, R));
+      const il = (1 - Math.cos(2 * Math.PI * edadLuna())) / 2, al = (A.tipo === 'niebla' ? 0.4 : A.tipo === 'nublado' ? 0.6 : 1) * kLuna * vAst.mf;
       const gl = ex.createRadialGradient(mx, my, 0, mx, my, R * 4.5); gl.addColorStop(0, `rgba(190,208,255,${0.34 * al * il})`); gl.addColorStop(1, 'rgba(190,208,255,0)');
       ex.fillStyle = gl; ex.fillRect(mx - R * 4.5, my - R * 4.5, R * 9, R * 9);
       dibujarLuna(ex, mx, my, R * 0.85, al);
@@ -1686,13 +1718,19 @@
       } else eRayo = null;
     }
     ex.fillStyle = eSombra; ex.fillRect(0, 0, eW, eH * 0.4);   // sombra arriba para que se lean las etiquetas
+    if (eFundido > 0) {                                           // la escena anterior se desvanece encima de la nueva
+      eFundido = anim ? eFundido - dt / 1400 : 0;
+      if (eFundido > 0) { ex.save(); ex.setTransform(1, 0, 0, 1, 0, 0); ex.globalAlpha = eFundido * eFundido * (3 - 2 * eFundido); ex.drawImage(eFoto, 0, 0); ex.restore(); }
+    }
   }
   function etiquetaEscena(a) {                                     // las etiquetas sobre el cuadro: ciudad, clima y momento del día
     // en una vista previa se muestra el clima elegido (con el mismo texto que la app usa para un código típico de ese clima), no el real
     const c0 = a.weather_code, real = [95, 96, 99].includes(c0) ? 'tormenta' : c0 >= 51 && c0 <= 86 ? 'lluvia' : c0 === 45 || c0 === 48 ? 'niebla' : c0 === 3 ? 'nublado' : c0 === 2 ? 'parcial' : 'despejado';
     const cod = amb.previa && real !== amb.tipo ? { despejado: 0, parcial: 2, nublado: 3, lluvia: 63, tormenta: 95, niebla: 45 }[amb.tipo] : c0;   // si coincide con el real, se deja el texto real (p. ej. «Tormenta con granizo»)
     const w = clima(cod, amb.previa ? (amb.fase === 'noche' ? 0 : 1) : a.is_day), tx = [`📍 ${seleccionada}`, `${w.emoji} ${w.texto}`, { amanecer: '🌅 Amanecer', dia: '☀️ Día', atardecer: '🌇 Atardecer', noche: '🌙 Noche' }[amb.fase] || '☀️ Día'], caja = $('escenaEtq');
-    caja.textContent = ''; tx.forEach(s => { const e = document.createElement('span'); e.textContent = s; caja.appendChild(e); });
+    if (vigiaEtq) vigiaEtq.disconnect();
+    caja.textContent = ''; tx.forEach(s => { const e = document.createElement('span'); e.textContent = s; caja.appendChild(e); if (vigiaEtq) vigiaEtq.observe(e); });
+    eEtqSucio = true;
   }
   // Barra de navegación del celular
   document.querySelectorAll('.barra-nav [data-ir]').forEach(b => b.addEventListener('click', () => { const s = $(b.dataset.ir); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
@@ -1710,9 +1748,11 @@
     cieloLimpio = false;
     armarParticulas();
   }
-  let cClave = '', cieloLimpio = false, cAcum = 0, cDestello = 0;
+  let cClave = '', cieloLimpio = false, cAcum = 0, cDestello = 0, cViejo = null;   // cViejo: nubes y estrellas del clima anterior, que se desvanecen
   const claveCielo = () => [amb.tipo, cvW, cvH, claveFx()].join('|');
   function armarParticulas() {
+    const ant = cClave.split('|');                                 // si cambió el clima (no el tamaño), lo anterior se desvanece en ~1,5 s
+    cViejo = fx && cClave && ant[0] !== amb.tipo && +ant[1] === cvW && +ant[2] === cvH && (nubes.length || estrellas.length) ? { nubes, estrellas, k: 1, kE: vEsc.esc[1] } : null;
     cClave = claveCielo();
     const area = cvW * cvH, abierto = amb.tipo === 'despejado' || amb.tipo === 'parcial';
     gotas = [];                                                    // la lluvia se dibuja solo en el paisaje de arriba (no sobre los datos)
@@ -1751,21 +1791,28 @@
         brillar(cvW * L.x, cvH * (0.5 - 0.4 * L.alt), '190,205,255', 0.16 * cub * kLuna * L.f * pulso * (0.3 + 0.7 * il));
       }
     }
-    if (estrellas.length && kEstr > 0.01) {                        // estrellas en 4 grupos que titilan a destiempo
+    const V = cViejo;
+    if (V) { V.k = quieto ? 0 : V.k - dt / 1500; if (V.k <= 0) cViejo = null; }
+    const fv = cViejo ? V.k * V.k * (3 - 2 * V.k) : 0;             // cuánto queda de lo anterior (suavizado)
+    const pintarEstrellas = (lista, a) => {                         // estrellas en 4 grupos que titilan a destiempo
       cx.fillStyle = '#fff';
-      for (let k = 0; k < 4; k++) { cx.globalAlpha = kEstr * (0.35 + 0.45 * Math.sin(t / 900 + k * 1.7) ** 2); cx.beginPath(); for (let i = k; i < estrellas.length; i += 4) { const s = estrellas[i]; cx.moveTo(s.x + s.r, s.y); cx.arc(s.x, s.y, s.r, 0, 6.283); } cx.fill(); }
+      for (let k = 0; k < 4; k++) { cx.globalAlpha = a * (0.35 + 0.45 * Math.sin(t / 900 + k * 1.7) ** 2); cx.beginPath(); for (let i = k; i < lista.length; i += 4) { const s = lista[i]; cx.moveTo(s.x + s.r, s.y); cx.arc(s.x, s.y, s.r, 0, 6.283); } cx.fill(); }
       cx.globalAlpha = 1;
-    }
+    };
+    if (estrellas.length && kEstr > 0.01) pintarEstrellas(estrellas, kEstr);
+    if (fv && V.estrellas.length && V.kE > 0.01) pintarEstrellas(V.estrellas, V.kE * fv);
     const oscuras = A.tipo === 'lluvia' || A.tipo === 'tormenta';
     const ca = A.tipo === 'tormenta' ? 0.34 : A.tipo === 'niebla' ? 0.24 : 0.12 + 0.05 * luz;
     const cc = oscuras ? '40,50,70' : `${Math.round(150 + 105 * luz)},${Math.round(165 + 90 * luz)},${Math.round(200 + 55 * luz)}`;
-    nubes.forEach(n => {
+    const pintarNube = (n, a) => {
       if (!quieto) { n.x += n.v * dt * (1 + A.viento / 25); if (n.x - n.r * 1.8 > cvW) n.x = -n.r * 1.8; }
       const g = cx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
-      g.addColorStop(0, `rgba(${cc},${ca})`); g.addColorStop(1, `rgba(${cc},0)`);
+      g.addColorStop(0, `rgba(${cc},${a})`); g.addColorStop(1, `rgba(${cc},0)`);
       cx.save(); cx.translate(n.x, n.y); cx.scale(1.8, 0.55); cx.translate(-n.x, -n.y);
       cx.fillStyle = g; cx.fillRect(n.x - n.r, n.y - n.r, n.r * 2, n.r * 2); cx.restore();   // el recuadro de la nube, no un círculo trazado
-    });
+    };
+    if (fv) V.nubes.forEach(n => pintarNube(n, ca * fv));
+    nubes.forEach(n => pintarNube(n, ca * (1 - fv)));
     if (quieto) return;
     if (A.tipo === 'tormenta' && destello > 0.02 && efectoActivo('rayos')) { cx.fillStyle = `rgba(220,230,255,${destello * 0.16})`; cx.fillRect(0, 0, cvW, cvH); }   // relámpago: se aclara todo el cielo
   }
