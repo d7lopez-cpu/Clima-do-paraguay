@@ -2318,6 +2318,8 @@
   aplicarNavidad();
 
   // ============ 7) RESUMEN, LISTA Y DETALLE ============
+  // Íconos de los controles: el set propio de estilos.css (scripts/iconos.mjs). La estrella se llena sola con la clase .on.
+  const ICONO_ESTRELLA = '<span class="i i-estrella" aria-hidden="true"></span>';
   function dibujarStats() {
     const con = CIUDADES.filter(c => valor(c) !== null);
     if (!con.length) { $('stats').innerHTML = ''; return; }
@@ -2368,7 +2370,7 @@
           <span class="nom"><span class="e">${d ? clima(d.weather_code, d.is_day).emoji : '⏳'}</span> ${c.n}<small>${nombreDep(c.dep)}</small></span>
           <span class="t" style="color:${x === null ? 'var(--suave)' : paraTexto(colorValor(x))}">${fmt(x)}</span>
         </button>
-        <button class="estrella${fav ? ' on' : ''}" data-fav="${c.n}" aria-label="${fav ? 'Quitar ' + c.n + ' de favoritas' : 'Marcar ' + c.n + ' como favorita'}">${fav ? '★' : '☆'}</button>
+        <button class="estrella${fav ? ' on' : ''}" data-fav="${c.n}" aria-label="${fav ? 'Quitar ' + c.n + ' de favoritas' : 'Marcar ' + c.n + ' como favorita'}">${ICONO_ESTRELLA}</button>
       </div>`;
     };
     const cont = $('lista'), scroll = cont.scrollTop;
@@ -2412,7 +2414,7 @@
     dibujarLista();
     pintarFavs();
     const b = document.querySelector('#detalle .estrella');
-    if (b && b.dataset.fav === n) { b.classList.toggle('on', favoritas.has(n)); b.textContent = favoritas.has(n) ? '★' : '☆'; }
+    if (b && b.dataset.fav === n) { b.classList.toggle('on', favoritas.has(n)); b.setAttribute('aria-pressed', String(favoritas.has(n))); }   // el ícono cambia solo con .on (estilos.css)
   }
 
   // --- Detalle de la ciudad elegida ---
@@ -2456,8 +2458,8 @@
         <div>
           <div class="ciudad-fila">
             <span class="ciudad-nombre">${c.n}</span>
-            <button class="estrella${fav ? ' on' : ''}" data-fav="${c.n}" aria-label="Favorita">${fav ? '★' : '☆'}</button>
-            ${d ? `<button class="btn" data-compartir="1" aria-label="Compartir el clima de esta ciudad">📤 Compartir</button>` : ''}
+            <button class="estrella${fav ? ' on' : ''}" data-fav="${c.n}" aria-label="Favorita" aria-pressed="${fav}">${ICONO_ESTRELLA}</button>
+            ${d ? `<button class="btn con-ic" data-compartir="1" aria-label="Compartir el clima de esta ciudad"><span class="i i-compartir" aria-hidden="true"></span><span>Compartir</span></button>` : ''}
             ${d && !navigator.share ? `<button class="btn" data-compartir="wa" aria-label="Enviar el clima por WhatsApp">WhatsApp</button>` : ''}
           </div>
           <div class="dep-nombre">${c.dep === 'Asunción' ? 'Capital del país' : 'Departamento ' + c.dep}</div>
@@ -2998,7 +3000,7 @@
   const GN = {
     // --- pantalla principal ---
     "● Cargando…": "● Eha'ãrõ…", "● Sin conexión · usando datos guardados": "● Ndaipóri internet · oñemoĩ marandu oñeñongatúva",
-    "📲 Instalar": "📲 Emoĩ", "Buscar lugar": "Eheka tenda", "Comparar": "Ñembojoja", "Cerca de mí": "Che ag̃ui", "Actualizar": "Mbopyahu",
+    "📲 Instalar": "📲 Emoĩ", "Instalar": "Emoĩ", "Radar de lluvia": "Radar ama rehegua", "Rutas": "Tape", "Buscar lugar": "Eheka tenda", "Comparar": "Ñembojoja", "Cerca de mí": "Che ag̃ui", "Actualizar": "Mbopyahu",
     "Cargando el clima…": "Oñembyaty ára marandu…", "⚖️ Comparar ciudades": "⚖️ Ñembojoja táva",
     "Usa Ctrl + rueda para hacer zoom": "Eipuru Ctrl + rueda embotuicha térã emomichĩ hag̃ua",
     "Ahora": "Ko'ág̃a", "📡 Radar de lluvia": "📡 Radar ama rehegua", "Ⅱ Pausar": "Ⅱ Mbopyta", "Pausar": "Mbopyta", "▶ Reanudar": "▶ Eñepyrũ jey",

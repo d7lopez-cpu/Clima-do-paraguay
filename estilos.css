@@ -182,9 +182,107 @@ input::placeholder { color: var(--suave); opacity: 1; }
 h2 { font-size: var(--t-chico); text-transform: uppercase; letter-spacing: 0.1em; color: var(--suave); font-weight: 700; }
 
 /* ============ 3. ÍCONOS ============ */
-.ic { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-/* El engranaje ⚙️ es un emoji gris que se pierde sobre cielos claros: un contorno suave lo hace visible en cualquier fondo */
-#btnAjustesAnim { filter: drop-shadow(0 0 1px rgba(8, 15, 30, 0.85)) drop-shadow(0 0 1px rgba(8, 15, 30, 0.6)); }
+/* Set propio de íconos de los controles (scripts/iconos.mjs): cada uno es una máscara que se pinta con el color del texto.
+   <span class="i i-sol" aria-hidden="true"></span> · tamaño con --i-tam. Los emojis del CLIMA (☀️ ⛈️) siguen siendo emojis. */
+.i { display: inline-block; flex: none; width: var(--i-tam, 17px); height: var(--i-tam, 17px); vertical-align: -0.22em; background-color: currentColor;
+  -webkit-mask: var(--i) center / contain no-repeat; mask: var(--i) center / contain no-repeat; }
+/* Botón con ícono y texto */
+.con-ic { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+/* Botones cuyo texto (un emoji o símbolo) lo escribe app.js fuera de esta zona: el texto se oculta y el ícono
+   sale de ::before según el estado (atributos que app.js ya mantiene). El nombre accesible sigue siendo su aria-label. */
+#btnTema, #btnSonido, #btnIdioma, #hPlay { font-size: 0; display: inline-flex; align-items: center; justify-content: center; }
+#btnTema::before, #btnSonido::before, #btnIdioma::before, #hPlay::before { content: ""; width: var(--i-tam, 17px); height: var(--i-tam, 17px); flex: none;
+  background-color: currentColor; -webkit-mask: var(--i) center / contain no-repeat; mask: var(--i) center / contain no-repeat; }
+#btnTema::before { --i: var(--ic-sol); }                                      /* oscuro: ☀️ = pasar a claro */
+:root[data-tema=claro] #btnTema::before { --i: var(--ic-luna); }
+#btnSonido::before { --i: var(--ic-silencio); }
+#btnSonido[aria-pressed=true]::before { --i: var(--ic-sonido); }
+#btnIdioma::before { --i: var(--ic-globo); }
+#btnIdioma::after { content: "ES" / ""; font-size: var(--t-control); margin-left: 5px; }       /* «/ ""»: sin texto extra para lectores de pantalla */
+:root[lang=gn] #btnIdioma::after { content: "GN" / ""; }
+#hPlay::before { --i: var(--ic-reproducir); --i-tam: 16px; }
+#hPlay[aria-label="Pausar"]::before, #hPlay[aria-label="Mbopyta"]::before { --i: var(--ic-pausa); }
+/* «Ⅱ Pausar» / «▶ Reanudar»: se oculta el primer símbolo y el ícono va a la izquierda (::after absoluto, para no
+   estorbar a ::first-letter) */
+#btnRadarPlay { position: relative; padding-left: 28px; }
+#btnRadarPlay::first-letter { font-size: 0; }
+#btnRadarPlay::after { content: ""; position: absolute; left: 10px; top: 50%; width: 16px; height: 16px; margin-top: -8px;
+  background-color: currentColor; -webkit-mask: var(--i) center / contain no-repeat; mask: var(--i) center / contain no-repeat; --i: var(--ic-pausa); }
+#btnRadarPlay[aria-pressed=true]::after { --i: var(--ic-reproducir); }
+/* Estrella de favorita: contorno o llena según .on */
+.estrella .i { --i-tam: 1em; }
+.pref { --i-tam: 16px; }                                                    /* mismo alto que el texto de los botones vecinos */
+.estrella.on .i { --i: var(--ic-estrella-llena); }
+/* Alto contraste de Windows: los fondos se fuerzan, así que el ícono se pinta con el color del texto del sistema */
+@media (forced-colors: active) {
+  .i, #btnTema::before, #btnSonido::before, #btnIdioma::before, #hPlay::before, #btnRadarPlay::after { background-color: ButtonText; forced-color-adjust: none; }
+}
+/* ICONOS:INICIO — generado por scripts/iconos.mjs a partir de su tabla; no editar a mano */
+:root {
+  --ic-buscar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  --ic-comparar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 20V10M12 20V4M19 20v-7'/%3E%3C/svg%3E");
+  --ic-ubicacion: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-7-5.6-7-11a7 7 0 0 1 14 0c0 5.4-7 11-7 11z'/%3E%3Ccircle cx='12' cy='10' r='2.5'/%3E%3C/svg%3E");
+  --ic-actualizar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5'/%3E%3C/svg%3E");
+  --ic-compartir: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 14.5V3.5M7.5 7.5 12 3l4.5 4.5M6 11v9h12v-9'/%3E%3C/svg%3E");
+  --ic-instalar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14'/%3E%3C/svg%3E");
+  --ic-cerrar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 6l12 12M18 6 6 18'/%3E%3C/svg%3E");
+  --ic-nube: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 18a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17 9.5a4.25 4.25 0 0 1 0 8.5z'/%3E%3C/svg%3E");
+  --ic-mapa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14'/%3E%3C/svg%3E");
+  --ic-lista: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01'/%3E%3C/svg%3E");
+  --ic-globo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3z'/%3E%3C/svg%3E");
+  --ic-sol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4'/%3E%3C/svg%3E");
+  --ic-luna: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 14.6A8.2 8.2 0 0 1 9.4 4 8.2 8.2 0 1 0 20 14.6z'/%3E%3C/svg%3E");
+  --ic-sonido: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 6v12l-4.5-3.5H4z'/%3E%3Cpath d='M15.5 9.2a4 4 0 0 1 0 5.6M18.3 6.6a7.8 7.8 0 0 1 0 10.8'/%3E%3C/svg%3E");
+  --ic-silencio: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 6v12l-4.5-3.5H4z'/%3E%3Cpath d='m16 10 4 4m0-4-4 4'/%3E%3C/svg%3E");
+  --ic-destellos: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 4.5l1.5 4a2 2 0 0 0 1.2 1.2l4 1.5-4 1.5a2 2 0 0 0-1.2 1.2l-1.5 4-1.5-4a2 2 0 0 0-1.2-1.2l-4-1.5 4-1.5a2 2 0 0 0 1.2-1.2z'/%3E%3Cpath d='M18.5 3v3.5M16.75 4.75h3.5M18.5 17v3M17 18.5h3'/%3E%3C/svg%3E");
+  --ic-ajustes: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.07 5.69L10.4 2.94L13.6 2.94L13.93 5.69A6.6 6.6 0 0 1 15.1 6.17L17.28 4.46L19.54 6.72L17.83 8.9A6.6 6.6 0 0 1 18.31 10.07L21.06 10.4L21.06 13.6L18.31 13.93A6.6 6.6 0 0 1 17.83 15.1L19.54 17.28L17.28 19.54L15.1 17.83A6.6 6.6 0 0 1 13.93 18.31L13.6 21.06L10.4 21.06L10.07 18.31A6.6 6.6 0 0 1 8.9 17.83L6.72 19.54L4.46 17.28L6.17 15.1A6.6 6.6 0 0 1 5.69 13.93L2.94 13.6L2.94 10.4L5.69 10.07A6.6 6.6 0 0 1 6.17 8.9L4.46 6.72L6.72 4.46L8.9 6.17A6.6 6.6 0 0 1 10.07 5.69Z'/%3E%3Ccircle cx='12' cy='12' r='2.6'/%3E%3C/svg%3E");
+  --ic-campana: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z'/%3E%3Cpath d='M10 20.5a2 2 0 0 0 4 0'/%3E%3C/svg%3E");
+  --ic-mas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
+  --ic-menos: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E");
+  --ic-encuadrar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5'/%3E%3C/svg%3E");
+  --ic-reproducir: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 5.5v13l10.5-6.5z'/%3E%3C/svg%3E");
+  --ic-pausa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5.5v13M15 5.5v13'/%3E%3C/svg%3E");
+  --ic-radar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-9-9M16.5 12A4.5 4.5 0 1 1 12 7.5M12 12l6.4-6.4'/%3E%3Ccircle cx='12' cy='12' r='.6'/%3E%3C/svg%3E");
+  --ic-ruta: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 3 5 21M15.5 3 19 21M12 4v2.5M12 10.5v3M12 17.5V20'/%3E%3C/svg%3E");
+  --ic-estrella: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z'/%3E%3C/svg%3E");
+  --ic-estrella-llena: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath fill='black' d='m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z'/%3E%3C/svg%3E");
+  --ic-ojo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
+  --ic-reloj: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
+  --ic-grafico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4v16h16'/%3E%3Cpath d='m7.5 14.5 3.5-4 3 2.5 5-6'/%3E%3C/svg%3E");
+  --ic-calendario: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='5' width='16' height='15' rx='2'/%3E%3Cpath d='M4 10h16M8.5 3v4M15.5 3v4'/%3E%3C/svg%3E");
+}
+.i-buscar { --i: var(--ic-buscar); }
+.i-comparar { --i: var(--ic-comparar); }
+.i-ubicacion { --i: var(--ic-ubicacion); }
+.i-actualizar { --i: var(--ic-actualizar); }
+.i-compartir { --i: var(--ic-compartir); }
+.i-instalar { --i: var(--ic-instalar); }
+.i-cerrar { --i: var(--ic-cerrar); }
+.i-nube { --i: var(--ic-nube); }
+.i-mapa { --i: var(--ic-mapa); }
+.i-lista { --i: var(--ic-lista); }
+.i-globo { --i: var(--ic-globo); }
+.i-sol { --i: var(--ic-sol); }
+.i-luna { --i: var(--ic-luna); }
+.i-sonido { --i: var(--ic-sonido); }
+.i-silencio { --i: var(--ic-silencio); }
+.i-destellos { --i: var(--ic-destellos); }
+.i-ajustes { --i: var(--ic-ajustes); }
+.i-campana { --i: var(--ic-campana); }
+.i-mas { --i: var(--ic-mas); }
+.i-menos { --i: var(--ic-menos); }
+.i-encuadrar { --i: var(--ic-encuadrar); }
+.i-reproducir { --i: var(--ic-reproducir); }
+.i-pausa { --i: var(--ic-pausa); }
+.i-radar { --i: var(--ic-radar); }
+.i-ruta { --i: var(--ic-ruta); }
+.i-estrella { --i: var(--ic-estrella); }
+.i-estrella-llena { --i: var(--ic-estrella-llena); }
+.i-ojo { --i: var(--ic-ojo); }
+.i-reloj { --i: var(--ic-reloj); }
+.i-grafico { --i: var(--ic-grafico); }
+.i-calendario { --i: var(--ic-calendario); }
+/* ICONOS:FIN */
 
 /* ============ 4. CONTROLES ============ */
 .btn, .acciones button, .capa, .pestana {
@@ -336,7 +434,7 @@ button.stat:hover:not(:disabled) { border-color: var(--acento); }
 .capas { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
 .capa { background: var(--fondo-mini); border: 1px solid var(--borde); color: var(--suave); }
 .zoom { display: flex; gap: 6px; }
-.zoom button { width: 34px; height: 34px; border-radius: var(--r-m); background: var(--fondo-mini); border: 1px solid var(--borde); font-size: 1.1rem; line-height: 1;
+.zoom button { display: grid; place-items: center; width: 34px; height: 34px; border-radius: var(--r-m); background: var(--fondo-mini); border: 1px solid var(--borde); font-size: 1.1rem; line-height: 1;
   transition: transform var(--d-1), background var(--d-2); }
 .zoom button:hover { border-color: var(--acento); }
 .zoom button:active { transform: scale(0.92); }
@@ -459,7 +557,7 @@ footer a { color: var(--acento); }
 /* ============ 15. OBJETIVOS TÁCTILES (44 px en celular y pantallas táctiles) ============ */
 @media (max-width: 820px), (pointer: coarse) {
   .pref .btn, .acciones button, .capa, .pestana, .zoom button, .reloj .btn, .radar-tools .btn, .extras .btn, .ver-todas, .fav-chip, #reintentar, #compCerrar,
-  .lista-filtros select, .acciones input { min-height: 44px; }
+  .lista-filtros select, .acciones input, .ciudad-fila .btn, .vacio .btn { min-height: 44px; }
   .pref .btn, .zoom button, .reloj .btn { min-width: 44px; }
   .zoom button, .reloj .btn { width: 44px; height: 44px; }
   .item .estrella, .estrella { min-width: 44px; min-height: 44px; display: inline-grid; place-items: center; }
@@ -477,7 +575,7 @@ footer a { color: var(--acento); }
   .barra-nav button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px var(--e-1); min-height: 52px; border: 0; border-radius: var(--r-m);
     background: transparent; color: #cfe0f5; font-size: 0.7rem; font-weight: 600; transition: background var(--d-2), transform var(--d-1); }
   .barra-nav button i { font-style: normal; font-size: 1.25rem; line-height: 1.2; display: grid; place-items: center; }
-  .barra-nav .ic { width: 21px; height: 21px; }
+  .barra-nav .i { --i-tam: 21px; }
   .barra-nav button.on { background: var(--nav-activo-fondo); color: var(--nav-activo-texto); box-shadow: 0 6px 16px -6px rgba(56, 189, 248, 0.75); }
   .barra-nav button:active { transform: scale(0.93); }
   #aviso { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
