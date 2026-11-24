@@ -14,6 +14,9 @@ Se puede instalar en el celular como una app (desde el menú del navegador: *Agr
 - **Probabilidad de lluvia con ensambles** de 4 modelos (ECMWF, GFS, ICON y GEM) y rango probable de temperatura.
 - **Compartir** el clima de una ciudad (menú del celular, copiar enlace o WhatsApp), con enlace directo a esa ciudad.
 - **Avisos** en el detalle: calor extremo (sensación ≥ 38 °C), frío intenso (≤ 5 °C) y viento fuerte (≥ 50 km/h), además de UV, lluvia y tormenta.
+- **Paisaje y cielo animados** que cambian con el clima y la hora de la ciudad elegida: lluvia, granizo, viento con hojas y palmeras que se mecen, niebla en capas, relámpagos, luna con su fase real, estrellas fugaces, arcoíris, ondas de calor y lapachos en flor (julio a septiembre). Con sonido opcional (🔈): chicharras en verano, grillos, ráfagas, lluvia, granizo y truenos.
+- **Ajustes de animación (⚙️):** qué efectos ver, intensidad, calidad (automática, alta o ahorro de batería), fondo y paisaje por separado, volumen y una **vista previa** para ver cualquier clima y momento del día. Se guardan en el navegador de cada persona. La calidad automática baja sola si el equipo va lento.
+- **Decoración navideña** automática del 1 de diciembre al 6 de enero (logo festivo, guirnalda de luces y saludo), configurable en ⚙️ (Automática / Siempre / Nunca). Sin nieve: en Paraguay la Navidad es en verano.
 - Radar de lluvia, comparación de ciudades, favoritas, "cerca de mí", tema claro/oscuro y °C/°F.
 
 ## Cómo funciona
@@ -51,6 +54,7 @@ En vez de que cada visitante consulte cientos de ciudades a Open-Meteo, un proce
 - **Publicar una versión nueva:** después de cambiar `index.html`, `app.js`, `estilos.css` o `geo.js`, sube el número de `VERSION` en `sw.js` para que los celulares renueven su copia guardada. **Con `geo.js` es imprescindible:** se sirve primero desde el caché, así que sin subir `VERSION` cada persona vería el cambio recién en su segunda visita.
 - **Aligerar los mapas:** `geo.js` ya está simplificado (−40 % de peso). Si se vuelve a generar, hay que partir del archivo original (no de uno ya simplificado): `git show 17b6f36:geo.js > /tmp/original.js` y luego `node scripts/simplificar-geo.mjs --entrada /tmp/original.js --eps-dep 0.007 --eps-vec 0.01`. Con `--eps-dep 0.005` se conserva más detalle (−34 %).
 - **Actualizar el clima a mano:** pestaña *Actions* → *Actualizar clima* → *Run workflow*.
+- **Probar la animación en todas sus variantes:** en la consola del navegador, `climaAnim.fijar({ vistaPrevia: { tipo: 'tormenta', fase: 'noche' } })` (tipos: despejado, parcial, nublado, lluvia, tormenta, niebla; fases: amanecer, dia, atardecer, noche) y `climaAnim.fijar({ vistaPrevia: null })` para volver al clima real.
 - **Revisar que nada esté roto:** GitHub lo hace solo en cada cambio (✅ o ❌ junto al commit). A mano: `node scripts/revisar.mjs`.
 - **Probar en tu computadora:** desde la carpeta del proyecto, ejecuta `python3 -m http.server` y abre http://localhost:8000.
 
