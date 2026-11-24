@@ -1453,9 +1453,15 @@
     eGranizo = part('lluvia') && A.granizo ? Array.from({ length: cant(34) }, () => { const g = nuevoGranizo({ nuevo: nuevoGranizo }); g.y = Math.random() * eH * 0.7; return g; }) : [];
     eHojas = part('viento') ? Array.from({ length: cant(limitar((vientoVis() - 12) / 25, 0, 1) * 18) }, () => ({ x: Math.random() * eW, y: eH * (0.35 + Math.random() * 0.6), v: 0.6 + Math.random() * 0.7, f: Math.random() * 6.28, a: Math.random() * 6.28, g: (Math.random() - 0.5) * 0.02, l: 1.6 + Math.random() * 1.8 })) : [];
     ePetalos = part('especiales') && mesLapacho() ? Array.from({ length: cant(10) }, (_, i) => ({ i: i % 3, x: eW * LAPACHOS[i % 3][0], y: eH * (0.5 + Math.random() * 0.3), v: 0.5 + Math.random() * 0.5, f: Math.random() * 6.28 })) : [];
-    eNiebla = Array.from({ length: 3 }, (_, i) => ({ x: Math.random() * eW, y: eH * (0.44 + i * 0.14), h: eH * (0.3 + i * 0.08), v: 0.005 + i * 0.006, a: 0.55 + i * 0.22 }));
-    eOndas = []; eFugaz = null; eRayo = null;
     if (!eTexNiebla) eTexNiebla = texturaNiebla();
+    const tw = Math.max(eW * 0.7, eH * 3);
+    // cada capa de niebla se escala UNA vez a su tamaño final: al pintarla solo se copia (mucho más barato que estirarla en cada cuadro)
+    eNiebla = efectoActivo('niebla') && (A.tipo === 'niebla' || A.tipo === 'lluvia' || A.tipo === 'nublado' || abierto) ? Array.from({ length: 3 }, (_, i) => {
+      const h = eH * (0.3 + i * 0.08), c = document.createElement('canvas'); c.width = Math.ceil(tw * eD); c.height = Math.ceil(h * eD);
+      c.getContext('2d').drawImage(eTexNiebla, 0, 0, c.width, c.height);
+      return { x: Math.random() * tw, y: eH * (0.44 + i * 0.14), h, tw, c, v: 0.005 + i * 0.006, a: 0.55 + i * 0.22 };
+    }) : [];
+    eOndas = []; eFugaz = null; eRayo = null;
     if (!eSprLuci) eSprLuci = spriteLuci();
     eSombra = ex.createLinearGradient(0, 0, 0, eH * 0.4); eSombra.addColorStop(0, 'rgba(0,0,0,0.28)'); eSombra.addColorStop(1, 'rgba(0,0,0,0)');
   }
@@ -1577,7 +1583,7 @@
     // ondas de calor: el aire sobre las colinas tiembla (se corre en franjas finas, como un espejismo)
     if (esp && anim && kCalor > 0.02) {
       const y0 = Math.round(eH * 0.47), y1 = Math.round(yAgua), paso = 3;
-      for (let y = y0; y < y1; y += paso) ex.drawImage(ec, 0, y * eD, ec.width, paso * eD, Math.sin(y * 0.55 + t / 170) * 1.4 * kCalor, y, eW, paso);
+      for (let y = y0; y < y1; y += paso) ex.drawImage(ec, 0, y * eD, ec.width, paso * eD, Math.sin(y * 0.55 + t / 170) * 2 * kCalor, y, eW, paso);
       const gc = ex.createLinearGradient(0, y0, 0, y1); gc.addColorStop(0, 'rgba(255,214,160,0)'); gc.addColorStop(1, `rgba(255,214,160,${0.1 * kCalor})`); ex.fillStyle = gc; ex.fillRect(0, y0, eW, y1 - y0);
     }
     // río: toma el color del cielo, con destellos que se mueven
@@ -1630,9 +1636,9 @@
       const gf = ex.createLinearGradient(0, eH * 0.35, 0, eH); gf.addColorStop(0, `rgba(${cn},0)`); gf.addColorStop(0.55, `rgba(${cn},${nb * 0.55})`); gf.addColorStop(1, `rgba(${cn},${nb * 0.3})`);
       ex.fillStyle = gf; ex.fillRect(0, eH * 0.35, eW, eH * 0.65);
       eNiebla.forEach(f => {
-        const tw = Math.max(eW * 0.7, eH * 3); f.x = (f.x + f.v * dt) % tw;
+        const tw = f.tw; f.x = (f.x + f.v * dt) % tw;
         ex.globalAlpha = Math.min(1, nb * f.a * (1 + 0.6 * kLuz));
-        for (let x = f.x - tw; x < eW; x += tw) ex.drawImage(eTexNiebla, x, f.y - f.h / 2, tw, f.h);
+        for (let x = Math.round((f.x - tw) * eD) / eD; x < eW; x += tw) ex.drawImage(f.c, x, Math.round((f.y - f.h / 2) * eD) / eD, tw, f.h);
       });
       ex.globalAlpha = 1;
     }
@@ -1644,6 +1650,9 @@
     }
     // granizo (tormenta con granizo): cae rápido, rebota en las orillas y salpica en el río
     if (eGranizo.length) {
+      ex.strokeStyle = 'rgba(225,235,255,0.35)'; ex.lineWidth = 1.2; ex.beginPath();   // estela corta: así el granizo se lee cayendo y no como estrellas
+      eGranizo.forEach(g => { if (g.vy > 0.25) { ex.moveTo(g.x, g.y - g.r); ex.lineTo(g.x - g.vx * 14, g.y - g.vy * 14); } });
+      ex.stroke();
       ex.fillStyle = 'rgba(236,243,255,0.92)'; ex.beginPath();
       eGranizo.forEach(g => {
         if (dt) {
@@ -1697,7 +1706,7 @@
     cieloLimpio = false;
     armarParticulas();
   }
-  let cClave = '', cieloLimpio = false, cSprNube = null, cSprCol = '';
+  let cClave = '', cieloLimpio = false, cAcum = 0, cDestello = 0;
   const claveCielo = () => [amb.tipo, cvW, cvH, claveFx()].join('|');
   function armarParticulas() {
     cClave = claveCielo();
@@ -1708,17 +1717,17 @@
     const n = { despejado: 0, parcial: 3, nublado: 5, niebla: 5, lluvia: 5, tormenta: 5 }[amb.tipo];
     nubes = efectoActivo('nubes') ? Array.from({ length: Math.round(n * limitar(multFx(), 0.7, 1.3)) }, () => ({ x: Math.random() * cvW, y: cvH * (0.05 + Math.random() * 0.45), r: cvW * (0.18 + Math.random() * 0.18), v: 0.01 + Math.random() * 0.02 })) : [];
   }
-  function spriteNube(col) {                                       // una nube difusa dibujada una vez por color y estirada al pintarla
-    if (cSprNube && cSprCol === col) return cSprNube;
-    const c = cSprNube || document.createElement('canvas'); c.width = c.height = 128;
-    const g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-    gr.addColorStop(0, `rgba(${col})`); gr.addColorStop(1, `rgba(${col.replace(/,[^,]*$/, ',0')})`);
-    g.clearRect(0, 0, 128, 128); g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
-    cSprNube = c; cSprCol = col; return c;
-  }
   function pintarCielo(t, dt, quieto) {
     if (!quieto) latidoRayo(t, dt || 0);
     if (!prefsAnim.fondo) { if (!cieloLimpio) { cx.clearRect(0, 0, cvW, cvH); cieloLimpio = true; } return; }   // fondo apagado: el lienzo queda limpio
+    // El fondo cambia muy despacio (nubes de menos de 1 px por cuadro) y repintarlo obliga al navegador a recomponer toda la página
+    // (los paneles translúcidos se apoyan en él): basta con repintarlo ~15 veces por segundo, salvo durante un relámpago.
+    if (!quieto) {
+      cAcum += dt || 0;
+      if (cAcum < 62 && !cieloLimpio && cClave === claveCielo() && destello <= 0.02 && cDestello <= 0.02) return;
+      dt = cAcum; cAcum = 0;
+    }
+    cDestello = destello;
     cieloLimpio = false;
     if (cClave !== claveCielo()) armarParticulas();
     if (!vEsc.Ph) avanzarVisual(0, true);
@@ -1746,13 +1755,13 @@
     const oscuras = A.tipo === 'lluvia' || A.tipo === 'tormenta';
     const ca = A.tipo === 'tormenta' ? 0.34 : A.tipo === 'niebla' ? 0.24 : 0.12 + 0.05 * luz;
     const cc = oscuras ? '40,50,70' : `${Math.round(150 + 105 * luz)},${Math.round(165 + 90 * luz)},${Math.round(200 + 55 * luz)}`;
-    if (nubes.length) {
-      const spr = spriteNube(`${cc},${ca.toFixed(2)}`);
-      nubes.forEach(n => {
-        if (!quieto) { n.x += n.v * dt * (1 + A.viento / 25); if (n.x - n.r * 1.8 > cvW) n.x = -n.r * 1.8; }
-        cx.drawImage(spr, n.x - n.r * 1.8, n.y - n.r * 0.55, n.r * 3.6, n.r * 1.1);
-      });
-    }
+    nubes.forEach(n => {
+      if (!quieto) { n.x += n.v * dt * (1 + A.viento / 25); if (n.x - n.r * 1.8 > cvW) n.x = -n.r * 1.8; }
+      const g = cx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+      g.addColorStop(0, `rgba(${cc},${ca})`); g.addColorStop(1, `rgba(${cc},0)`);
+      cx.save(); cx.translate(n.x, n.y); cx.scale(1.8, 0.55); cx.translate(-n.x, -n.y);
+      cx.fillStyle = g; cx.fillRect(n.x - n.r, n.y - n.r, n.r * 2, n.r * 2); cx.restore();   // el recuadro de la nube, no un círculo trazado
+    });
     if (quieto) return;
     if (A.tipo === 'tormenta' && destello > 0.02 && efectoActivo('rayos')) { cx.fillStyle = `rgba(220,230,255,${destello * 0.16})`; cx.fillRect(0, 0, cvW, cvH); }   // relámpago: se aclara todo el cielo
   }
