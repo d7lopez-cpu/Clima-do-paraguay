@@ -32,7 +32,7 @@
   /* --- Página --- */
   --fondo-html: #0a1433;
   --fondo-1: #0a1433; --fondo-2: #172a63; --fondo-3: #2b2463;      /* degradado de la noche azul */
-  --tinte-cielo: 30%;                                             /* cuánto tiñe el clima real al fondo (siempre oscuro: el texto no pierde contraste) */
+  --tinte-cielo: 16%;                                             /* cuánto tiñe el clima real al fondo (siempre oscuro: el texto no pierde contraste) */
   --cielo-canvas-opacidad: 0.8;
   --halo: rgba(244, 163, 198, 0.16);                              /* resplandor lapacho detrás del contenido */
   /* --- Superficies y texto --- */
@@ -113,7 +113,7 @@
   --texto: #14213d;
   --suave: #475569;
   --temp: #0b2a6f;
-  --acento: #be3a7c;
+  --acento: #a8306d;                                              /* lapacho oscuro (algo más que #be3a7c de la guía, para AA en los enlaces) */
   --acento-texto: #ffffff;
   --celeste: #1d4ed8;
   --dorado: #92400e;
@@ -324,7 +324,7 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
 .mini:hover { background: var(--vidrio-hover); }
 .mini > .ic { width: 24px; height: 24px; }
 .mini b { color: var(--texto); font-size: 0.95rem; font-weight: 600; }
-.mini .lluvia { display: inline-flex; align-items: center; gap: 2px; color: var(--c-dato); font-size: var(--t-mini); font-weight: 600; font-variant-numeric: tabular-nums; }
+.mini .lluvia { display: inline-flex; align-items: center; gap: 2px; color: color-mix(in oklab, var(--c-dato) 70%, var(--texto)); font-size: var(--t-mini); font-weight: 600; font-variant-numeric: tabular-nums; }
 .mini .lluvia .ic { width: 12px; height: 12px; }
 .dias { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: var(--e-2); }
 .dias .mini { min-width: 0; background: var(--vidrio-2); border: 1px solid var(--borde); }
@@ -436,11 +436,11 @@ button.stat:hover:not(:disabled) { border-color: var(--borde-fuerte); }
 .sep .ic { width: 13px; height: 13px; color: var(--sel); }
 .item { display: flex; align-items: center; flex: 0 0 auto; background: var(--vidrio-2); border: 1px solid transparent; border-radius: var(--r-m); transition: background-color var(--d-2), border-color var(--d-2); }
 .item:hover { border-color: var(--borde-fuerte); }
-.item.activo { border-color: var(--acento); background: color-mix(in oklab, var(--acento) 12%, transparent); }
+.item.activo { border-color: var(--acento); background: color-mix(in oklab, var(--acento) 8%, transparent); }
 .item-main { flex: 1; display: flex; align-items: center; gap: var(--e-3); min-height: 48px; background: none; border: none; padding: 6px var(--e-1) 6px var(--e-3); text-align: left; min-width: 0; }
 .item-main > .ic { width: 22px; height: 22px; }
 .item-main .nom { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-weight: 500; }
-.item-main .nom small { color: var(--suave); display: block; font-size: var(--t-mini); font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+.item-main .nom small { color: color-mix(in oklab, var(--suave) 75%, var(--texto)); display: block; font-size: var(--t-mini); font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
 .item-main .t { font-weight: 700; font-size: 1.02rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ver-todas { width: 100%; margin-top: var(--e-1); flex: 0 0 auto; }
 @media (max-width: 900px) {

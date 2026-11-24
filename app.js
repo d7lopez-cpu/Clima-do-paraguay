@@ -39,7 +39,7 @@
   }
   // Para TEXTO sobre fondo claro, los colores vivos (amarillo, verde agua) se oscurecen para que se lean bien
   const esClaro = () => document.documentElement.dataset.tema === 'claro';
-  const paraTexto = c => esClaro() ? `oklch(from ${c} 0.56 calc(c * 1.35) h)` : c;   // mismo tono, más oscuro e intenso
+  const paraTexto = c => esClaro() ? `oklch(from ${c} 0.5 calc(c * 1.35) h)` : `oklch(from ${c} 0.92 calc(c * 0.75) h)`;   // mismo tono: más oscuro en claro, más luminoso en oscuro (AA sobre el vidrio)
   let capaId = 'temp';
   const capa = () => CAPAS[capaId];
   const esNumero = v => typeof v === 'number' && isFinite(v);
