@@ -582,8 +582,6 @@
   .escena-previa[hidden] { display: none; }
   .escena-previa .btn { background: #fff; color: #78350f; border: 0; min-height: 36px; padding: 6px 14px; font-size: 0.82rem; }
   .escena.en-previa { outline: 2px dashed #fbbf24; outline-offset: -2px; }
-  /* Durante la vista previa las etiquetas de clima y hora del paisaje no corresponden a lo que se ve: queda solo la ciudad y el aviso */
-  .escena.en-previa .escena-etq span:not(:first-child) { display: none; }
   @media (max-width: 820px), (pointer: coarse) { .escena-previa .btn { min-height: 44px; } }
   /* La barra de preferencias pasa a dos líneas si no entra (pantallas muy angostas) */
   @media (max-width: 420px) { .pref { flex-wrap: wrap; max-width: 100%; } }

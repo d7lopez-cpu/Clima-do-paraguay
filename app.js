@@ -1278,7 +1278,9 @@
   }
   const prefsAnim = cargarPrefsAnim();
   prefsAnim.vistaPrevia = null;   // { tipo: TIPOS_CIELO, fase: FASES_DIA } para ver otro clima u hora sin esperar a que ocurra; NO se guarda
-  const efectoActivo = nombre => fx && prefsAnim.efectos[nombre] !== false;
+  // Qué se DIBUJA depende solo de los efectos elegidos; `fx` decide si se MUEVE. Así, con ✨ apagado el paisaje queda
+  // quieto pero sigue mostrando el clima (nubes, luna, lluvia), en vez de un cielo vacío.
+  const efectoActivo = nombre => prefsAnim.efectos[nombre] !== false;
   let ultimoAmbiente = null;      // último clima recibido por ambiente(), para volver a aplicarlo al cambiar preferencias o vista previa
   function fijarPrefAnim(cambios) {
     for (const [k, v] of Object.entries(cambios || {})) {
@@ -1287,6 +1289,7 @@
     }
     const { vistaPrevia, ...guardable } = prefsAnim;
     guardar('clima-py-anim', JSON.stringify(guardable));
+    if (Object.keys(cambios || {}).every(k => k === 'volumen')) { mezclar(); return; }   // el volumen solo toca el sonido: no se rearma la animación (el deslizador llama en cada movimiento)
     ambClave = ''; faseClave = '';                                  // obliga a rearmar partículas y colores con las preferencias nuevas
     if (ultimoAmbiente) ambiente(...ultimoAmbiente); else { armarParticulas(); reanudarCielo(); mezclar(); }
   }
