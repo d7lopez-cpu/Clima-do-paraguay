@@ -306,11 +306,22 @@ select option { background: #172036; }
 .tarjeta, .stat { background: var(--tarjeta-fondo); border: 1px solid var(--borde); border-radius: var(--r); box-shadow: var(--sombra-tarjeta);
   backdrop-filter: var(--vidrio-tarjeta); -webkit-backdrop-filter: var(--vidrio-tarjeta); }
 .tarjeta { padding: var(--relleno-tarjeta); min-width: 0; }
-.vacio { text-align: center; color: var(--suave); padding: 22px 10px; border-radius: var(--r-m);
-  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.08) 50%, transparent 70%) 0 0 / 220% 100%; animation: brilla 1.6s linear infinite; }
+.vacio { text-align: center; color: var(--suave); padding: 22px 10px; border-radius: var(--r-m); }
+/* Mientras algo carga (aria-busy), su mensaje lleva un brillo que pasa; un mensaje de error o de lista vacía queda quieto */
+[aria-busy=true] > .vacio { background: linear-gradient(100deg, transparent 30%, var(--esq-base) 50%, transparent 70%) 0 0 / 220% 100%; animation: brilla 1.6s linear infinite; }
 .vacio .btn { margin-top: 10px; }
 /* Esqueleto de carga: bloque con un brillo que pasa (el texto de adentro solo da el tamaño) */
 .esq { color: transparent !important; border-radius: var(--r-xs); background: linear-gradient(90deg, var(--esq-base), var(--esq-brillo), var(--esq-base)); background-size: 200% 100%; animation: brillo 1.3s linear infinite; }
+/* Formas del esqueleto inicial (index.html): mismas medidas que el detalle y el resumen reales */
+.esqueleto { pointer-events: none; }
+.esq-icono { flex: none; width: 1em; height: 1em; font-size: var(--t-icono); border-radius: 50%; }
+.esq-col { display: grid; gap: var(--e-2); min-width: 0; }
+.esq-titulo { width: 8em; height: var(--t-ciudad); }
+.esq-linea { width: 7em; height: 0.8rem; }
+.esq-linea.esq-larga { width: 10em; }
+.esq-temp { width: 2.4em; height: 0.9em; font-size: var(--t-temp); }
+.esq-stat .esq, .esqueleto .dato .esq { display: inline-block; line-height: 1.1; }
+.esq-stat b .esq { width: 2.6em; height: 0.85em; vertical-align: middle; }
 
 /* ============ 6. ENCABEZADO ============ */
 header { display: grid; grid-template-columns: 1fr minmax(0, 560px); gap: var(--hueco-seccion) 28px; align-items: center; padding: 2px 0 var(--e-5); border-bottom: 1px solid var(--borde); }
@@ -668,11 +679,16 @@ html.navidad .pestana.on { box-shadow: inset 0 -3px 0 var(--nv-rojo); }
 @keyframes sube { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes brillo { to { background-position: -200% 0; } }
 @keyframes brilla { to { background-position: -220% 0; } }
+@keyframes entra { from { opacity: 0; transform: translateY(var(--desplaza-entrada)); } }
 @media (prefers-reduced-motion: no-preference) {
   html.navidad header::before { animation: nvBrillo 3.2s ease-in-out infinite alternate; }
   html.navidad header::after { animation: nvBrillo 3.2s ease-in-out infinite alternate-reverse; }
   @keyframes nvBrillo { from { opacity: 1; } to { opacity: 0.45; } }
   .hoja-anim[open] { animation: daSube 0.22s ease-out; }
+  /* Microinteracciones (las clases las pone app.js, sección 7): entrada de un bloque al cambiar de ciudad o de
+     pestaña, y aparición en cascada de tarjetas (--i = orden de cada una, con un tope para listas largas) */
+  .entra { animation: entra var(--d-3) var(--curva-salida) both; }
+  .cascada > * { animation: entra var(--d-entrada) var(--curva-salida) both; animation-delay: calc(min(var(--i, 0), 10) * var(--d-escalon)); }
   @keyframes daSube { from { transform: translateY(16px); opacity: 0; } }
 }
 /* Quien pide menos movimiento no ve animaciones ni transiciones (el paisaje se muestra quieto desde app.js) */

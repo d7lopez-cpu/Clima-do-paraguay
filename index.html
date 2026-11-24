@@ -48,12 +48,24 @@
   <nav class="favs" id="favs" aria-label="Ciudades favoritas" hidden></nav>
 
   <h2 class="sr-only">Resumen nacional</h2>
-  <section class="stats" id="stats" aria-label="Resumen nacional"></section>
+  <section class="stats" id="stats" aria-label="Resumen nacional">
+    <!-- Esqueleto de carga: app.js lo reemplaza al llegar los datos -->
+    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
+    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
+    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
+    <div class="stat esq-stat" aria-hidden="true"><small><span class="esq">00000000000</span></small><b><span class="esq">00,0</span></b><span><span class="esq">000000000</span></span></div>
+  </section>
 
   <h2 class="sr-only">Clima de la ciudad elegida</h2>
 
   <section class="tarjeta" id="detalle" aria-busy="true">
-    <div class="vacio">Cargando el clima…</div>
+    <!-- Esqueleto de carga con la misma forma que el detalle, para que nada salte al llegar los datos -->
+    <div class="actual esqueleto" aria-hidden="true">
+      <div class="esq esq-icono"></div>
+      <div class="esq-col"><div class="esq esq-titulo"></div><div class="esq esq-linea"></div><div class="esq esq-temp"></div><div class="esq esq-linea esq-larga"></div></div>
+      <div class="datos"><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div><div class="dato"><small><span class="esq">000000000</span></small><b><span class="esq">0000000</span></b></div></div>
+    </div>
+    <p class="sr-only">Cargando el clima…</p>
   </section>
 
   <section class="tarjeta" id="comparar" hidden aria-label="Comparar ciudades">
