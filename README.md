@@ -12,6 +12,8 @@ Se puede instalar en el celular como una app (desde el menú del navegador: *Agr
 - **Pronóstico de cada ciudad** por horas y para 6 días, con índice UV, amanecer, atardecer y luna.
 - **Datos medidos, no solo calculados:** cerca de un aeropuerto (≤ 25 km) se usan las observaciones reales (METAR); en el resto del país se muestra cuánto difiere el modelo de lo medido.
 - **Probabilidad de lluvia con ensambles** de 4 modelos (ECMWF, GFS, ICON y GEM) y rango probable de temperatura.
+- **Compartir** el clima de una ciudad (menú del celular, copiar enlace o WhatsApp), con enlace directo a esa ciudad.
+- **Avisos** en el detalle: calor extremo (sensación ≥ 38 °C), frío intenso (≤ 5 °C) y viento fuerte (≥ 50 km/h), además de UV, lluvia y tormenta.
 - Radar de lluvia, comparación de ciudades, favoritas, "cerca de mí", tema claro/oscuro y °C/°F.
 
 ## Cómo funciona
