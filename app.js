@@ -3178,7 +3178,7 @@
   }
   // Guirnalda del borde superior: cable en festones (4 en celular, más en pantallas anchas) con bombillas de 4 colores en
   // tres grupos que se encienden por turnos (estilos.css; quietas con html.navidad-quieta o «reducir movimiento»)
-  // y tres rosetas de ñandutí doradas colgando de hilos finos.
+  // y tres ñandutí navideños (verde, rojo y dorado) colgando de hilos finos.
   const COLORES_LUZ = ['#ef4444', '#fbbf24', '#22c55e', '#60a5fa'];
   let anchoGuirnalda = 0;
   function armarGuirnalda() {
@@ -3197,8 +3197,8 @@
         focos[i % 3] += `<circle cx="${f(x)}" cy="${f(y + 7)}" r="7" fill="${c}" opacity=".28"/><rect x="${f(x - 3.5)}" y="${f(y + 1.5)}" width="7" height="10.5" rx="3.5" fill="${c}"/><rect x="${f(x - 2)}" y="${f(y - 0.5)}" width="4" height="3" rx="1" fill="#1f3326"/>`;
       }
     }
-    const adornos = [0.12, 0.5, 0.88].map((p, k) => { const x = W * p, largo = [26, 40, 28][k], tam = [22, 26, 22][k];
-      return `<line x1="${f(x)}" y1="20" x2="${f(x)}" y2="${20 + largo}" stroke="rgba(253,230,138,.6)" stroke-width="1"/><image href="logo-nanduti-hilos.svg" x="${f(x - tam / 2)}" y="${20 + largo}" width="${tam}" height="${tam}"/>`; }).join('');
+    const adornos = [0.12, 0.5, 0.88].map((p, k) => { const x = W * p, largo = [22, 30, 24][k], tam = [22, 26, 22][k];   // hilo + adorno ≤ 80 px: la guirnalda mide 80 px y lo que pasa se corta
+      return `<line x1="${f(x)}" y1="20" x2="${f(x)}" y2="${20 + largo}" stroke="rgba(253,230,138,.6)" stroke-width="1"/><image href="nanduti-navidad-hilos.svg" x="${f(x - tam / 2)}" y="${20 + largo}" width="${tam}" height="${tam}"/>`; }).join('');
     caja.innerHTML = `<svg width="${W}" height="80" viewBox="0 0 ${W} 80"><path d="${cable}" fill="none" stroke="#3f5a3a" stroke-width="1.6"/>${adornos}` +
       focos.map((g, n) => `<g class="focos f${n}">${g}</g>`).join('') + '</svg>';
   }
