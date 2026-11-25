@@ -74,6 +74,10 @@ const ICONOS = {
   musica: p('M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0a3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0a3 3 0 0 1 6 0z'),
   calendario: p('M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM4 10h16M8.5 3v4M15.5 3v4'),
   fuegos: p('M12 9V3M14.1 9.9l4.3-4.3M15 12h6M14.1 14.1l4.3 4.3M12 15v6M9.9 14.1l-4.3 4.3M9 12H3M9.9 9.9 5.6 5.6'),
+  // --- rediseño de la portada ---
+  menu: p('M4 7h16M4 12h16M4 17h16'),
+  paraguas: p('M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9zM12 3v1M12 12v6.5a2 2 0 0 1-4 0'),
+  reloj: p('M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 7.5V12l3 2'),
 };
 // alias: nombres que usan el paisaje (data-icono) y la interfaz
 const ALIAS = { dia: 'despejado', noche: 'noche-clara', 'despejado-noche': 'noche-clara', temperatura: 'sensacion', aire: 'hoja', luna: 'noche-clara' };
