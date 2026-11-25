@@ -44,11 +44,10 @@
   --texto: #eef2ff;
   --suave: #d2daf6;   /* un poco más claro que el #c3cdf0 de la guía: en celular el fondo es más claro y pasan los hilos del ñandutí */
   --temp: #ffffff;
-  /* portada: ñandutí como las piezas de Itauguá (scripts/nanduti.mjs), en cinco colores: hilos de la urdimbre y la red (hilo),
-     apyte y aros (centro, dorado), lóbulos del borde y estrella central (trama, celeste), flores botella y el degradé de los
-     lóbulos (anillo, durazno) y las hojitas entre las ruedas (pétalo, violeta) */
-  --nd-hilo: #f1edfb; --nd-centro: #fde68a; --nd-trama: #7cc4f5; --nd-anillo: #f6b9a8; --nd-petalo: #c4b5fd;
-  --nd-op: 0.62; --nd-brillo: rgba(244, 163, 198, 0.4); --temp-sombra: rgba(10, 20, 51, 0.65); --pill-portada: rgba(10, 20, 51, 0.55); --velo-portada: rgba(10, 20, 51, 0.7);
+  /* portada: el ñandutí tricolor (scripts/nanduti.mjs), con los colores de la bandera: hilos, apyte y aros en blanco; lóbulos del
+     borde y estrella central en azul; flores botella en rojo; los lóbulos con degradé rojo → blanco → azul (en Navidad: verde y rojo) */
+  --nd-hilo: #f8fafc; --nd-centro: #ffffff; --nd-trama: #4d7cff; --nd-anillo: #ff4f43; --nd-petalo: #8fa9ff; --nd-medio: #ffffff;
+  --nd-op: 0.78; --nd-brillo: rgba(77, 124, 255, 0.35); --temp-sombra: rgba(10, 20, 51, 0.65); --pill-portada: rgba(10, 20, 51, 0.55); --velo-portada: rgba(10, 20, 51, 0.7);
   /* tarjetas de vidrio y la hora «Ahora» */
   --tarjeta-fondo: linear-gradient(140deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.035));
   --tarjeta-sombra: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 14px 34px -22px rgba(0, 0, 0, 0.75);
@@ -124,8 +123,8 @@
   --texto: #14213d;
   --suave: #475569;
   --temp: #0b2a6f;
-  --nd-hilo: #64748b; --nd-centro: #b45309; --nd-trama: #0369a1; --nd-anillo: #c2410c; --nd-petalo: #6d28d9;
-  --nd-op: 0.3; --nd-brillo: transparent; --temp-sombra: rgba(255, 255, 255, 0.9); --pill-portada: rgba(255, 255, 255, 0.85); --velo-portada: rgba(255, 255, 255, 0.7);
+  --nd-hilo: #64748b; --nd-centro: #475569; --nd-trama: #0038a8; --nd-anillo: #d52b1e; --nd-petalo: #3b5bcc; --nd-medio: #e2e8f0;   /* colores exactos de la bandera */
+  --nd-op: 0.6; --nd-brillo: transparent; --temp-sombra: rgba(255, 255, 255, 0.9); --pill-portada: rgba(255, 255, 255, 0.85); --velo-portada: rgba(255, 255, 255, 0.7);
   --tarjeta-fondo: #ffffff; --tarjeta-sombra: 0 6px 16px -10px rgba(11, 42, 111, 0.35);
   --ahora-fondo: rgba(0, 56, 168, 0.07); --ahora-borde: rgba(0, 56, 168, 0.45); --ahora-texto: #0038a8;
   --c-sens: #be185d; --c-hum: #0369a1; --c-vie: #0e7490; --c-pre: #7e22ce; --c-llu: #1d4ed8; --c-uv: #b45309; --c-par: #047857; --c-vis: #4338ca; --c-luna: #475569; --c-aire: #15803d;
@@ -310,7 +309,8 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
 .ciudad-nombre.largo { font-size: clamp(1.2rem, 5.6vw, 1.45rem); }
 /* el ícono va pegado a la primera palabra (dentro del texto), así un nombre largo en dos líneas sigue centrado */
 .ciudad-nombre .ic { display: inline-block; width: 0.8em; height: 0.8em; margin-right: 0.3em; vertical-align: -0.06em; color: var(--acento); }
-.dep-nombre { display: flex; align-items: center; justify-content: center; gap: 10px; max-width: 100%; color: var(--texto); font-size: 0.88rem; font-weight: 500; }
+.dep-nombre { display: flex; align-items: center; justify-content: center; gap: 10px; max-width: 100%; color: var(--texto); font-size: 0.88rem; font-weight: 500;
+  position: relative; z-index: 1; text-shadow: 0 1px 2px var(--temp-sombra), 0 0 12px var(--temp-sombra); }
 .dep-nombre span { min-width: 0; text-align: center; }
 .dep-nombre::before, .dep-nombre::after { content: ""; flex: 0 0 22px; height: 1px; background: currentColor; opacity: 0.55; }
 .btn-redondo { display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--borde); background: var(--vidrio); color: var(--texto); }
@@ -324,11 +324,11 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
 .btn-redondo.estrella { color: var(--suave); border: 1px solid var(--borde); border-radius: 50%; background: var(--vidrio); }
 .btn-redondo.estrella.on { color: var(--sel); border-color: color-mix(in oklab, var(--sel) 45%, transparent); }
 /* el ñandutí a color detrás de la temperatura (símbolo #nanduti-portada, lo genera scripts/nanduti-portada.mjs) */
-.hero-temp { position: relative; display: grid; place-items: center; width: 100%; min-height: clamp(220px, 62vw, 320px); isolation: isolate; margin: calc(-1 * var(--e-2)) 0; }
-.hero-nanduti { position: absolute; z-index: -1; left: 50%; top: 50%; width: clamp(240px, 70vw, 340px); aspect-ratio: 1; translate: -50% -50%; pointer-events: none;
+.hero-temp { position: relative; display: grid; place-items: center; width: 100%; min-height: calc(clamp(228px, 63vw, 330px) + 6px); isolation: isolate; margin: 2px 0; }   /* alto = el ñandutí: no sube hasta el texto de arriba */
+.hero-nanduti { position: absolute; z-index: -1; left: 50%; top: 50%; width: clamp(228px, 63vw, 330px); aspect-ratio: 1; translate: -50% -50%; pointer-events: none;
   opacity: var(--nd-op); filter: drop-shadow(0 0 5px var(--nd-brillo));
   /* detrás de los números los hilos se atenúan: el ñandutí rodea la temperatura sin estorbar su lectura */
-  -webkit-mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.32) 0 26%, #000 45%); mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.32) 0 26%, #000 45%); }
+  -webkit-mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.3) 0 28%, rgba(0, 0, 0, 0.55) 40%, #000 52%); mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.3) 0 28%, rgba(0, 0, 0, 0.55) 40%, #000 52%); }
 .temp-grande { font-family: var(--fuente-titulo); font-weight: 300; font-size: var(--t-temp); line-height: 0.95; letter-spacing: -0.03em; color: var(--temp);
   font-variant-numeric: tabular-nums; margin-left: 0.1em; text-shadow: 0 2px 28px var(--temp-sombra); }
 .temp-grande .unidad { font-size: 0.3em; font-weight: 400; letter-spacing: 0; vertical-align: 1.85em; margin-left: 0.04em; color: var(--texto); }
@@ -343,7 +343,7 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
 .rango-prob { color: var(--suave); font-size: var(--t-chico); }
 .hero-acciones { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--e-2); margin-top: var(--e-2); }
 .hero-acciones .btn { background: var(--pill-portada); border-color: var(--borde-fuerte); }
-@media (min-width: 901px) { .hero-temp { min-height: 300px; } .portada { padding-bottom: 110px; } }
+@media (min-width: 901px) { .hero-temp { min-height: 336px; } .portada { padding-bottom: 110px; } }
 
 body[data-cielo=tormenta] { --nd-brillo: rgba(196, 181, 253, 0.55); }
 body[data-cielo=lluvia] { --nd-brillo: rgba(147, 197, 253, 0.42); }
@@ -352,8 +352,8 @@ body:not(.noche)[data-cielo=despejado], body:not(.noche)[data-cielo=parcial] { -
 :root[data-tema=claro] body { --nd-brillo: transparent; }
 @media (prefers-reduced-motion: no-preference) { .hero-nanduti { animation: nd-respira 7s ease-in-out infinite; will-change: opacity; } }
 @keyframes nd-respira { 50% { opacity: calc(var(--nd-op) * 0.72); } }
-html.navidad { --nd-trama: #4ade80; --nd-anillo: #f87171; --nd-petalo: #86efac; --nd-brillo: rgba(251, 191, 36, 0.4); }
-:root[data-tema=claro].navidad { --nd-trama: #15803d; --nd-anillo: #b91c1c; --nd-petalo: #16a34a; }
+html.navidad { --nd-trama: #4ade80; --nd-anillo: #f87171; --nd-petalo: #86efac; --nd-hilo: #f7efdd; --nd-centro: #fde68a; --nd-medio: #f87171; --nd-brillo: rgba(251, 191, 36, 0.4); }
+:root[data-tema=claro].navidad { --nd-trama: #15803d; --nd-anillo: #b91c1c; --nd-petalo: #16a34a; --nd-hilo: #64748b; --nd-centro: #b45309; --nd-medio: #b91c1c; }
 
 /* ============ 8. ESCENA: la franja de paisaje animado (el canvas lo dibuja app.js) ============ */
 /* En el celular va de borde a borde; arriba se funde con el cielo de la página y abajo la tapa en parte el pronóstico. */

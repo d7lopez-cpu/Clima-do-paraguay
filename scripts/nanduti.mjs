@@ -27,9 +27,11 @@ const TAU = Math.PI * 2, ARR = -Math.PI / 2;               // el primer rayo apu
 
 // Colores fijos (archivos sueltos) y de la portada (variables CSS)
 const COLORES = {
-  normal: { hilo: '#f1edfb', centro: '#fde68a', trama: '#7cc4f5', anillo: '#f6b9a8', petalo: '#c4b5fd' },
+  // tricolor de la bandera (rojo, blanco y azul, algo más luminosos para que se lean sobre el fondo azul noche);
+  // medio: el blanco del degradé de los lóbulos (rojo adentro, blanco al medio, azul afuera)
+  normal: { hilo: '#f8fafc', centro: '#ffffff', trama: '#4f7bff', anillo: '#ef4b41', petalo: '#9db2ff', medio: '#ffffff' },
   navidad: { hilo: '#f7efdd', centro: '#fde68a', trama: '#4ade80', anillo: '#f87171', petalo: '#86efac' },
-  css: { hilo: 'var(--nd-hilo)', centro: 'var(--nd-centro)', trama: 'var(--nd-trama)', anillo: 'var(--nd-anillo)', petalo: 'var(--nd-petalo)' }
+  css: { hilo: 'var(--nd-hilo)', centro: 'var(--nd-centro)', trama: 'var(--nd-trama)', anillo: 'var(--nd-anillo)', petalo: 'var(--nd-petalo)', medio: 'var(--nd-medio)' }
 };
 
 // ---- Piezas del encaje ----
@@ -100,7 +102,8 @@ function nanduti(c, detalle = 'completo') {
   const relleno = (d, fill, op = 1, extra = '') => out.push(`<path d="${d}" style="fill:${fill};fill-opacity:${op}" stroke="none"${extra}/>`);
   const circ = (cx, cy, r) => `M${f(cx + r)} ${f(cy)}A${f(r)} ${f(r)} 0 1 1 ${f(cx - r)} ${f(cy)}A${f(r)} ${f(r)} 0 1 1 ${f(cx + r)} ${f(cy)}`;
   const defs = `<radialGradient id="${id}L" gradientUnits="userSpaceOnUse" cx="100" cy="100" r="${S ? 98 : 99}">` +
-    `<stop offset="${S ? 0.62 : 0.72}" style="stop-color:${c.anillo}"/><stop offset="${S ? 0.8 : 0.84}" style="stop-color:${c.trama}"/><stop offset="1" style="stop-color:${c.trama}"/></radialGradient>`;
+    `<stop offset="${S ? 0.62 : 0.72}" style="stop-color:${c.anillo}"/>` + (c.medio ? `<stop offset="${S ? 0.76 : 0.81}" style="stop-color:${c.medio}"/>` : '') +
+    `<stop offset="${c.medio ? (S ? 0.9 : 0.91) : (S ? 0.8 : 0.84)}" style="stop-color:${c.trama}"/><stop offset="1" style="stop-color:${c.trama}"/></radialGradient>`;
 
   // 1) Lóbulos del borde: abanicos de hilos que convergen hacia adentro, con degradé y piquitos
   const NL = S ? 12 : 18, rc = S ? 79 : 84.5, lr = S ? 19 : 13.6, rf = S ? 64 : 73;
