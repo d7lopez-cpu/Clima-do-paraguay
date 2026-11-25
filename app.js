@@ -3605,7 +3605,8 @@
       const rMx = rd && rd.max[i], rMn = rd && rd.min[i];
       const inc = rMx && rMn ? `<i class="inc" style="left:${Math.max(0, (rMn[0] - minG) / rango * 100).toFixed(0)}%;width:${Math.min(Math.max(6, (rMx[1] - rMn[0]) / rango * 100), 100 - Math.max(0, (rMn[0] - minG) / rango * 100)).toFixed(0)}%"></i>` : '';
       const tip = rMx && rMn ? ` title="Máxima probable ${grados(rMx[0])} a ${grados(rMx[1])} · mínima probable ${grados(rMn[0])} a ${grados(rMn[1])}"` : '';
-      return `<li class="dia-fila"${tip}><span class="dia-nombre">${i === 0 ? 'Hoy' : nombres[fecha.getDay()]}</span>
+      const nom = i === 0 ? 'Hoy' : nombres[fecha.getDay()];
+      return `<li class="dia-fila"${tip}><span class="dia-nombre"><span class="nom-largo">${nom}</span><span class="nom-corto" aria-hidden="true">${i === 0 ? 'Hoy' : nom.slice(0, 3)}</span></span>
         <span class="dia-ic" title="${w.texto}">${w.svg}</span>
         <span class="lluvia${(pr ?? 0) >= 50 ? ' alta' : ''}">${icono('humedad')}${pr ?? 0}%</span>
         <span class="dia-min">${grados(mn)}</span><span class="barra-rango">${inc}<i style="left:${izq.toFixed(0)}%;width:${Math.min(ancho, 100 - izq).toFixed(0)}%"></i></span><span class="dia-max">${grados(mx)}</span></li>`;
