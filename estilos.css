@@ -164,6 +164,8 @@ body {
   transition: --c1 var(--d-cielo) ease, --c2 var(--d-cielo) ease, --c3 var(--d-cielo) ease;
 }
 #cielo { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: var(--cielo-canvas-opacidad); }
+html.fuegos-vivos #cielo { opacity: 1; }   /* el 24 y el 31 a medianoche, los fuegos artificiales se ven a pleno (también en modo claro) */
+#cielo { transition: opacity 1.2s ease; }
 .contenedor { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--hueco-seccion); }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
