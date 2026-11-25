@@ -44,6 +44,15 @@
   --texto: #eef2ff;
   --suave: #d2daf6;   /* un poco más claro que el #c3cdf0 de la guía: en celular el fondo es más claro y pasan los hilos del ñandutí */
   --temp: #ffffff;
+  /* portada: ñandutí a color (dorado, rosa y violeta), sombra de la temperatura y la píldora de sensación */
+  --nd-petalo: #e879f9; --nd-hilo: #f3d58a; --nd-anillo: #f9a8d4; --nd-trama: #a78bfa; --nd-centro: #fde68a;
+  --nd-op: 0.62; --nd-brillo: rgba(244, 163, 198, 0.4); --nd-relleno-op: 0.24; --temp-sombra: rgba(10, 20, 51, 0.65); --pill-portada: rgba(10, 20, 51, 0.55); --velo-portada: rgba(10, 20, 51, 0.7);
+  /* tarjetas de vidrio y la hora «Ahora» */
+  --tarjeta-fondo: linear-gradient(140deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.035));
+  --tarjeta-sombra: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 14px 34px -22px rgba(0, 0, 0, 0.75);
+  --ahora-fondo: linear-gradient(180deg, rgba(244, 163, 198, 0.24), rgba(244, 163, 198, 0.07)); --ahora-borde: rgba(244, 163, 198, 0.65); --ahora-texto: #ffe6f0;
+  /* un color por dato (íconos de las tarjetas) */
+  --c-sens: #f9a8d4; --c-hum: #38bdf8; --c-vie: #22d3ee; --c-pre: #d8b4fe; --c-llu: #60a5fa; --c-uv: #fbbf24; --c-par: #34d399; --c-vis: #a5b4fc; --c-luna: #e2e8f0; --c-aire: #86efac;
   --acento: #f4a3c6;                                              /* rosa lapacho */
   --acento-texto: #2a0f1f;
   --celeste: #93c5fd;
@@ -113,6 +122,11 @@
   --texto: #14213d;
   --suave: #475569;
   --temp: #0b2a6f;
+  --nd-petalo: #a21caf; --nd-hilo: #b45309; --nd-anillo: #be185d; --nd-trama: #6d28d9; --nd-centro: #d97706;
+  --nd-op: 0.3; --nd-brillo: transparent; --nd-relleno-op: 0.14; --temp-sombra: rgba(255, 255, 255, 0.9); --pill-portada: rgba(255, 255, 255, 0.85); --velo-portada: rgba(255, 255, 255, 0.7);
+  --tarjeta-fondo: #ffffff; --tarjeta-sombra: 0 6px 16px -10px rgba(11, 42, 111, 0.35);
+  --ahora-fondo: rgba(0, 56, 168, 0.07); --ahora-borde: rgba(0, 56, 168, 0.45); --ahora-texto: #0038a8;
+  --c-sens: #be185d; --c-hum: #0369a1; --c-vie: #0e7490; --c-pre: #7e22ce; --c-llu: #1d4ed8; --c-uv: #b45309; --c-par: #047857; --c-vis: #4338ca; --c-luna: #475569; --c-aire: #15803d;
   --acento: #a8306d;                                              /* lapacho oscuro (algo más que #be3a7c de la guía, para AA en los enlaces) */
   --acento-texto: #ffffff;
   --celeste: #1d4ed8;
@@ -216,8 +230,11 @@ select option { background: var(--dialogo-fondo); color: var(--texto); }
   -webkit-mask: url("logo-nanduti-hilos.svg") center / contain no-repeat; mask: url("logo-nanduti-hilos.svg") center / contain no-repeat; }
 .carga-txt { color: var(--suave); font-size: var(--t-chico); margin-top: var(--e-3); text-align: center; }
 
-/* ============ 6. ENCABEZADO ============ */
-.cabecera { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "marca acciones" "sub pref"; gap: var(--e-3) var(--e-6); align-items: center; }
+/* ============ 6. BARRA SUPERIOR Y MENÚ ============ */
+/* Pantalla grande: marca · buscador · estado, y debajo las preferencias y los accesos (todo a la vista).
+   Celular: menú · marca · estado, el buscador debajo y lo demás dentro del menú desplegable (#btnMenu). */
+.cabecera { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "marca buscador estado" "panel panel panel"; gap: var(--e-3) var(--e-5); align-items: center; }
+.btn-menu { grid-area: menu; display: none; }
 .marca { grid-area: marca; display: flex; align-items: center; gap: var(--e-3); min-width: 0; }
 .logo { width: 44px; height: 44px; border-radius: 12px; flex: none; }
 .marca-txt { display: flex; flex-direction: column; line-height: 1.1; }
@@ -226,97 +243,176 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
 .bandera i { width: 12px; height: 2px; border-radius: 1px; background: var(--bandera-1); }
 .bandera i:nth-child(2) { background: var(--bandera-2); } .bandera i:nth-child(3) { background: var(--bandera-3); }
 .edicion { display: none; font-size: var(--t-mini); color: var(--dorado); margin-top: 4px; letter-spacing: 0.04em; }
-.sub { grid-area: sub; color: var(--suave); font-size: var(--t-chico); display: flex; flex-wrap: wrap; gap: var(--e-2); align-items: center; }
-.pref { grid-area: pref; justify-self: end; display: flex; flex-wrap: wrap; gap: 6px; }
+#estado { grid-area: estado; justify-self: end; }
+.buscador { grid-area: buscador; justify-self: center; width: 100%; max-width: 440px; position: relative; min-width: 0; }
+.menu-panel { grid-area: panel; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-4); }
+.sub { color: var(--suave); font-size: var(--t-chico); margin-right: auto; }
+.pref { display: flex; flex-wrap: wrap; gap: 6px; }
 .pref .btn { min-width: 44px; padding: 0 var(--e-3); }
 .pref .btn .ic { width: 18px; height: 18px; }
-.acciones { grid-area: acciones; display: flex; flex-wrap: wrap; gap: var(--e-2); justify-content: flex-end; min-width: 0; }
+.acciones { display: flex; flex-wrap: wrap; gap: var(--e-2); min-width: 0; }
 .acciones button { padding: 0 var(--e-3); white-space: nowrap; }
 #btnIdioma { white-space: nowrap; }
-.buscador { position: relative; flex: 1 1 180px; min-width: 0; max-width: 340px; }
 .buscador .ic { position: absolute; left: 14px; top: 50%; translate: 0 -50%; width: 18px; height: 18px; color: var(--suave); pointer-events: none; }
 .buscador input { width: 100%; min-height: 44px; padding: 0 var(--e-4) 0 42px; border-radius: var(--r-m); border: 1px solid var(--borde); background: var(--vidrio); font-size: 0.95rem; }
 :root[data-tema=claro] .buscador input { box-shadow: var(--sombra); }
 .buscador input:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
 .lugares { display: flex; flex-wrap: wrap; gap: var(--e-2); align-items: center; }
 @media (max-width: 900px) {
-  .cabecera { grid-template-columns: minmax(0, 1fr); grid-template-areas: "marca" "sub" "pref" "acciones"; }
-  .pref { justify-self: stretch; }
-  .pref .btn { flex: 1 0 44px; padding: 0 var(--e-2); }
-  .acciones { justify-content: stretch; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .buscador { grid-column: 1 / -1; max-width: none; }
-  /* en el celular las cuatro acciones son una barra de herramientas: ícono arriba, texto corto abajo */
+  .cabecera { grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: "menu marca estado" "buscador buscador buscador" "panel panel panel"; gap: var(--e-3); }
+  .btn-menu { display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; }
+  .btn-menu .ic { width: 20px; height: 20px; }
+  .cabecera.menu-abierto .btn-menu { background: var(--activo-fondo); color: var(--activo-texto); border-color: transparent; }
+  .logo { width: 36px; height: 36px; border-radius: 10px; }
+  h1 { font-size: 1.35rem; }
+  .buscador { max-width: none; }
+  /* el menú: una hoja de vidrio bajo la barra superior */
+  .menu-panel { display: none; flex-direction: column; align-items: stretch; gap: var(--e-3); padding: var(--e-4); border-radius: var(--r-l);
+    background: var(--flotante-fondo); border: 1px solid var(--borde); box-shadow: var(--sombra-flotante); }
+  .cabecera.menu-abierto .menu-panel { display: flex; }
+  .pref { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .pref .btn { padding: 0 var(--e-2); }
+  .acciones { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* las cuatro acciones son una barra de herramientas: ícono arriba, texto corto abajo */
   .acciones button { flex-direction: column; gap: 3px; min-height: 58px; padding: 6px 4px; font-size: var(--t-mini); white-space: normal; overflow-wrap: normal; }
 }
+@media (max-width: 440px) {
+  .marca-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #estado { font-size: var(--t-mini); padding-inline: 10px; }
+}
+@media (max-width: 330px) {
+  .cabecera { grid-template-columns: 44px minmax(0, 1fr); grid-template-areas: "menu marca" "estado estado" "buscador buscador" "panel panel"; }
+  #estado { justify-self: start; }
+}
 @media (max-width: 360px) { .acciones button { padding: 6px 1px; font-size: 0.66rem; letter-spacing: -0.01em; } }
+@media (prefers-reduced-motion: no-preference) { .cabecera.menu-abierto .menu-panel { animation: menu-entra var(--d-2) var(--ease-salida, ease-out); } }
+@keyframes menu-entra { from { opacity: 0; transform: translateY(-6px); } }
 
-/* ============ 7. DETALLE: CABECERA (ciudad y temperatura) ============ */
-.detalle { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); grid-template-areas: "cab escena" "cuerpo cuerpo"; gap: var(--e-4) var(--e-6); align-items: center; }
-.detalle-cab { grid-area: cab; position: relative; min-width: 0; }
-.detalle-cuerpo { grid-area: cuerpo; display: flex; flex-direction: column; gap: var(--e-3); min-width: 0; }
-.hero { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--e-1); padding: var(--e-2) 0; isolation: isolate; }
-/* el ñandutí como marca de agua detrás de la temperatura (sutil: no baja el contraste del texto) */
-.hero::before { content: ""; position: absolute; z-index: -1; left: 50%; top: 50%; width: min(400px, 100%); aspect-ratio: 1; translate: -50% -50%;
-  background: var(--nanduti); opacity: var(--nanduti-opacidad); pointer-events: none;
-  -webkit-mask: url("logo-nanduti-hilos.svg") center / contain no-repeat; mask: url("logo-nanduti-hilos.svg") center / contain no-repeat; }
-.hero-carga { min-height: 280px; justify-content: center; }
-.hero-carga::before { display: none; }
-.ciudad-fila { display: flex; align-items: center; justify-content: center; gap: var(--e-1); }
-.ciudad-nombre { font-family: var(--fuente-titulo); font-weight: 500; font-size: var(--t-ciudad); letter-spacing: -0.01em; line-height: 1.15; overflow-wrap: break-word; }
-.dep-nombre { display: inline-flex; align-items: center; gap: 6px; color: var(--suave); font-size: 0.9rem; font-weight: 500; }
-.dep-nombre .ic { width: 15px; height: 15px; }
-.temp-grande { font-family: var(--fuente-titulo); font-weight: 300; font-size: var(--t-temp); line-height: 0.95; letter-spacing: -0.03em; color: var(--temp);
-  font-variant-numeric: tabular-nums; margin: var(--e-1) 0 var(--e-1) 0.1em; }
-.temp-grande .unidad { font-size: 0.3em; font-weight: 400; letter-spacing: 0; vertical-align: 1.85em; margin-left: 0.04em; color: var(--suave); }
-.temp-grande .esq { font-size: 0.8em; }
-.estado { display: inline-flex; align-items: center; gap: var(--e-2); font-size: 1.08rem; font-weight: 500; }
-.estado .ic { width: 26px; height: 26px; }
-.minmax { color: var(--suave); font-size: 0.92rem; display: flex; flex-wrap: wrap; justify-content: center; gap: 0 var(--e-2); }
-.minmax i { font-style: normal; opacity: 0.7; }
-.rango-prob { color: var(--suave); font-size: var(--t-chico); }
-.hero-acciones { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--e-2); margin-top: var(--e-3); }
+/* ============ 7. PORTADA: ciudad, ñandutí y temperatura sobre el paisaje ============ */
+/* Capas: 1) el cielo animado de toda la página (#cielo); 2) la franja de paisaje (#escena, un solo canvas que se reutiliza para
+   todas las ciudades y cambia con el clima y la hora); 3) el ñandutí, fijo, que solo cambia su brillo con el clima; 4) los datos. */
+.detalle { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "portada" "cuerpo"; gap: 0; --solape: clamp(28px, 8vw, 56px); }
+.portada { grid-area: portada; position: relative; isolation: isolate; padding-bottom: clamp(70px, 18vw, 120px); }
+.detalle-cab { position: relative; z-index: 1; min-width: 0; }
+.detalle-cuerpo { grid-area: cuerpo; position: relative; z-index: 1; display: flex; flex-direction: column; gap: var(--e-3); min-width: 0; margin-top: calc(-1 * var(--solape)); }
+.hero { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--e-1); padding: var(--e-1) 0 0; }
+/* velo muy suave detrás del estado, la máx/mín y la sensación: se leen igual sobre una nube blanca o un cielo claro de día */
+.hero:not(.hero-carga)::after { content: ""; position: absolute; z-index: -1; left: 50%; bottom: -30px; width: min(560px, calc(100% + 2 * var(--relleno-pagina))); height: 230px; translate: -50% 0; pointer-events: none;
+  background: radial-gradient(closest-side, var(--velo-portada), transparent); }
+.hero-carga { min-height: 300px; justify-content: center; }
+.ciudad-fila { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: var(--e-2); width: 100%; max-width: 560px; }
+.hero-lado { display: flex; justify-content: center; }
+.ciudad-centro { display: flex; flex-direction: column; align-items: center; min-width: 0; gap: 2px; }
+.ciudad-nombre { display: inline-flex; align-items: center; justify-content: center; gap: 8px; max-width: 100%; font-family: var(--fuente-titulo); font-weight: 500;
+  font-size: var(--t-ciudad); letter-spacing: -0.01em; line-height: 1.15; overflow-wrap: break-word; }
+.ciudad-nombre .ic { width: 20px; height: 20px; flex: none; color: var(--acento); }
+.dep-nombre { display: inline-flex; align-items: center; gap: 10px; color: var(--texto); font-size: 0.88rem; font-weight: 500; }
+.dep-nombre::before, .dep-nombre::after { content: ""; width: 26px; height: 1px; background: currentColor; opacity: 0.55; }
+.btn-redondo { display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--borde); background: var(--vidrio); color: var(--texto); }
+.btn-redondo:hover { background: var(--vidrio-hover); border-color: var(--borde-fuerte); }
+.btn-redondo .ic { width: 20px; height: 20px; }
+/* estrella de favorita (también en la lista de ciudades) */
 .estrella { display: inline-grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: var(--r-s); background: none; color: var(--suave); }
 .estrella .ic { width: 20px; height: 20px; }
 .estrella.on { color: var(--sel); }
 .estrella:hover { background: var(--vidrio-hover); }
-@media (max-width: 900px) {
-  .detalle { grid-template-columns: minmax(0, 1fr); grid-template-areas: "cab" "escena" "cuerpo"; }
-}
+.btn-redondo.estrella { color: var(--suave); border: 1px solid var(--borde); border-radius: 50%; background: var(--vidrio); }
+.btn-redondo.estrella.on { color: var(--sel); border-color: color-mix(in oklab, var(--sel) 45%, transparent); }
+/* el ñandutí a color detrás de la temperatura (símbolo #nanduti-portada, lo genera scripts/nanduti-portada.mjs) */
+.hero-temp { position: relative; display: grid; place-items: center; width: 100%; min-height: clamp(220px, 62vw, 320px); isolation: isolate; margin: calc(-1 * var(--e-2)) 0; }
+.hero-nanduti { position: absolute; z-index: -1; left: 50%; top: 50%; width: clamp(240px, 70vw, 340px); aspect-ratio: 1; translate: -50% -50%; pointer-events: none;
+  opacity: var(--nd-op); filter: drop-shadow(0 0 5px var(--nd-brillo));
+  /* detrás de los números los hilos se atenúan: el ñandutí rodea la temperatura sin estorbar su lectura */
+  -webkit-mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.22) 0 30%, #000 47%); mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.22) 0 30%, #000 47%); }
+.temp-grande { font-family: var(--fuente-titulo); font-weight: 300; font-size: var(--t-temp); line-height: 0.95; letter-spacing: -0.03em; color: var(--temp);
+  font-variant-numeric: tabular-nums; margin-left: 0.1em; text-shadow: 0 2px 28px var(--temp-sombra); }
+.temp-grande .unidad { font-size: 0.3em; font-weight: 400; letter-spacing: 0; vertical-align: 1.85em; margin-left: 0.04em; color: var(--texto); }
+.temp-grande .esq { font-size: 0.8em; }
+.estado { display: inline-flex; align-items: center; gap: var(--e-2); font-size: 1.15rem; font-weight: 500; text-shadow: 0 1px 2px var(--temp-sombra), 0 0 14px var(--temp-sombra); }
+.estado .ic { width: 28px; height: 28px; }
+.minmax { color: var(--texto); font-size: 0.98rem; font-weight: 500; text-shadow: 0 1px 2px var(--temp-sombra), 0 0 14px var(--temp-sombra); display: flex; flex-wrap: wrap; justify-content: center; gap: 0 var(--e-2); }
+.minmax i { font-style: normal; opacity: 0.6; }
+.sensacion-pill { display: inline-flex; align-items: center; gap: 8px; margin-top: var(--e-2); padding: 7px 16px; border-radius: var(--r-pill); font-size: 0.9rem; font-weight: 500;
+  background: var(--pill-portada); border: 1px solid var(--borde-fuerte); }
+.sensacion-pill .ic { width: 18px; height: 18px; color: var(--c-sens); }
+.rango-prob { color: var(--suave); font-size: var(--t-chico); }
+.hero-acciones { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--e-2); margin-top: var(--e-2); }
+.hero-acciones .btn { background: var(--pill-portada); border-color: var(--borde-fuerte); }
+@media (min-width: 901px) { .hero-temp { min-height: 300px; } .portada { padding-bottom: 110px; } }
 
-/* ============ 8. ESCENA (paisaje animado; el canvas lo dibuja app.js) ============ */
-.escena { grid-area: escena; position: relative; width: 100%; min-width: 0; height: clamp(160px, 22vw, 250px); border-radius: var(--r-l); overflow: hidden; isolation: isolate;
-  border: 1px solid var(--borde); background: #1d3473; box-shadow: var(--sombra); }
+body[data-cielo=tormenta] { --nd-brillo: rgba(196, 181, 253, 0.55); --nd-petalo: #a78bfa; }
+body[data-cielo=lluvia] { --nd-brillo: rgba(147, 197, 253, 0.42); }
+body[data-cielo=niebla] { --nd-op: 0.4; --nd-brillo: rgba(226, 232, 240, 0.3); }
+body:not(.noche)[data-cielo=despejado], body:not(.noche)[data-cielo=parcial] { --nd-brillo: rgba(253, 230, 138, 0.5); }
+:root[data-tema=claro] body { --nd-brillo: transparent; }
+@media (prefers-reduced-motion: no-preference) { .hero-nanduti { animation: nd-respira 7s ease-in-out infinite; will-change: opacity; } }
+@keyframes nd-respira { 50% { opacity: calc(var(--nd-op) * 0.72); } }
+html.navidad { --nd-petalo: #ef4444; --nd-anillo: #4ade80; --nd-brillo: rgba(251, 191, 36, 0.4); }
+:root[data-tema=claro].navidad { --nd-petalo: #b91c1c; --nd-anillo: #15803d; }
+
+/* ============ 8. ESCENA: la franja de paisaje animado (el canvas lo dibuja app.js) ============ */
+/* En el celular va de borde a borde; arriba se funde con el cielo de la página y abajo la tapa en parte el pronóstico. */
+.escena { position: absolute; z-index: 0; left: calc(-1 * var(--relleno-pagina)); right: calc(-1 * var(--relleno-pagina)); bottom: 0; height: clamp(250px, 68vw, 340px);
+  overflow: hidden; isolation: isolate; background: transparent;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 36%, #000 86%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 36%, #000 86%, transparent 100%); }
+@media (min-width: 901px) {
+  .escena { left: 0; right: 0; height: 320px; border-radius: var(--r-xl);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 34%, #000 82%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 34%, #000 82%, transparent 100%); }
+}
 .escena canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; }
-.escena-etq { position: absolute; left: var(--e-3); right: var(--e-3); top: var(--e-3); z-index: 2; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+.escena-etq { position: absolute; left: var(--relleno-pagina); right: var(--relleno-pagina); bottom: calc(var(--solape) + 14px); z-index: 2; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
 .escena-etq span { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--r-pill); background: rgba(10, 20, 51, 0.62); color: #eef2ff;
   font-size: var(--t-mini); font-weight: 600; max-width: 100%; }
+/* las etiquetas del paisaje (ciudad, clima, momento) repiten lo que ya dice la portada: no se muestran */
+.escena-etq { display: none; }
+.escena-previa { position: absolute; left: var(--relleno-pagina); right: var(--relleno-pagina); bottom: calc(var(--solape) + 10px); z-index: 3; display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 6px 10px; padding: 6px 6px 6px 14px; border-radius: var(--r-m); background: rgba(42, 15, 31, 0.9); color: #fff; border: 1px solid var(--acento);
+  font-size: var(--t-chico); font-weight: 600; }
+@media (min-width: 901px) { .escena-etq, .escena-previa { left: var(--e-4); right: var(--e-4); } }
 .escena-etq .ic { width: 14px; height: 14px; }
 :root[data-tema=claro] .escena-etq span { background: rgba(255, 255, 255, 0.9); color: #14213d; }
-.escena-previa { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px;
-  padding: 6px 6px 6px 14px; border-radius: var(--r-m); background: rgba(42, 15, 31, 0.9); color: #fff; border: 1px solid var(--acento); font-size: var(--t-chico); font-weight: 600; }
 .escena-previa .ep-txt { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .escena-previa .btn { background: var(--acento); color: #2a0f1f; border: 0; }
 .escena.en-previa { outline: 2px dashed var(--acento); outline-offset: -2px; }
-@media (max-width: 900px) { .escena { height: clamp(140px, 40vw, 190px); } }
-@media (max-width: 560px) { .datos { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); } .dato { padding: 10px; } .dato b { font-size: 0.95rem; } }
 
-/* ============ 9. DETALLE: CUERPO (avisos, datos y pronóstico) ============ */
+/* ============ 9. CUERPO: pronóstico, avisos, tarjetas y 7 días ============ */
 .alertas { display: flex; flex-direction: column; gap: var(--e-2); }
 .alerta { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--r); background: var(--vidrio); border: 1px solid var(--borde); font-size: 0.86rem; font-weight: 500; }
 .alerta .ic { width: 18px; height: 18px; color: var(--c-dato); }
 .alerta.fuerte { background: var(--aviso-fondo); border-color: var(--aviso-borde); color: var(--aviso-texto); }
 .alerta.fuerte .ic { color: var(--aviso-ic); }
-.datos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--e-2); }
-.dato { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: var(--r); background: var(--vidrio); border: 1px solid var(--borde); min-width: 0; box-shadow: var(--sombra); }
-.dato .ic { width: 18px; height: 18px; color: var(--c-dato); }
-.dato b { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.dato small { font-size: var(--t-mini); color: var(--suave); }
 .verif { display: flex; gap: var(--e-2); align-items: flex-start; padding: 10px 14px; border-radius: var(--r); background: var(--vidrio-2); border: 1px solid var(--borde); color: var(--suave); font-size: var(--t-chico); line-height: 1.5; }
 .verif .ic { width: 16px; height: 16px; margin-top: 2px; color: var(--c-dato); }
 .verif b { color: var(--texto); }
-.pronostico-caja { background: var(--vidrio); border: 1px solid var(--borde); border-radius: var(--r-l); padding: var(--e-3) var(--e-4) var(--e-4); box-shadow: var(--sombra); min-width: 0; }
-.pestanas { display: grid; grid-template-columns: repeat(3, minmax(0, max-content)); gap: 6px; margin-bottom: var(--e-3); }
-@media (max-width: 560px) { .pestanas { grid-template-columns: repeat(3, minmax(0, 1fr)); } .pestana { padding: 0 6px; font-size: var(--t-chico); } }
+/* tarjetas de vidrio: ícono de color a la izquierda, valor grande y su nombre */
+.datos { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: var(--e-2); }
+.dato { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "ic val" "ic lab"; align-items: center; column-gap: 12px; row-gap: 1px;
+  padding: 12px 14px; border-radius: var(--r-l); min-width: 0; background: var(--tarjeta-fondo); border: 1px solid var(--borde); box-shadow: var(--tarjeta-sombra); }
+.dato > :first-child { grid-area: ic; width: 30px; height: 30px; }
+.dato > .ic { color: var(--c, var(--c-dato)); }
+.dato b { grid-area: val; font-size: 1.12rem; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.dato small { grid-area: lab; font-size: var(--t-mini); color: var(--suave); }
+.dato[data-c=sensacion] { --c: var(--c-sens); } .dato[data-c=humedad] { --c: var(--c-hum); } .dato[data-c=viento] { --c: var(--c-vie); }
+.dato[data-c=presion] { --c: var(--c-pre); } .dato[data-c=lluvia] { --c: var(--c-llu); } .dato[data-c=uv] { --c: var(--c-uv); }
+.dato[data-c=paraguas] { --c: var(--c-par); } .dato[data-c=ojo] { --c: var(--c-vis); } .dato[data-c=luna] { --c: var(--c-luna); }
+.dato[data-c=hoja] { --c: var(--c-aire); } .dato[data-c=amanecer], .dato[data-c=atardecer] { --c: var(--c-uv); }
+.dato-sol > :first-child { width: auto; height: auto; }
+.dato-sol { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); }
+.sol-lado { display: flex; flex-direction: column; align-items: center; gap: 1px; text-align: center; min-width: 6.5em; }
+.sol-lado .ic { width: 26px; height: 26px; color: var(--c-uv); }
+.sol-lado b { font-size: 1.12rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sol-arco { flex: 1; min-width: 0; max-width: 220px; height: auto; overflow: visible; }
+.sol-camino { fill: none; stroke: var(--borde-fuerte); stroke-width: 1.2; stroke-dasharray: 2 3; }
+.sol-suelo { stroke: var(--borde); stroke-width: 1; }
+.sol-punto { fill: var(--dorado); stroke: color-mix(in oklab, var(--dorado) 40%, transparent); stroke-width: 4; }
+@media (max-width: 560px) { .datos { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dato { padding: 11px 12px; column-gap: 10px; } .dato > :first-child { width: 26px; height: 26px; } }
+/* cajas del pronóstico */
+.pronostico-caja { background: var(--tarjeta-fondo); border: 1px solid var(--borde); border-radius: var(--r-xl); padding: var(--e-3) var(--e-4) var(--e-4); box-shadow: var(--tarjeta-sombra); min-width: 0; }
+.caja-titulo { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-2); margin-bottom: var(--e-3); }
+.caja-titulo h4 { display: inline-flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 600; color: var(--texto); }
+.caja-titulo h4 .ic { width: 20px; height: 20px; color: var(--acento); }
+.pestanas { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); gap: 6px; }
+.pestana { padding: 0 var(--e-3); font-size: var(--t-chico); }
 .pestana { background: transparent; border-color: transparent; color: var(--suave); }
 .pestana.on { background: var(--activo-fondo); color: var(--activo-texto); }
 .fila-scroll { display: flex; gap: 2px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: var(--borde-fuerte) transparent; }
@@ -327,15 +423,29 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
 .mini b { color: var(--texto); font-size: 0.95rem; font-weight: 600; }
 .mini .lluvia { display: inline-flex; align-items: center; gap: 2px; color: color-mix(in oklab, var(--c-dato) 70%, var(--texto)); font-size: var(--t-mini); font-weight: 600; font-variant-numeric: tabular-nums; }
 .mini .lluvia .ic { width: 12px; height: 12px; }
-.dias { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: var(--e-2); }
-.dias .mini { min-width: 0; background: var(--vidrio-2); border: 1px solid var(--borde); }
-.dias .mini span { color: var(--suave); }
 .barra-rango { align-self: stretch; height: 5px; border-radius: 3px; background: var(--borde); margin: 4px 4px 2px; position: relative; }
 .barra-rango i { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, #7dd3fc, #f4a3c6); }
 .barra-rango i.inc { top: -2px; bottom: -2px; background: var(--borde-fuerte); border-radius: 5px; }
 .grafico { width: 100%; height: auto; display: block; }
 .grafico text { fill: var(--suave); font-size: 11px; }
 .grafico .valor { fill: var(--texto); font-weight: 600; }
+.mini { border: 1px solid transparent; }
+.mini.ahora { color: var(--texto); background: var(--ahora-fondo); border-color: var(--ahora-borde); box-shadow: 0 0 18px -6px var(--ahora-borde); }
+.mini.ahora > div:first-child { color: var(--ahora-texto); font-weight: 700; }
+.mini.ahora .lluvia { color: var(--texto); }
+/* próximos 7 días, en filas */
+.dias-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.dia-fila { display: grid; grid-template-columns: minmax(5.6em, 1.2fr) 26px 3.4em 2.4em minmax(56px, 2fr) 2.4em; align-items: center; gap: 10px; padding: 10px 2px; border-top: 1px solid var(--borde); }
+.dia-fila:first-child { border-top: 0; padding-top: 2px; }
+.dia-nombre { font-weight: 600; }
+.dia-ic { display: inline-grid; place-items: center; } .dia-ic .ic { width: 24px; height: 24px; }
+.dia-fila .lluvia { display: inline-flex; align-items: center; gap: 2px; font-size: var(--t-mini); font-weight: 600; color: var(--suave); font-variant-numeric: tabular-nums; }
+.dia-fila .lluvia .ic { width: 12px; height: 12px; }
+.dia-fila .lluvia.alta { color: color-mix(in oklab, var(--c-dato) 45%, var(--texto)); }
+.dia-min { color: var(--suave); text-align: right; font-variant-numeric: tabular-nums; }
+.dia-max { font-weight: 600; font-variant-numeric: tabular-nums; }
+.dia-fila .barra-rango { margin: 0; align-self: center; }
+@media (max-width: 380px) { .dia-fila { grid-template-columns: minmax(4.6em, 1fr) 22px 3em 2.2em minmax(36px, 1.4fr) 2.2em; gap: 6px; font-size: 0.9rem; } }
 
 /* ============ 10. RESUMEN NACIONAL Y FAVORITAS ============ */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--e-3); }

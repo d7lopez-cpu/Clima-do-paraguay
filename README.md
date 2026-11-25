@@ -9,7 +9,7 @@ Se puede instalar en el celular como una app (desde el menú del navegador: *Agr
 ## Qué ofrece
 
 - **Mapa de los 18 departamentos** con capas de temperatura, humedad, viento y lluvia, y un deslizador para ver las próximas 24 horas.
-- **Pronóstico de cada ciudad** por horas y para 6 días, con índice UV, amanecer, atardecer y luna.
+- **Pronóstico de cada ciudad** por horas (con «Ahora» destacado) o en gráfico, y los **próximos 7 días** en filas con probabilidad de lluvia y rango de temperatura; tarjetas de sensación, humedad, viento, presión, lluvia, UV, probabilidad de lluvia, visibilidad, luna, calidad del aire y una de salida y puesta del sol con el arco del día.
 - **Datos medidos, no solo calculados:** cerca de un aeropuerto (≤ 25 km) se usan las observaciones reales (METAR); en el resto del país se muestra cuánto difiere el modelo de lo medido.
 - **Probabilidad de lluvia con ensambles** de 4 modelos (ECMWF, GFS, ICON y GEM) y rango probable de temperatura.
 - **Compartir** el clima de una ciudad (menú del celular, copiar enlace o WhatsApp), con enlace directo a esa ciudad.
@@ -18,6 +18,7 @@ Se puede instalar en el celular como una app (desde el menú del navegador: *Agr
 - **Sonido ambiente opcional** con una mezcla limpia (un fondo y como mucho dos detalles, volumen parejo entre climas, limitador): chicharras en verano, grillos, aves, ranas, viento, lluvia, granizo y truenos.
 - **Ajustes (botón de ajustes):** pestañas Animación, Sonido y Navidad: qué efectos ver, intensidad, calidad (automática, alta o ahorro de batería), fondo y paisaje por separado, volumen y una **vista previa** para ver cualquier clima y momento del día. Se guardan en el navegador de cada persona.
 - **Navidad** automática del 1 de diciembre al 6 de enero (o siempre/nunca): logo ñandutí festivo, guirnalda de luces que parpadean (se puede dejar fija), saludo con cuenta regresiva, pino decorado y palmeras con luces en el paisaje, **música navideña opcional** (caja de música sintetizada con melodías de dominio público) y fuegos artificiales en Año Nuevo. Sin nieve: en Paraguay la Navidad es en verano.
+- **Portada premium:** la ciudad y la temperatura sobre la franja de paisaje animado, con un **ñandutí a color** (dorado, rosa y violeta) que rodea la temperatura y cambia su brillo con el clima; barra superior compacta con un **menú** (en el celular) para idioma, tema, sonido, ajustes y accesos rápidos.
 - **Diseño «Cristal guaraní»:** modo oscuro por defecto, el **ñandutí** como logo y como detalle, tipografía Fraunces + Inter (incluidas, con las letras del guaraní) y un set de íconos propio: la interfaz no usa emojis.
 - Radar de lluvia, comparación de ciudades, favoritas, "cerca de mí", tema claro/oscuro y °C/°F.
 
@@ -45,6 +46,7 @@ En vez de que cada visitante consulte cientos de ciudades a Open-Meteo, un proce
 | `sw.js` | Service worker: permite abrir la app sin internet (`geo.js` sale primero del caché y se renueva en segundo plano) |
 | `fonts/` | Fuentes propias Fraunces e Inter (licencia OFL): subconjunto latino y las letras del guaraní ĩ ũ ẽ ỹ |
 | `icono.svg`, `logo-nanduti*.svg`, `logo-navidad.svg`, `icono-*.png` | Logo ñandutí y sus variantes (normal y navideña, para la app instalada y el navegador) |
+| `scripts/nanduti-portada.mjs` | Escribe en `index.html` (entre `<!-- NANDUTI:INICIO -->` y `<!-- NANDUTI:FIN -->`) el ñandutí grande de la portada a partir de `logo-nanduti-hilos.svg`, con una variable de color por capa de hilos; los colores están en `estilos.css` (`--nd-…`) |
 | `scripts/iconos.mjs` | Genera el set de íconos SVG de la interfaz dentro de `index.html`, entre `<!-- ICONOS:INICIO -->` y `<!-- ICONOS:FIN -->` (para cambiar un ícono, edita este script y córrelo: `node scripts/iconos.mjs`) |
 | `scripts/simplificar-geo.mjs` | Aligera los mapas de `geo.js` sin deformar los bordes compartidos (ver abajo) |
 | `manifest.webmanifest` | Nombre e íconos para instalar la app |
