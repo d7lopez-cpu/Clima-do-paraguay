@@ -445,7 +445,9 @@ html.navidad { --nd-petalo: #ef4444; --nd-anillo: #4ade80; --nd-brillo: rgba(251
 .mini.ahora .lluvia { color: var(--texto); }
 /* próximos 7 días, en filas */
 .dias-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.dia-fila { display: grid; grid-template-columns: minmax(5.6em, 1.2fr) 26px 3.4em 2.4em minmax(56px, 2fr) 2.4em; align-items: center; gap: 10px; padding: 10px 2px; border-top: 1px solid var(--borde); }
+/* columnas que se ajustan al contenido: con letra agrandada (Samsung) la barra se achica y los números nunca se salen de la tarjeta */
+.dia-fila { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto minmax(24px, 1.3fr) auto; align-items: center; gap: 10px; padding: 10px 2px; border-top: 1px solid var(--borde); }
+.dia-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dia-fila:first-child { border-top: 0; padding-top: 2px; }
 .dia-nombre { font-weight: 600; }
 .dia-ic { display: inline-grid; place-items: center; } .dia-ic .ic { width: 24px; height: 24px; }
@@ -455,7 +457,13 @@ html.navidad { --nd-petalo: #ef4444; --nd-anillo: #4ade80; --nd-brillo: rgba(251
 .dia-min { color: var(--suave); text-align: right; font-variant-numeric: tabular-nums; }
 .dia-max { font-weight: 600; font-variant-numeric: tabular-nums; }
 .dia-fila .barra-rango { margin: 0; align-self: center; }
-@media (max-width: 380px) { .dia-fila { grid-template-columns: minmax(4.6em, 1fr) 22px 3em 2.2em minmax(36px, 1.4fr) 2.2em; gap: 6px; font-size: 0.9rem; } }
+.nom-corto { display: none; }
+/* celular angosto: el día abreviado (Mié, Jue…) en vez de cortarlo con «…» */
+@media (max-width: 420px) {
+  .dia-fila { gap: 7px; } .dia-fila .lluvia .ic { display: none; }
+  .nom-largo { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .nom-corto { display: inline; }
+}
 
 /* ============ 10. RESUMEN NACIONAL Y FAVORITAS ============ */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--e-3); }
