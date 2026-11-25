@@ -1349,7 +1349,7 @@
   const ec = $('escenaCv'), ex = ec.getContext('2d');
   let eW = 0, eH = 0, eD = 1, eClave = '', eFirma = '', eNubes = [], eAves = [], eLuci = [], eEstr = [], eGotas = [], eGranizo = [], eHojas = [], ePetalos = [], eOndas = [], eNiebla = [], eRayo = null, eFugaz = null;
   let eTexNiebla = null, eSprLuci = null, eSombra = null, ultRayoT = -1, reGolpe = 0;
-  let eFuegos = [], eSprGuir = null, eNuevo = { t: -1e9, si: false }, eLuces = [], eViaL = null, eCharcos = [], eMoj = -1, eFoto = null, eFundido = 0, eEtq = [], eEtqSucio = true;        // fundido entre escenas · zonas ocupadas por las etiquetas
+  let eSprGuir = null, eNuevo = { t: -1e9, si: false }, eLuces = [], eViaL = null, eCharcos = [], eMoj = -1, eFoto = null, eFundido = 0, eEtq = [], eEtqSucio = true;        // fundido entre escenas · zonas ocupadas por las etiquetas
   const vAst = { ok: false, sx: 0, sy: 0, so: 0, mx: 0, my: 0, mf: 0 };   // sol y luna suavizados (no saltan al cambiar de momento del día)
   // Paralaje: el puntero sobre el cuadro (o la inclinación del celular, donde el navegador la da sin pedir permiso) corre un poco
   // cada capa según su distancia: lo lejano casi nada, las palmeras y la orilla lo que más. Nunca con movimiento reducido.
@@ -1702,41 +1702,18 @@
     }
     ex.globalAlpha = 1;
   }
-  // ¿Es Año Nuevo en Paraguay? (31 de diciembre desde las 23:30 hasta la 1:00 del 1 de enero, hora de Asunción). Se consulta cada 15 s.
-  function esAnoNuevo() {
+  // ¿Hay fuegos artificiales? En Paraguay se tiran en Nochebuena y en Año Nuevo: el 24 y el 31 de diciembre desde las 23:30
+  // hasta la 1:00 del día siguiente (hora de Asunción). Devuelve 0 (no), 1 (sí) o 2 (gran final: de las 0:00 a las 0:03).
+  // Se consulta cada 15 s.
+  function hayFuegos() {
     const ahora = Date.now(); if (Math.abs(ahora - eNuevo.t) < 15000) return eNuevo.si;
     const p = {}; eNuevo.t = ahora;
-    try { new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Asuncion', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(ahora)).forEach(x => { p[x.type] = +x.value; }); } catch (e) { return eNuevo.si = false; }
-    return eNuevo.si = (p.month === 12 && p.day === 31 && p.hour * 60 + p.minute >= 23 * 60 + 30) || (p.month === 1 && p.day === 1 && p.hour < 1);
+    try { new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Asuncion', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(ahora)).forEach(x => { p[x.type] = +x.value; }); } catch (e) { return eNuevo.si = 0; }
+    const vispera = p.month === 12 && (p.day === 24 || p.day === 31) && p.hour * 60 + p.minute >= 23 * 60 + 30;
+    const despues = ((p.month === 12 && p.day === 25) || (p.month === 1 && p.day === 1)) && p.hour < 1;
+    return eNuevo.si = !(vispera || despues) ? 0 : despues && p.minute < 3 ? 2 : 1;
   }
-  const COL_FUEGO = ['255,210,120', '255,150,175', '150,220,232', '255,238,212', '170,228,150'];
-  // Fuegos artificiales sobre el río: cohetes que suben por detrás de las colinas y estallan en chispas que caen despacio.
-  // Sin destellos: solo un halo tenue en el estallido y su reflejo en el agua.
-  function fuegos(t, dt, yAgua) {
-    if (eFuegos.filter(f => !f.chispas).length < 2 && Math.random() < dt / 1700 * prefsAnim.intensidad)
-      eFuegos.push({ x: eW * (0.3 + Math.random() * 0.42), y: yAgua - eH * 0.06, v: eH * (0.00055 + Math.random() * 0.0002), meta: eH * (0.12 + Math.random() * 0.2), c: COL_FUEGO[Math.floor(Math.random() * COL_FUEGO.length)], chispas: null, vida: 0 });
-    ex.lineCap = 'round';
-    eFuegos = eFuegos.filter(f => {
-      if (!f.chispas) {                                             // subiendo: un punto con una estela corta
-        f.y -= f.v * dt; f.v *= Math.exp(-dt / 2600);
-        ex.strokeStyle = `rgba(${f.c},0.55)`; ex.lineWidth = 1.2; ex.beginPath(); ex.moveTo(f.x, f.y); ex.lineTo(f.x, f.y + eH * 0.05); ex.stroke();
-        if (f.y <= f.meta) {
-          const n = Math.max(14, cant(34)), vel = eH * (0.0003 + Math.random() * 0.0001);
-          f.chispas = Array.from({ length: n }, (_, i) => { const a = i / n * 6.283 + Math.random() * 0.2, s = vel * (0.7 + Math.random() * 0.45); return { x: f.x, y: f.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s }; });
-          f.dur = 1500 + Math.random() * 600; f.cx = f.x; f.cy = f.y;
-          if (window.climaSonido && climaSonido.estallido) climaSonido.estallido(0.4 + Math.random() * 0.6);   // suena solo si el sonido del clima está encendido
-        }
-        return true;
-      }
-      f.vida += dt; const u = f.vida / f.dur; if (u >= 1) return false;
-      const a = (1 - u) ** 1.6, ar = Math.exp(-dt / 900), g = eH * 1.3e-7 * dt;
-      if (u < 0.5) { const r = eH * 0.16, gl = ex.createRadialGradient(f.cx, f.cy, 0, f.cx, f.cy, r); gl.addColorStop(0, `rgba(${f.c},${0.1 * (1 - u * 2) ** 2})`); gl.addColorStop(1, `rgba(${f.c},0)`); ex.fillStyle = gl; ex.fillRect(f.cx - r, f.cy - r, r * 2, r * 2); }
-      ex.strokeStyle = `rgba(${f.c},${0.85 * a})`; ex.lineWidth = 1.3; ex.beginPath();
-      for (const c of f.chispas) { c.vx *= ar; c.vy = c.vy * ar + g; c.x += c.vx * dt; c.y += c.vy * dt; ex.moveTo(c.x, c.y); ex.lineTo(c.x - c.vx * 55, c.y - c.vy * 55); }
-      ex.stroke();
-      return true;
-    });
-  }
+
   function pintarEscena(t, dt, quieto) {
     const w = ec.clientWidth, h = ec.clientHeight;
     if (!w || !h) return;
@@ -1853,8 +1830,8 @@
       const f = Math.sin(t / 140 + b.f) * b.s * 0.45, y = b.y + Math.sin(t / 1500 + b.f) * 4;
       ex.beginPath(); ex.moveTo(b.x - b.s, y - f); ex.quadraticCurveTo(b.x - b.s * 0.4, y - b.s * 0.3 - f * 0.4, b.x, y); ex.quadraticCurveTo(b.x + b.s * 0.4, y - b.s * 0.3 - f * 0.4, b.x + b.s, y - f); ex.stroke();
     });
-    // fuegos artificiales de Año Nuevo (nunca con la escena quieta, con movimiento reducido ni con <html class="sin-fuegos">)
-    if (esp && anim && esAnoNuevo() && !document.documentElement.classList.contains('sin-fuegos')) fuegos(t, dt, yAgua); else if (eFuegos.length) eFuegos = [];   // la clase sin-fuegos los apaga (panel)
+    // los fuegos artificiales del 24 y del 31 se dibujan en el cielo de toda la pantalla (fuegosCielo): en la franja del paisaje
+    // quedaban chicos y tapados por la portada   // la clase sin-fuegos los apaga (panel)
     // colinas lejanas y cercanas
     ex.translate(pX(0.25), 0); colinaEsc(eH * 0.56, eH * 0.07, 2, 5, 0.6, T[0]); ex.translate(-pX(0.25), 0);
     // bruma atmosférica: lo lejano se funde con el color del horizonte (más de día, menos de noche)
@@ -1925,9 +1902,9 @@
       for (const l of eLuces) { const L = 3 + l.r * 4 + Math.sin(t / 600 + l.x) * 1.5; ex.fillRect(l.x + dxC - 0.5 + Math.sin(t / 500 + l.y) * 0.6, yAgua + 1.5, 1, L); }
       ex.globalAlpha = 1;
     }
-    for (const f of eFuegos) if (f.chispas && f.vida < f.dur * 0.6) {   // el estallido se refleja apenas en el agua
+    for (const f of cFuegos) if (f.chispas && f.vida < f.dur * 0.6) {   // los estallidos del cielo se reflejan apenas en el río
       const k = 1 - f.vida / (f.dur * 0.6), r = eH * 0.2;
-      ex.save(); ex.translate(f.cx, yAgua + hAg * 0.35); ex.scale(1, 0.3);
+      ex.save(); ex.translate(f.cx * eW / (cvW || 1), yAgua + hAg * 0.35); ex.scale(1, 0.3);
       const gw = ex.createRadialGradient(0, 0, 0, 0, 0, r); gw.addColorStop(0, `rgba(${f.c},${0.16 * k * k})`); gw.addColorStop(1, `rgba(${f.c},0)`);
       ex.fillStyle = gw; ex.fillRect(-r, -r, r * 2, r * 2); ex.restore();
     }
@@ -2131,6 +2108,62 @@
     const n = { despejado: 0, parcial: 3, nublado: 5, niebla: 5, lluvia: 5, tormenta: 5 }[amb.tipo];
     nubes = efectoActivo('nubes') ? Array.from({ length: Math.round(n * limitar(multFx(), 0.7, 1.3)) }, () => ({ x: Math.random() * cvW, y: cvH * (0.05 + Math.random() * 0.45), r: cvW * (0.18 + Math.random() * 0.18), v: 0.01 + Math.random() * 0.02 })) : [];
   }
+  // ---- Fuegos artificiales del 24 y del 31, en el cielo de toda la pantalla ----
+  // Cohetes que suben desde abajo y estallan alrededor de la portada (se ven también a través de las tarjetas de vidrio).
+  // Cuatro estallidos: esfera, anillo, doble color y «sauce» dorado que cae lento; colores de la bandera y de fiesta.
+  // Gran final en los primeros 3 minutos después de la medianoche. Nunca con movimiento reducido, con los efectos apagados,
+  // sin «Efectos especiales» o con el interruptor «Fuegos artificiales» apagado (<html class="sin-fuegos">).
+  const COL_FUEGOS = ['255,82,70', '255,255,255', '90,140,255', '255,214,102', '120,230,140', '255,140,200', '150,220,255'];
+  let cFuegos = [], cProxCohete = 0;
+  const fuegosPermitidos = () => fx && !REDUCIDO && efectoActivo('especiales') && !document.documentElement.classList.contains('sin-fuegos') && hayFuegos() > 0;
+  function fuegosCielo(t, dt) {
+    const modo = fuegosPermitidos() ? hayFuegos() : 0;
+    document.documentElement.classList.toggle('fuegos-vivos', modo > 0 || cFuegos.length > 0);
+    if (!modo && !cFuegos.length) return;
+    const escala = Math.min(cvW, cvH * 0.8), subiendo = cFuegos.filter(f => !f.chispas).length;
+    if (modo && t >= cProxCohete && subiendo < (modo === 2 ? 6 : 3)) {
+      cProxCohete = t + (modo === 2 ? 250 + Math.random() * 350 : 700 + Math.random() * 900) / Math.max(0.4, prefsAnim.intensidad || 1);
+      const meta = cvH * (0.08 + Math.random() * 0.34);
+      cFuegos.push({ x: cvW * (0.12 + Math.random() * 0.76), y: cvH + 10, meta, v: (cvH + 10 - meta) / (900 + Math.random() * 400),
+        tipo: ['esfera', 'esfera', 'anillo', 'doble', 'sauce'][Math.floor(Math.random() * 5)],
+        c: COL_FUEGOS[Math.floor(Math.random() * COL_FUEGOS.length)], c2: COL_FUEGOS[Math.floor(Math.random() * COL_FUEGOS.length)], estela: [] });
+    }
+    cx.save(); cx.globalCompositeOperation = 'lighter'; cx.lineCap = 'round';
+    cFuegos = cFuegos.filter(f => {
+      if (!f.chispas) {                                             // subiendo: una chispa con su estela
+        f.y -= f.v * dt; f.v = Math.max(f.v * Math.exp(-dt / 1800), 0.05);
+        f.estela.push([f.x + Math.sin(f.y * 0.05) * 0.6, f.y]); if (f.estela.length > 10) f.estela.shift();
+        cx.strokeStyle = 'rgba(255,220,170,0.5)'; cx.lineWidth = 1.6; cx.beginPath(); f.estela.forEach(([x, y], i) => i ? cx.lineTo(x, y) : cx.moveTo(x, y)); cx.stroke();
+        cx.fillStyle = 'rgba(255,240,210,0.95)'; cx.beginPath(); cx.arc(f.x, f.y, 1.8, 0, 6.283); cx.fill();
+        if (f.y <= f.meta) estallar(f, escala);
+        return true;
+      }
+      f.vida += dt; const u = f.vida / f.dur; if (u >= 1) return false;
+      if (u < 0.25) {                                               // el resplandor del estallido
+        const r = escala * 0.34, gl = cx.createRadialGradient(f.cx, f.cy, 0, f.cx, f.cy, r);
+        gl.addColorStop(0, `rgba(${f.c},${0.3 * (1 - u * 4)})`); gl.addColorStop(1, `rgba(${f.c},0)`); cx.fillStyle = gl; cx.fillRect(f.cx - r, f.cy - r, 2 * r, 2 * r);
+      }
+      const sauce = f.tipo === 'sauce', ar = Math.exp(-dt / (sauce ? 1400 : 700)), g = (sauce ? 9e-5 : 5e-5) * dt, largo = sauce ? 130 : 70;
+      for (const c of f.chispas) {
+        c.vx *= ar; c.vy = c.vy * ar + g; c.x += c.vx * dt; c.y += c.vy * dt;
+        const a = (1 - u) ** 1.4 * (c.titila ? 0.55 + 0.45 * Math.sin(t / 60 + c.titila) : 1);
+        cx.strokeStyle = `rgba(${c.col},${0.9 * a})`; cx.lineWidth = c.ancho;
+        cx.beginPath(); cx.moveTo(c.x, c.y); cx.lineTo(c.x - c.vx * largo, c.y - c.vy * largo); cx.stroke();
+      }
+      return true;
+    });
+    cx.restore();
+  }
+  function estallar(f, escala) {
+    const sauce = f.tipo === 'sauce', n = Math.round((f.tipo === 'anillo' ? 56 : sauce ? 70 : 84) * Math.max(0.5, nivelR())), vel = escala * (0.0005 + Math.random() * 0.00016);
+    f.chispas = []; f.cx = f.x; f.cy = f.y; f.vida = 0; f.dur = sauce ? 2600 : 1700 + Math.random() * 500;
+    if (sauce) f.c = '255,200,110';
+    for (let i = 0; i < n; i++) {
+      const a = i / n * 6.283 + Math.random() * 0.08, s = vel * (f.tipo === 'anillo' ? 1 : sauce ? 0.55 + Math.random() * 0.5 : 0.35 + Math.random() * 0.75);
+      f.chispas.push({ x: f.x, y: f.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, col: f.tipo === 'doble' && i % 2 ? f.c2 : f.c, ancho: sauce ? 1.5 : 2.1, titila: Math.random() < 0.3 ? Math.random() * 6 : 0 });
+    }
+    if (window.climaSonido && climaSonido.estallido) climaSonido.estallido(0.5 + Math.random() * 0.5);   // suena solo si el sonido del clima está encendido
+  }
   function pintarCielo(t, dt, quieto) {
     if (!quieto) latidoRayo(t, dt || 0);
     if (!prefsAnim.fondo) { if (!cieloLimpio) { cx.clearRect(0, 0, cvW, cvH); cieloLimpio = true; } return; }   // fondo apagado: el lienzo queda limpio
@@ -2138,7 +2171,7 @@
     // (los paneles translúcidos se apoyan en él): basta con repintarlo ~15 veces por segundo, salvo durante un relámpago.
     if (!quieto) {
       cAcum += dt || 0;
-      if (cAcum < 62 && !cieloLimpio && cClave === claveCielo() && destello <= 0.02 && cDestello <= 0.02) return;
+      if (cAcum < 62 && !cieloLimpio && cClave === claveCielo() && destello <= 0.02 && cDestello <= 0.02 && !cFuegos.length && !fuegosPermitidos()) return;   // con fuegos: a ritmo completo
       dt = cAcum; cAcum = 0;
     }
     cDestello = destello;
@@ -2147,6 +2180,7 @@
     if (!vEsc.Ph) avanzarVisual(0, true);
     const A = amb, kEstr = vEsc.esc[1], kLuna = vEsc.esc[4], luz = vEsc.esc[6], ast = arcoAstros();
     cx.clearRect(0, 0, cvW, cvH);
+    if (!quieto) fuegosCielo(t, dt || 0);
     if (A.tipo === 'despejado' || A.tipo === 'parcial' || A.tipo === 'nublado') {      // sol o luna: un resplandor suave que sigue su arco
       const r = Math.max(cvW, cvH) * 0.34, brillar = (x, y, col, a) => {
         const g = cx.createRadialGradient(x, y, 0, x, y, r);
@@ -3109,6 +3143,8 @@
     const falta = (n, que) => n === 1 ? `Falta 1 día para ${que}` : `Faltan ${n} días para ${que}`;
     if (m === 1 && d === 1) return '¡Feliz Año Nuevo!';
     if (m === 1) return '';
+    if (m === 12 && d === 24 && hayFuegos()) return '¡Feliz Navidad!';          // desde las 23:30 del 24, con los fuegos artificiales
+    if (m === 12 && d === 31 && hayFuegos()) return '¡Feliz Año Nuevo!';
     if (m === 12 && d === 25) return '¡Feliz Navidad!';
     if (m === 12 && d > 25) return falta(dias(a + 1, 1, 1), 'Año Nuevo');
     return falta(dias(a, 12, 25), 'Navidad');
@@ -3176,7 +3212,7 @@
   });
   $('btnAjustesAnim').addEventListener('click', () => aplicarNavidad());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) aplicarNavidad(); });   // por si la página quedó abierta de un día para otro
-  setInterval(aplicarNavidad, 30 * 60e3);
+  setInterval(aplicarNavidad, 5 * 60e3);   // cada 5 min: el saludo cambia a tiempo a las 23:30 del 24 y del 31
   aplicarNavidad();
 
   // ============ 7) RESUMEN, LISTA Y DETALLE ============
