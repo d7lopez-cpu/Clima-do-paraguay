@@ -42,7 +42,7 @@
   --borde: rgba(255, 255, 255, 0.12);
   --borde-fuerte: rgba(255, 255, 255, 0.2);
   --texto: #eef2ff;
-  --suave: #c3cdf0;
+  --suave: #d2daf6;   /* un poco más claro que el #c3cdf0 de la guía: en celular el fondo es más claro y pasan los hilos del ñandutí */
   --temp: #ffffff;
   --acento: #f4a3c6;                                              /* rosa lapacho */
   --acento-texto: #2a0f1f;
