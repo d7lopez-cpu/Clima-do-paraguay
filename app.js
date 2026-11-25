@@ -2127,6 +2127,8 @@
       cFuegos.push({ x: cvW * (0.12 + Math.random() * 0.76), y: cvH + 10, meta, v: (cvH + 10 - meta) / (900 + Math.random() * 400),
         tipo: ['esfera', 'esfera', 'anillo', 'doble', 'sauce'][Math.floor(Math.random() * 5)],
         c: COL_FUEGOS[Math.floor(Math.random() * COL_FUEGOS.length)], c2: COL_FUEGOS[Math.floor(Math.random() * COL_FUEGOS.length)], estela: [] });
+      const ult = cFuegos[cFuegos.length - 1];                       // uno de cada tres cohetes silba al subir (sube en ~1–1,3 s)
+      if (Math.random() < 0.35 && window.climaSonido && climaSonido.cohete) climaSonido.cohete((ult.y - ult.meta) / ult.v / 1000 * 0.9);
     }
     cx.save(); cx.globalCompositeOperation = 'lighter'; cx.lineCap = 'round';
     cFuegos = cFuegos.filter(f => {
@@ -2162,7 +2164,7 @@
       const a = i / n * 6.283 + Math.random() * 0.08, s = vel * (f.tipo === 'anillo' ? 1 : sauce ? 0.55 + Math.random() * 0.5 : 0.35 + Math.random() * 0.75);
       f.chispas.push({ x: f.x, y: f.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, col: f.tipo === 'doble' && i % 2 ? f.c2 : f.c, ancho: sauce ? 1.5 : 2.1, titila: Math.random() < 0.3 ? Math.random() * 6 : 0 });
     }
-    if (window.climaSonido && climaSonido.estallido) climaSonido.estallido(0.5 + Math.random() * 0.5);   // suena solo si el sonido del clima está encendido
+    if (window.climaSonido && climaSonido.estallido) climaSonido.estallido(0.55 + Math.random() * 0.45, f.tipo);   // suena solo si el sonido del clima está encendido
   }
   function pintarCielo(t, dt, quieto) {
     if (!quieto) latidoRayo(t, dt || 0);
@@ -2528,20 +2530,43 @@
   }
   // Estallido suave para los fuegos artificiales de Año Nuevo: el paisaje puede llamar a climaSonido.estallido(0..1) al estallar
   // cada uno. Ruido grave y breve + chisporroteo; como mucho 4 por segundo (anti-ráfaga) y solo con el sonido del clima encendido.
-  function estallido(fuerza) {
-    if (!au || !sonando || au.ctx.state !== 'running' || !hayLugar(8)) return false;
+  function estallido(fuerza, tipo) {
+    if (!au || !sonando || au.ctx.state !== 'running' || !hayLugar(12)) return false;
     const ahora = performance.now(); if (ahora - (au.ultEstallido || 0) < 250) return false; au.ultEstallido = ahora;
     const { ctx, buf } = au, T = ctx.currentTime + MARGEN, k = limitar(Number(fuerza) || 0.6, 0.1, 1), sal = salida(au.duckAcentos);
-    const s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
-    s.buffer = buf; fl.type = 'lowpass'; fl.frequency.setValueAtTime(900, T); fl.frequency.exponentialRampToValueAtTime(120, T + 0.6);
-    g.gain.setValueAtTime(0.0001, T); g.gain.exponentialRampToValueAtTime(0.5 * k, T + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, T + 0.7);
-    s.connect(fl); fl.connect(g); g.connect(sal); vigilar(s).start(T, Math.random() * 4, 0.8);
-    for (let i = 0; i < 5; i++) {                                  // chispas: golpecitos agudos que caen después del estallido
-      const t = T + 0.15 + Math.random() * 0.5, c = ctx.createBufferSource(), h = ctx.createBiquadFilter(), cg = ctx.createGain();
-      c.buffer = buf; h.type = 'highpass'; h.frequency.value = azar(3500, 7000);
-      cg.gain.setValueAtTime(0.0001, t); cg.gain.exponentialRampToValueAtTime(0.12 * k, t + 0.002); cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
-      c.connect(h); h.connect(cg); cg.connect(sal); vigilar(c).start(t, Math.random() * 4, 0.05);
+    const ruido = (t, tipoF, f0, f1, vol, ataque, dur) => {
+      const s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+      s.buffer = buf; fl.type = tipoF; fl.frequency.setValueAtTime(f0, t); fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + ataque); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      s.connect(fl); fl.connect(g); g.connect(sal); vigilar(s).start(t, Math.random() * 4, dur + 0.05);
+    };
+    // 1) el golpe grave que se siente en el pecho: un seno que cae de ~95 a ~38 Hz
+    const o = ctx.createOscillator(), og = ctx.createGain();
+    o.frequency.setValueAtTime(azar(85, 105), T); o.frequency.exponentialRampToValueAtTime(38, T + 0.45);
+    og.gain.setValueAtTime(0.0001, T); og.gain.exponentialRampToValueAtTime(0.75 * k, T + 0.006); og.gain.exponentialRampToValueAtTime(0.0001, T + 0.6);
+    o.connect(og); og.connect(sal); vigilar(o).start(T); o.stop(T + 0.65);
+    // 2) el estampido (ruido que se apaga de agudo a grave) y su retumbo, que llega un poco después
+    ruido(T, 'lowpass', 2600, 160, 0.95 * k, 0.004, 0.9);
+    ruido(T + azar(0.18, 0.32), 'lowpass', 520, 70, 0.32 * k, 0.08, 1.3);
+    // 3) chisporroteo: golpecitos agudos que caen mientras se apagan las chispas (más largo en el «sauce»)
+    const sauce = tipo === 'sauce', n = sauce ? 26 : tipo === 'anillo' ? 10 : 16, largo = sauce ? 2.2 : 1.3;
+    for (let i = 0; i < n; i++) {
+      const t = T + 0.25 + Math.pow(Math.random(), 0.8) * largo, c = ctx.createBufferSource(), h = ctx.createBiquadFilter(), cg = ctx.createGain(), d = azar(0.012, 0.03);
+      c.buffer = buf; h.type = 'highpass'; h.frequency.value = azar(2800, 7500);
+      cg.gain.setValueAtTime(0.0001, t); cg.gain.exponentialRampToValueAtTime(azar(0.08, 0.2) * k, t + 0.002); cg.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      c.connect(h); h.connect(cg); cg.connect(sal); vigilar(c).start(t, Math.random() * 4, d + 0.02);
     }
+    return true;
+  }
+  // Silbido de un cohete que sube (los «silbadores»): ruido en una banda angosta que sube de tono durante el ascenso
+  function silbidoCohete(dur) {
+    if (!au || !sonando || au.ctx.state !== 'running' || !hayLugar(1)) return false;
+    const { ctx, buf } = au, T = ctx.currentTime + MARGEN, D = limitar(Number(dur) || 1.1, 0.4, 2.5), sal = salida(au.duckAcentos);
+    const s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = buf; s.loop = true; fl.type = 'bandpass'; fl.Q.value = 18;
+    fl.frequency.setValueAtTime(azar(700, 900), T); fl.frequency.exponentialRampToValueAtTime(azar(2400, 3200), T + D);
+    g.gain.setValueAtTime(0.0001, T); g.gain.exponentialRampToValueAtTime(0.5, T + 0.15); g.gain.setValueAtTime(0.5, T + D * 0.8); g.gain.exponentialRampToValueAtTime(0.0001, T + D);
+    s.connect(fl); fl.connect(g); g.connect(sal); vigilar(s).start(T, Math.random() * 4); s.stop(T + D + 0.05);
     return true;
   }
 
@@ -2943,7 +2968,9 @@
     renderizarMusica: seg => renderizarMusica(seg),
     canciones: () => CANCIONES.map(c => c.nombre),
     // Para el paisaje: un estallido suave por cada fuego artificial (fuerza 0 a 1)
-    estallido: fuerza => estallido(fuerza)
+    estallido: (fuerza, tipo) => estallido(fuerza, tipo),
+    // Para el cielo: el silbido de un cohete que sube (duración en s)
+    cohete: dur => silbidoCohete(dur)
   });
   // Ganancias REALES de cada capa en este instante (con fundidos y ducking incluidos), para las pruebas
   function ganancias(A) {
