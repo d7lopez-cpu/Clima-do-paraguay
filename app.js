@@ -4038,7 +4038,7 @@
     "Idioma: Español": "Ñe'ẽ: Español", "Idioma: Avañe'ẽ (guaraní)": "Ñe'ẽ: Avañe'ẽ (guaraní)",
     "Menú": "Menu", "Menú: idioma, tema, sonido y más": "Menu: ñe'ẽ, sa'y, ryapu ha hetave", "Pronóstico": "Ára oúva",
     "Visibilidad": "Hecha", "Salida del sol": "Kuarahy osẽ", "Puesta del sol": "Kuarahy oike",
-    "Lunes": "Arateĩ", "Martes": "Arakõi", "Miércoles": "Araapy", "Jueves": "Ararundy", "Viernes": "Arapo", "Sábado": "Arapokõi", "Domingo": "Arapokõindy"
+    "Creado por": "Ojapo", "Lunes": "Arateĩ", "Martes": "Arakõi", "Miércoles": "Araapy", "Jueves": "Ararundy", "Viernes": "Arapo", "Sábado": "Arapokõi", "Domingo": "Arapokõindy"
   };
   const DIAS_GN = { dom: "Arapokõindy", lun: "Arateĩ", mar: "Arakõi", mié: "Araapy", jue: "Ararundy", vie: "Arapo", sáb: "Arapokõi" };
   const diaGN = x => DIAS_GN[x.toLowerCase().replace('.', '')] || x;
