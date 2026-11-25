@@ -64,8 +64,12 @@ jobs:
           "$BT/apksigner" verify --print-certs ClimaPY.apk | head -3
           "$BT/aapt2" dump badging ClimaPY.apk | grep -E "^(package|sdkVersion|targetSdkVersion|uses-permission|launchable-activity|application-label)"
           "$BT/aapt2" dump xmltree --file AndroidManifest.xml ClimaPY.apk | grep -q "android.appwidget.provider"
-          "$BT/aapt2" dump xmltree --file res/xml/widget_info.xml ClimaPY.apk | grep -E "updatePeriodMillis|configure|initialLayout"
-          unzip -l ClimaPY.apk | grep -E "assets/ciudades.json|classes.dex|nanduti"
+          # en la versión final los archivos de recursos tienen nombres cortos: se busca el del widget por su nombre de recurso
+          INFO=$("$BT/aapt2" dump resources ClimaPY.apk | grep -A3 "xml/widget_info" | grep -oE "res/[^ ]+\.xml" | head -1)
+          echo "widget_info: $INFO"
+          "$BT/aapt2" dump xmltree --file "$INFO" ClimaPY.apk | grep -E "updatePeriodMillis|configure|initialLayout|previewLayout"
+          "$BT/aapt2" dump resources ClimaPY.apk | grep -cE "drawable/(ic_|nanduti)" | xargs echo "íconos y ñandutí:"
+          unzip -l ClimaPY.apk | grep -E "assets/ciudades.json|classes.dex"
           ls -la ClimaPY.apk
 
       - uses: actions/upload-artifact@v5
