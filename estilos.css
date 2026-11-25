@@ -596,6 +596,11 @@ button.stat:hover:not(:disabled) { border-color: var(--borde-fuerte); }
   background: var(--flotante-fondo); color: var(--texto); border: 1px solid var(--borde-fuerte); padding: 11px 18px; border-radius: var(--r); font-size: 0.9rem; font-weight: 500;
   box-shadow: var(--sombra-flotante); }
 footer { color: var(--suave); font-size: var(--t-chico); text-align: center; line-height: 1.7; padding: var(--e-2) 0 var(--e-6); }
+/* firma del creador: el ñandutí y el nombre en la tipografía de los títulos, separada de los créditos de datos por una línea fina */
+.firma { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 10px; margin: 0 auto var(--e-4); padding-bottom: var(--e-4);
+  max-width: 420px; border-bottom: 1px solid var(--borde); font-family: var(--fuente-titulo); font-size: 1.05rem; color: var(--texto); }
+.firma img { width: 30px; height: 30px; border-radius: 8px; }
+.firma b { font-weight: 600; color: var(--dorado); letter-spacing: 0.01em; }
 
 /* ============ 15. OBJETIVOS TÁCTILES ============ */
 @media (max-width: 900px), (pointer: coarse) {
