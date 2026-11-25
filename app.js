@@ -12,7 +12,7 @@
   const norm = (v, a, b) => limitar((v - a) / (b - a), 0, 1);
   const esperar = ms => new Promise(r => setTimeout(r, ms));
   const REDUCIDO = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const INTERVALO = 30 * 60 * 1000;   // cada cuánto se actualiza solo
+  const INTERVALO = 15 * 60 * 1000;   // cada cuánto se actualiza solo (Open-Meteo renueva el clima de ahora cada 15 min)
   const nombreDep = n => n === 'Asunción' ? 'Asunción (capital)' : n;
 
   // ============ 2) CAPAS DEL MAPA ============
@@ -204,6 +204,28 @@
     if (!/\.github\.io$/i.test(h)) return null;                     // fuera de GitHub Pages: se consulta directo, como antes
     return `https://raw.githubusercontent.com/${h.split('.')[0]}/${location.pathname.split('/')[1] || h}/datos`;
   }
+  // ---- Frescura de cada dato ----
+  // Cada clima trae `time`: el cuarto de hora de Open-Meteo al que corresponde, en hora de Asunción ("2026-11-24T20:45").
+  // Con eso se sabe la edad REAL de cada ciudad, venga del archivo compartido, de Open-Meteo o de la memoria del celular.
+  const FRESCO_MS = 25 * 60000;           // un dato con menos de 25 min está al día (Open-Meteo lo renueva cada 15)
+  const fmtPY = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Asuncion', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  function msDato(d) {
+    const m = d && typeof d.time === 'string' && /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)/.exec(d.time);
+    if (!m) return 0;
+    const supuesto = Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5]), p = {};
+    fmtPY.formatToParts(new Date(supuesto)).forEach(x => { p[x.type] = x.value; });
+    return supuesto - (Date.UTC(+p.year, p.month - 1, +p.day, +p.hour, +p.minute) - supuesto);   // hora de Asunción → instante real
+  }
+  const viejo = c => !datos[c.n] || Date.now() - msDato(datos[c.n]) > FRESCO_MS;
+  // Cupo de consultas a Open-Meteo desde este dispositivo (su límite gratuito: 5000 por hora y 10 000 por día por red; cada ciudad
+  // de un pedido cuenta como una). Se lleva la cuenta en el dispositivo y se queda por debajo, con margen para las otras pestañas.
+  const CUPO_HORA = 2500, CUPO_DIA = 8000;
+  function registroConsultas() { const r = leerJSON('clima-py-consultas', []); return Array.isArray(r) ? r.filter(x => Array.isArray(x) && Date.now() - x[0] < 86400000) : []; }
+  function cupoConsultas() {
+    const r = registroConsultas(), hora = r.filter(x => Date.now() - x[0] < 3600000).reduce((a, x) => a + x[1], 0), dia = r.reduce((a, x) => a + x[1], 0);
+    return Math.max(0, Math.min(CUPO_HORA - hora, CUPO_DIA - dia));
+  }
+  function anotarConsultas(n) { if (n > 0) { const r = registroConsultas(); r.push([Date.now(), n]); guardar('clima-py-consultas', JSON.stringify(r.slice(-400))); } }
   async function cargarCompartidos() {
     const base = baseCompartida();
     if (!base) return null;
@@ -213,24 +235,28 @@
       let nuevos = 0;
       Object.keys(j.lugares || {}).forEach(n => { const v = j.lugares[n]; if (v && v.dep && esNumero(v.lat) && esNumero(v.lon) && sumarLugar(n, v.dep, v.lat, v.lon)) nuevos++; });
       if (nuevos) pintarConteos();
-      const cubre = new Set();
-      CIUDADES.forEach(c => { const d = j.datos[c.n]; if (d && esNumero(d.temperature_2m)) { datos[c.n] = d; cubre.add(c.n); } });
-      if (!cubre.size) return null;
+      // Se usa cada ciudad del archivo solo si es MÁS NUEVA que la que ya hay (antes un archivo atrasado pisaba datos más recientes)
+      let usadas = 0;
+      CIUDADES.forEach(c => { const d = j.datos[c.n]; if (d && esNumero(d.temperature_2m) && (!datos[c.n] || msDato(d) >= msDato(datos[c.n]))) { datos[c.n] = d; usadas++; } });
+      if (!usadas) return null;
       usoCompartido = true;
-      return { t: j.t, cubre, fresco: Date.now() - j.t < 100 * 60000 };
+      return { t: j.t };
     } catch (e) { return null; }
   }
   async function cargarTodas(forzar) {
-    // 1) Datos recientes ya guardados en el dispositivo: no se pide nada (abrir la app varias veces seguidas no gasta consultas)
-    if (!forzar && hayDatos && Date.now() - ultimaOk < 10 * 60000 && CIUDADES.every(c => c.g === 4 || datos[c.n])) return { ok: 1, total: 1, omitido: true };
-    // 2) Archivo compartido (lo actualiza GitHub cada 30 min)
+    // 1) Todo lo guardado en el dispositivo sigue al día: no se pide nada (abrir la app varias veces seguidas no gasta consultas)
+    if (!forzar && hayDatos && CIUDADES.every(c => c.g === 4 || !viejo(c))) return { ok: 1, total: 1, omitido: true };
+    // 2) Archivo compartido (lo publica GitHub; puede llegar atrasado: de cada ciudad se toma solo si es más nuevo)
     const comp = await cargarCompartidos();
-    // 3) Directo a Open-Meteo solo lo que falta
+    // 3) Directo a Open-Meteo, SOLO las ciudades cuyo dato tiene más de 25 min, de la más importante a la menos: la elegida, las
+    //    favoritas y luego por tamaño. Las localidades chicas (g 4) cada ~55 min. Así, aunque GitHub se atrase horas, el mapa
+    //    queda al día; y cuando el archivo llega fresco, no se pide nada.
     const caducan = Date.now() - ultimaExtras > EXTRAS_MS;
-    let lista;
-    if (comp && comp.fresco) lista = CIUDADES.filter(c => !comp.cubre.has(c.n) && (caducan || !datos[c.n] || favoritas.has(c.n) || c.n === seleccionada));
-    else if (comp) lista = CIUDADES.filter(c => !comp.cubre.has(c.n) || c.g <= 2 || favoritas.has(c.n) || c.n === seleccionada);   // archivo viejo: se usa y solo se refrescan principales y favoritas
-    else lista = CIUDADES.filter(c => c.g < 4 || caducan || !datos[c.n] || favoritas.has(c.n) || c.n === seleccionada);
+    const primero = c => c.n === seleccionada ? 0 : favoritas.has(c.n) ? 1 : c.g + 1;
+    let lista = CIUDADES.filter(c => viejo(c) && (c.g < 4 || caducan || !datos[c.n] || favoritas.has(c.n) || c.n === seleccionada))
+      .sort((a, b) => primero(a) - primero(b));
+    const cupo = cupoConsultas();
+    if (lista.length > cupo) lista = lista.filter((c, i) => i < cupo || primero(c) <= 1);   // sin cupo, igual la elegida y las favoritas
     const lotes = [];
     for (let i = 0; i < lista.length; i += TAM_LOTE) lotes.push(lista.slice(i, i + TAM_LOTE));
     let ok = 0;
@@ -239,14 +265,15 @@
         const url = `${OM.clima}?latitude=${lote.map(c => c.lat).join(',')}` +
           `&longitude=${lote.map(c => c.lon).join(',')}` +
           `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation,weather_code,is_day&timezone=America%2FAsuncion`;
+        anotarConsultas(lote.length);
         const json = await pedirClima(url);
         (Array.isArray(json) ? json : [json]).forEach((d, i) => { if (d && d.current && lote[i]) datos[lote[i].n] = d.current; });
       }));
       ok = res.filter(r => r.status === 'fulfilled').length;
       if (!ok && !comp) throw res[0].reason;
     }
-    if (caducan || (comp && comp.fresco)) ultimaExtras = Date.now();
-    return { ok: lotes.length ? ok : 1, total: lotes.length || 1, t: comp && comp.fresco ? comp.t : undefined };
+    if (caducan) ultimaExtras = Date.now();
+    return { ok: lotes.length ? ok : 1, total: lotes.length || 1 };
   }
 
   // ---- Probabilidad de lluvia: se calcula con ensambles (muchas simulaciones) de 4 modelos, no con el valor básico ----
@@ -865,6 +892,7 @@
       const url = `${OM.clima}?latitude=${lote.map(c => c.lat).join(',')}` +
         `&longitude=${lote.map(c => c.lon).join(',')}` +
         `&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation&timezone=America%2FAsuncion&forecast_days=2`;
+      anotarConsultas(lote.length);
       const json = await pedirClima(url);
       (Array.isArray(json) ? json : [json]).forEach((d, i) => { if (d && d.hourly && lote[i]) nuevas[lote[i].n] = d.hourly; });
     }));
@@ -3733,10 +3761,11 @@
     let clase, texto;
     if (!ultimaOk) { clase = cargando ? 'carga' : 'error'; texto = cargando ? 'Cargando…' : 'Sin datos'; }
     else {
-      const min = Math.round((Date.now() - ultimaOk) / 60000), hora = fmtHora(new Date(ultimaOk));
+      // la edad que se muestra es la del dato de la ciudad elegida (su cuarto de hora de Open-Meteo), no la del último pedido
+      const t = Math.min(msDato(datos[seleccionada]) || ultimaOk, Date.now()), min = Math.round((Date.now() - t) / 60000), hora = fmtHora(new Date(t));
       if (ultimoError) { clase = 'error'; texto = `Sin conexión · datos de las ${hora}`; }
-      else if (min >= 45) { clase = 'viejo'; texto = `Datos de hace ${min} min`; }
-      else { clase = 'ok'; texto = `En vivo · actualizado ${hora}`; }
+      else if (min >= 45) { clase = 'viejo'; texto = min >= 90 ? `Datos de hace ${Math.round(min / 60)} h` : `Datos de hace ${min} min`; }
+      else { clase = 'ok'; texto = `En vivo · datos de las ${hora}`; }
     }
     el.className = 'pill ' + clase;
     el.textContent = texto;
@@ -3757,7 +3786,7 @@
       const [r] = await Promise.all([cargarTodas(manual === true), cargarObservaciones()]);   // modelo + aeropuertos al mismo tiempo
       CIUDADES.forEach(c => { if (datos[c.n]) datos[c.n] = conObservacion(c, datos[c.n]); });
       sincronizarDia();
-      ultimaOk = r.omitido ? ultimaOk : (r.t || Date.now()); ultimoError = false; ok = true; hayDatos = true;
+      ultimaOk = r.omitido ? ultimaOk : Date.now(); ultimoError = false; ok = true; hayDatos = true;
       guardar('clima-py-datos', JSON.stringify({ t: ultimaOk, datos }));
       if (r.ok < r.total) aviso('Algunas ciudades no se pudieron actualizar.');
     } catch (e) {
@@ -3969,8 +3998,9 @@
   const SUB = x => traducir(x);
   // Frases completas con datos variables (se aplican al texto entero)
   const GN_PATRONES = [
-    [/^En vivo · actualizado (.+)$/, m => `Ko'ág̃agua · ojemopyahu ${m[1]}`],
+    [/^En vivo · datos de las (.+)$/, m => `Ko'ág̃agua · ojemopyahu ${m[1]}`],
     [/^Datos de hace (\d+) min$/, m => `Marandu ${m[1]} min ohasámava`],
+    [/^Datos de hace (\d+) h$/, m => `Marandu ${m[1]} aravo ohasámava`],
     [/^Sin conexión · datos de las (.+)$/, m => `Ndaipóri internet · marandu ${m[1]}-gua`],
     [/^Todo el país \((\d+)\)$/, m => `Tetã tuichakue (${m[1]})`],
     [/^(\d+) ciudades · (\d+) departamentos$/, m => `${m[1]} táva · ${m[2]} departamento`],
