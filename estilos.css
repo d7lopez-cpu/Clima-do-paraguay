@@ -303,11 +303,14 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
 .ciudad-fila { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: var(--e-2); width: 100%; max-width: 560px; }
 .hero-lado { display: flex; justify-content: center; }
 .ciudad-centro { display: flex; flex-direction: column; align-items: center; min-width: 0; gap: 2px; }
-.ciudad-nombre { display: inline-flex; align-items: center; justify-content: center; gap: 8px; max-width: 100%; font-family: var(--fuente-titulo); font-weight: 500;
+.ciudad-nombre { display: block; max-width: 100%; text-align: center; text-wrap: balance; font-family: var(--fuente-titulo); font-weight: 500;
   font-size: var(--t-ciudad); letter-spacing: -0.01em; line-height: 1.15; overflow-wrap: break-word; }
-.ciudad-nombre .ic { width: 20px; height: 20px; flex: none; color: var(--acento); }
-.dep-nombre { display: inline-flex; align-items: center; gap: 10px; color: var(--texto); font-size: 0.88rem; font-weight: 500; }
-.dep-nombre::before, .dep-nombre::after { content: ""; width: 26px; height: 1px; background: currentColor; opacity: 0.55; }
+.ciudad-nombre.largo { font-size: clamp(1.2rem, 5.6vw, 1.45rem); }
+/* el ícono va pegado a la primera palabra (dentro del texto), así un nombre largo en dos líneas sigue centrado */
+.ciudad-nombre .ic { display: inline-block; width: 0.8em; height: 0.8em; margin-right: 0.3em; vertical-align: -0.06em; color: var(--acento); }
+.dep-nombre { display: flex; align-items: center; justify-content: center; gap: 10px; max-width: 100%; color: var(--texto); font-size: 0.88rem; font-weight: 500; }
+.dep-nombre span { min-width: 0; text-align: center; }
+.dep-nombre::before, .dep-nombre::after { content: ""; flex: 0 0 22px; height: 1px; background: currentColor; opacity: 0.55; }
 .btn-redondo { display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--borde); background: var(--vidrio); color: var(--texto); }
 .btn-redondo:hover { background: var(--vidrio-hover); border-color: var(--borde-fuerte); }
 .btn-redondo .ic { width: 20px; height: 20px; }
@@ -677,7 +680,7 @@ footer { color: var(--suave); font-size: var(--t-chico); text-align: center; lin
 
 /* ============ 18. NAVIDAD (clase .navidad en <html>; app.js, sección 6g) ============ */
 /* Navidad paraguaya, en verano: guirnalda de luces, estrella y ñandutí dorado. Nada de nieve. */
-html.navidad body { padding-top: calc(var(--relleno-pagina) + 56px); }
+html.navidad body { padding-top: calc(var(--relleno-pagina) + 72px); }   /* la guirnalda mide 80 px: la barra superior queda debajo de sus adornos */
 .guirnalda { position: absolute; left: 0; right: 0; top: 0; height: 80px; z-index: 2; pointer-events: none; overflow: hidden; }
 .guirnalda svg { display: block; }
 html:not(.navidad) .guirnalda { display: none; }
