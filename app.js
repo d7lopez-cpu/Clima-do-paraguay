@@ -3336,8 +3336,8 @@
         <div class="ciudad-fila">
           <span class="hero-lado">${d ? `<button class="btn-redondo" data-compartir="1" aria-label="Compartir el clima de esta ciudad" title="Compartir">${icono('compartir')}</button>` : ''}</span>
           <div class="ciudad-centro">
-            <h3 class="ciudad-nombre">${icono('ubicacion')}<span>${n}</span></h3>
-            <div class="dep-nombre"><span>${c.dep === 'Asunción' ? 'Capital del país' : 'Departamento ' + escObs(c.dep)}</span></div>
+            <h3 class="ciudad-nombre${c.n.length > 16 ? ' largo' : ''}">${icono('ubicacion')}${n}</h3>
+            <div class="dep-nombre" title="${c.dep === 'Asunción' ? 'Capital del país' : 'Departamento ' + escObs(c.dep)}"><span>${c.dep === 'Asunción' ? 'Capital del país' : escObs(c.dep)}</span></div>
           </div>
           <span class="hero-lado"><button class="btn-redondo estrella${fav ? ' on' : ''}" data-fav="${n}" aria-label="Favorita" aria-pressed="${fav}">${iconoEstrella(fav)}</button></span>
         </div>
