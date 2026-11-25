@@ -303,7 +303,7 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
 .ciudad-fila { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: var(--e-2); width: 100%; max-width: 560px; }
 .hero-lado { display: flex; justify-content: center; }
 .ciudad-centro { display: flex; flex-direction: column; align-items: center; min-width: 0; gap: 2px; }
-.ciudad-nombre { display: block; max-width: 100%; text-align: center; text-wrap: balance; font-family: var(--fuente-titulo); font-weight: 500;
+.ciudad-nombre { display: block; max-width: 100%; text-align: center; font-family: var(--fuente-titulo); font-weight: 500;
   font-size: var(--t-ciudad); letter-spacing: -0.01em; line-height: 1.15; overflow-wrap: break-word; }
 .ciudad-nombre.largo { font-size: clamp(1.2rem, 5.6vw, 1.45rem); }
 /* el ícono va pegado a la primera palabra (dentro del texto), así un nombre largo en dos líneas sigue centrado */
@@ -399,7 +399,7 @@ html.navidad { --nd-petalo: #ef4444; --nd-anillo: #4ade80; --nd-brillo: rgba(251
 .dato[data-c=presion] { --c: var(--c-pre); } .dato[data-c=lluvia] { --c: var(--c-llu); } .dato[data-c=uv] { --c: var(--c-uv); }
 .dato[data-c=paraguas] { --c: var(--c-par); } .dato[data-c=ojo] { --c: var(--c-vis); } .dato[data-c=luna] { --c: var(--c-luna); }
 .dato[data-c=hoja] { --c: var(--c-aire); } .dato[data-c=amanecer], .dato[data-c=atardecer] { --c: var(--c-uv); }
-.dato-sol > :first-child { width: auto; height: auto; }
+.dato.dato-sol > .sol-lado { width: auto; height: auto; grid-area: auto; }   /* que no le apliquen el tamaño del ícono de las demás tarjetas */
 .dato-sol { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); }
 .sol-lado { display: flex; flex-direction: column; align-items: center; gap: 1px; text-align: center; min-width: 6.5em; }
 .sol-lado .ic { width: 26px; height: 26px; color: var(--c-uv); }
@@ -409,6 +409,13 @@ html.navidad { --nd-petalo: #ef4444; --nd-anillo: #4ade80; --nd-brillo: rgba(251
 .sol-suelo { stroke: var(--borde); stroke-width: 1; }
 .sol-punto { fill: var(--dorado); stroke: color-mix(in oklab, var(--dorado) 40%, transparent); stroke-width: 4; }
 @media (max-width: 560px) { .datos { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dato { padding: 11px 12px; column-gap: 10px; } .dato > :first-child { width: 26px; height: 26px; } }
+/* celulares angostos (o con letra agrandada por el sistema): ícono arriba y el valor con todo el ancho, así no se parte en 3 líneas */
+@media (max-width: 420px) {
+  .dato { grid-template-columns: minmax(0, 1fr); grid-template-areas: "ic" "val" "lab"; row-gap: 3px; align-items: start; }
+  .dato > :first-child { width: 22px; height: 22px; margin-bottom: 2px; }
+  .dato b { font-size: 1.05rem; }
+  .acciones button { font-size: 0.66rem; padding: 6px 2px; }
+}
 /* cajas del pronóstico */
 .pronostico-caja { background: var(--tarjeta-fondo); border: 1px solid var(--borde); border-radius: var(--r-xl); padding: var(--e-3) var(--e-4) var(--e-4); box-shadow: var(--tarjeta-sombra); min-width: 0; }
 .caja-titulo { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-2); margin-bottom: var(--e-3); }
@@ -455,7 +462,7 @@ html.navidad { --nd-petalo: #ef4444; --nd-anillo: #4ade80; --nd-brillo: rgba(251
 .stat { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 14px var(--e-4); border-radius: var(--r-l); background: var(--vidrio); border: 1px solid var(--borde); box-shadow: var(--sombra);
   min-width: 0; transition: transform var(--d-1), border-color var(--d-2); }
 button.stat:hover:not(:disabled) { border-color: var(--borde-fuerte); }
-.stat small { display: flex; align-items: center; gap: 6px; color: var(--suave); font-size: var(--t-mini); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.stat small { display: flex; align-items: center; gap: 6px; overflow-wrap: break-word; color: var(--suave); font-size: var(--t-mini); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
 .stat small .ic { width: 15px; height: 15px; color: var(--c-dato); }
 .stat b { font-size: clamp(1.45rem, 3.4vw, 1.8rem); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .stat > span { font-size: var(--t-chico); color: var(--suave); }
