@@ -2,7 +2,10 @@ name: Actualizar clima
 
 on:
   schedule:
-    - cron: "*/30 * * * *"     # cada 30 minutos (GitHub puede demorarse unos minutos)
+    # Cada 15 minutos (Open-Meteo renueva el clima de ahora cada 15), en minutos «raros»: a la hora en punto y a la media GitHub
+    # tiene tanta demanda que posterga o salta los horarios programados (con «*/30» llegó a correr cada 4 a 11 horas).
+    # Aunque igual se atrase, la app no depende de esto: de cada ciudad con dato de más de 25 min pide el clima directo a Open-Meteo.
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:            # permite ejecutarlo a mano desde la pestaña Actions
 
 permissions:
@@ -18,7 +21,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Descargar el repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Recuperar las localidades ya resueltas (si existen)
         run: curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/datos/lugares.json" -o lugares_previos.json || echo "{}" > lugares_previos.json
