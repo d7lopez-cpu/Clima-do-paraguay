@@ -187,7 +187,7 @@ const BRILLO = c => `<radialGradient id="ndBrillo" cx=".5" cy=".5" r=".5"><stop 
 const ESTRELLA = (() => { let d = ''; for (let i = 0; i < 10; i++) { const r = i % 2 ? 6 : 14, a = ARR + i * Math.PI / 5; d += (i ? 'L' : 'M') + f(100 + r * Math.cos(a)) + ' ' + f(17 + r * Math.sin(a)); } return `<path d="${d}Z" fill="#fde68a" stroke="#f59e0b" stroke-width="1" stroke-linejoin="round"/>`; })();
 
 // fondo: 'redondeado' | 'pleno' (cuadrado: maskable e iOS) | null ; escala: tamaño del encaje dentro del cuadro
-function svg({ detalle = 'completo', fondo = 'redondeado', escala, navidad = false } = {}) {
+function svg({ detalle = 'completo', fondo = 'redondeado', escala, navidad = false, estrella = navidad } = {}) {
   escala = escala ?? (fondo ? 0.86 : 1);
   const c = navidad ? COLORES.navidad : COLORES.normal;
   const tr = escala === 1 ? '' : ` transform="translate(${f(100 - 100 * escala)} ${f(100 - 100 * escala)}) scale(${escala})"`;
@@ -195,7 +195,7 @@ function svg({ detalle = 'completo', fondo = 'redondeado', escala, navidad = fal
   const fondoSvg = !fondo ? '' : `<rect width="200" height="200"${fondo === 'redondeado' ? ' rx="44"' : ''} fill="url(#${navidad ? 'nvFondo' : 'ndFondo'})"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">\n<!-- Generado por scripts/nanduti.mjs (ñandutí según la técnica de Itauguá): no editar a mano -->\n` +
     `<defs>${navidad ? FONDO_NV : FONDO}${BRILLO(c.centro)}${nd.defs}</defs>\n${fondoSvg}<g${tr}><circle cx="100" cy="100" r="40" fill="url(#ndBrillo)"/>${nd.cuerpo}</g>` +
-    `${navidad ? ESTRELLA : ''}</svg>\n`;
+    `${estrella ? ESTRELLA : ''}</svg>\n`;
 }
 
 const archivos = {
@@ -203,7 +203,8 @@ const archivos = {
   'logo-nanduti.svg': svg({ detalle: 'completo' }),
   'logo-nanduti-hilos.svg': svg({ detalle: 'completo', fondo: null }),
   'icono-navidad.svg': svg({ detalle: 'simple', navidad: true }),
-  'logo-navidad.svg': svg({ detalle: 'completo', navidad: true })
+  'logo-navidad.svg': svg({ detalle: 'completo', navidad: true }),
+  'nanduti-navidad-hilos.svg': svg({ detalle: 'completo', fondo: null, navidad: true, estrella: false })   // adornos de la guirnalda
 };
 for (const [n, s] of Object.entries(archivos)) writeFileSync(n, s);
 
