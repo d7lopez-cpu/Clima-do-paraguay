@@ -27,7 +27,7 @@ Se puede instalar en el celular como una app (desde el menú del navegador: *Agr
 ```
 GitHub Actions (cada 30 min)                       Navegador
 ┌──────────────────────────────┐                   ┌──────────────────────────────┐
-│ scripts/actualizar_clima.py  │──► rama "datos" ──►│ index.html + app.js          │
+│ scripts/actualizar_clima.py  │──► rama "datos" ──►│ index.html + js/             │
 │ baja el clima de Open-Meteo  │   datos.json       │ lee datos.json y solo pide   │
 │ para todas las ciudades      │   horas.json       │ directo lo que falte         │
 └──────────────────────────────┘                   └──────────────────────────────┘
@@ -37,31 +37,56 @@ En vez de que cada visitante consulte cientos de ciudades a Open-Meteo, un proce
 
 ## Archivos
 
+```
+index.html            la página (estructura)
+manifest.webmanifest  nombre e íconos para instalar la app
+sw.js                 service worker: abre la app sin internet (va en la raíz para cubrir toda la app)
+css/estilos.css       el diseño
+js/geo.js             datos geográficos: departamentos, distritos, países vecinos y ciudades (GEO)
+js/01…12-*.js         el código de la app, dividido por temas (ver abajo)
+img/                  logo ñandutí (tricolor y navideño) e íconos de la app instalada
+fonts/                Fraunces e Inter (licencia OFL), con las letras del guaraní ĩ ũ ẽ ỹ
+scripts/              herramientas: robot del clima, revisión automática, generadores de íconos y del ñandutí
+pruebas/              pruebas automáticas de la app (ver «Probar que nada esté roto»)
+.github/workflows/    robot del clima y revisión en cada cambio
+```
+
+**El código, por temas** (se cargan en este orden desde `index.html` y comparten las mismas variables):
+
+| Archivo | Qué hace |
+|---|---|
+| `js/01-base.js` | Datos geográficos, capas del mapa, estado de la app y funciones auxiliares (íconos, textos del clima) |
+| `js/02-datos.js` | Pide el clima: Open-Meteo, el archivo compartido de GitHub (con frescura por ciudad), cupo de consultas y aeropuertos (METAR) |
+| `js/03-mapa.js` | Mapa, deslizador de horas, comparar ciudades, radar, rutas, búsqueda de lugares, tema y unidad |
+| `js/04-ambiente.js` | Estado del cielo que comparten el fondo, el paisaje y el sonido; preferencias de la animación |
+| `js/05-paisaje.js` | Paisaje animado de la portada, cielo de fondo, fuegos artificiales y calidad automática |
+| `js/06-sonido.js` | Sonido del clima (Web Audio), música navideña y sonidos de los fuegos |
+| `js/07-ajustes.js` | Panel de ajustes (Animación, Sonido, Navidad) y vista previa de climas |
+| `js/08-navidad.js` | Decoración navideña automática, logo festivo, guirnalda y saludo |
+| `js/09-detalle.js` | Resumen nacional, lista de ciudades y detalle: portada, tarjetas, pronóstico por horas y 7 días |
+| `js/10-acciones.js` | Lo que hace la persona: elegir ciudad, favoritas, compartir, buscar, cerca de mí, avisos, menú |
+| `js/11-idioma.js` | Español y guaraní (diccionario y frases con datos variables) |
+| `js/12-arranque.js` | Arranque de la app y registro del service worker |
+
+**Herramientas** (`scripts/`):
+
 | Archivo | Qué es |
 |---|---|
-| `index.html` | La página (estructura) |
-| `estilos.css` | El diseño |
-| `app.js` | El código de la app |
-| `geo.js` | Datos geográficos: departamentos, distritos, países vecinos y ciudades (`GEO`) |
-| `sw.js` | Service worker: permite abrir la app sin internet (`geo.js` sale primero del caché y se renueva en segundo plano) |
-| `fonts/` | Fuentes propias Fraunces e Inter (licencia OFL): subconjunto latino y las letras del guaraní ĩ ũ ẽ ỹ |
-| `icono.svg`, `logo-nanduti*.svg`, `logo-navidad.svg`, `icono-*.png` | Logo ñandutí y sus variantes (normal y navideña, para la app instalada y el navegador) |
-| `scripts/nanduti.mjs` | Dibuja el ñandutí de la marca según la técnica de Itauguá (urdimbre de rayos, apyte, redes de nudos, dientes y flor de rombos zurcidos, círculos de refuerzo y puntas): `icono.svg`, los logos (normal, sin fondo y navideño) y el ñandutí de la portada en `index.html` (entre `<!-- NANDUTI:INICIO -->` y `<!-- NANDUTI:FIN -->`, con colores `--nd-…` de `estilos.css`). Con `--png` también los íconos PNG de la app instalada |
-| `scripts/iconos.mjs` | Genera el set de íconos SVG de la interfaz dentro de `index.html`, entre `<!-- ICONOS:INICIO -->` y `<!-- ICONOS:FIN -->` (para cambiar un ícono, edita este script y córrelo: `node scripts/iconos.mjs`) |
-| `scripts/simplificar-geo.mjs` | Aligera los mapas de `geo.js` sin deformar los bordes compartidos (ver abajo) |
-| `manifest.webmanifest` | Nombre e íconos para instalar la app |
-| `scripts/actualizar_clima.py` | Descarga el clima de todas las ciudades (solo usa Python estándar) |
-| `.github/workflows/clima.yml` | Ejecuta el script cada 30 minutos y publica en la rama `datos` |
-| `scripts/revisar.mjs` y `.github/workflows/revisar.yml` | Revisión automática: en cada cambio comprueba que el código no tenga errores y que las ciudades y archivos estén bien |
+| `scripts/actualizar_clima.py` y `.github/workflows/clima.yml` | El robot del clima: baja el clima de todas las ciudades y lo publica en la rama `datos` (solo usa Python estándar) |
+| `scripts/revisar.mjs` y `.github/workflows/revisar.yml` | Revisión automática en cada cambio: sintaxis, ciudades, archivos que existen, que cada parte del código se cargue en orden y que el service worker la guarde |
+| `scripts/nanduti.mjs` | Dibuja el ñandutí según la técnica de Itauguá y escribe en `img/` el ícono y los logos (tricolor, sin fondo y navideños) y el ñandutí de la portada en `index.html` (colores `--nd-…` de `css/estilos.css`). Con `--png` también los íconos PNG |
+| `scripts/iconos.mjs` | Genera el set de íconos SVG de la interfaz dentro de `index.html` (para cambiar un ícono, edita este script y córrelo) |
+| `scripts/simplificar-geo.mjs` | Aligera los mapas de `js/geo.js` sin deformar los bordes compartidos |
 
 ## Tareas comunes
 
-- **Agregar o mover una ciudad:** edita la lista `ciudades` dentro de `geo.js` (`n` nombre, `lat`, `lon`, `dep` departamento, `g` tamaño de 1 a 4). El script lee la misma lista, no hay que cambiarla en otro lugar.
-- **Publicar una versión nueva:** después de cambiar `index.html`, `app.js`, `estilos.css` o `geo.js`, sube el número de `VERSION` en `sw.js` para que los celulares renueven su copia guardada. **Con `geo.js` es imprescindible:** se sirve primero desde el caché, así que sin subir `VERSION` cada persona vería el cambio recién en su segunda visita.
-- **Aligerar los mapas:** `geo.js` ya está simplificado (−40 % de peso). Si se vuelve a generar, hay que partir del archivo original (no de uno ya simplificado): `git show 17b6f36:geo.js > /tmp/original.js` y luego `node scripts/simplificar-geo.mjs --entrada /tmp/original.js --eps-dep 0.007 --eps-vec 0.01`. Con `--eps-dep 0.005` se conserva más detalle (−34 %).
+- **Agregar o mover una ciudad:** edita la lista `ciudades` dentro de `js/geo.js` (`n` nombre, `lat`, `lon`, `dep` departamento, `g` tamaño de 1 a 4). El script lee la misma lista, no hay que cambiarla en otro lugar.
+- **Publicar una versión nueva:** después de cambiar `index.html`, algo en `js/` o `css/estilos.css`, sube el número de `VERSION` en `sw.js` para que los celulares renueven su copia guardada. **Con `js/geo.js` es imprescindible:** se sirve primero desde el caché, así que sin subir `VERSION` cada persona vería el cambio recién en su segunda visita.
+- **Aligerar los mapas:** `js/geo.js` ya está simplificado (−40 % de peso). Si se vuelve a generar, hay que partir del archivo original (no de uno ya simplificado): `git show 17b6f36:geo.js > /tmp/original.js` y luego `node scripts/simplificar-geo.mjs --entrada /tmp/original.js --eps-dep 0.007 --eps-vec 0.01`. Con `--eps-dep 0.005` se conserva más detalle (−34 %).
 - **Actualizar el clima a mano:** pestaña *Actions* → *Actualizar clima* → *Run workflow*.
 - **Probar la animación en todas sus variantes:** en la consola del navegador, `climaAnim.fijar({ vistaPrevia: { tipo: 'tormenta', fase: 'noche' } })` (tipos: despejado, parcial, nublado, lluvia, tormenta, niebla; fases: amanecer, dia, atardecer, noche) y `climaAnim.fijar({ vistaPrevia: null })` para volver al clima real.
 - **Revisar que nada esté roto:** GitHub lo hace solo en cada cambio (✅ o ❌ junto al commit). A mano: `node scripts/revisar.mjs`.
+- **Probar que nada esté roto (pruebas completas):** `node pruebas/todas.mjs` (o `--rapida`). Recorre toda la interfaz en celular y escritorio, el sonido, que los datos queden al día, una caza de errores en 11 escenarios, cero emojis y el contraste de los textos, sin internet (Open-Meteo se simula con `pruebas/datos.json` y `horas.json`). Necesita Playwright: `npm install --no-save playwright` y `npx playwright install chromium`. Cada prueba también se puede correr sola (ver el comienzo de cada archivo en `pruebas/`).
 - **Probar en tu computadora:** desde la carpeta del proyecto, ejecuta `python3 -m http.server` y abre http://localhost:8000.
 
 ## Fuentes de datos

@@ -1,6 +1,6 @@
 // Clima PY: simplifica los polígonos de geo.js (menos vértices = archivo más liviano).
 // Uso (desde la carpeta del proyecto):
-//   node scripts/simplificar-geo.mjs [--entrada geo.js] [--salida geo.js] [--eps-dep 0.004] [--eps-vec 0.02] [--radio-ciudad 0.05]
+//   node scripts/simplificar-geo.mjs [--entrada js/geo.js] [--salida js/geo.js] [--eps-dep 0.004] [--eps-vec 0.02] [--radio-ciudad 0.05]
 // Las tolerancias van en grados de latitud (1° ≈ 111 km): 0.004 ≈ 440 m, 0.02 ≈ 2,2 km.
 //
 // Cómo funciona (Douglas-Peucker que respeta la topología):
@@ -12,12 +12,12 @@
 //  3. Los departamentos y distritos usan --eps-dep; los países vecinos (solo contexto visual) usan --eps-vec.
 //  4. No se toca GEO.ciudades ni la estructura de GEO (deps, dist, vecinos, ciudades).
 // Es reproducible, pero parte del archivo que se le da: para repetir el resultado, usa como entrada el geo.js
-// ORIGINAL (p. ej. `git show <commit-anterior>:geo.js > /tmp/geo-original.js`), no uno ya simplificado.
+// ORIGINAL (p. ej. `git show <commit-anterior>:geo.js > /tmp/geo-original.js`; antes de ordenar las carpetas estaba en la raíz), no uno ya simplificado.
 import { readFileSync, writeFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i > 0 ? process.argv[i + 1] : d; };
-const ENTRADA = arg('entrada', 'geo.js'), SALIDA = arg('salida', 'geo.js');
+const ENTRADA = arg('entrada', 'js/geo.js'), SALIDA = arg('salida', 'js/geo.js');
 const EPS_DEP = parseFloat(arg('eps-dep', '0.004')), EPS_VEC = parseFloat(arg('eps-vec', '0.02'));
 const COS = Math.cos(24.5 * Math.PI / 180);   // misma proyección que la app, para medir distancias parejas
 

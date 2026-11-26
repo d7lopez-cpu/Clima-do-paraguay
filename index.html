@@ -10,12 +10,12 @@
 <meta name="application-name" content="Clima PY">
 <meta name="apple-mobile-web-app-title" content="Clima PY">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icono.svg" type="image/svg+xml">
-<link rel="alternate icon" href="icono-192.png" type="image/png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="img/icono.svg" type="image/svg+xml">
+<link rel="alternate icon" href="img/icono-192.png" type="image/png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
 <script>try{document.documentElement.dataset.tema=localStorage.getItem("clima-py-tema")==="claro"?"claro":"oscuro"}catch(e){}</script>
 <link rel="preload" href="fonts/fraunces-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="estilos.css">
+<link rel="stylesheet" href="css/estilos.css">
 </head>
 <body>
 <!-- NANDUTI:INICIO -->
@@ -94,7 +94,7 @@
   <header class="cabecera">
     <button type="button" id="btnMenu" class="btn btn-menu" aria-expanded="false" aria-controls="menuPanel" aria-label="Menú: idioma, tema, sonido y más" title="Menú"><svg class="ic ic-menu" aria-hidden="true" focusable="false"><use href="#i-menu"/></svg></button>
     <div class="marca">
-      <img class="logo" src="icono.svg" alt="" width="44" height="44">
+      <img class="logo" src="img/icono.svg" alt="" width="44" height="44">
       <div class="marca-txt">
         <h1>Clima PY</h1>
         <span class="bandera" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -116,7 +116,7 @@
     </div>
   </header>
   <div class="saludo-navidad" id="saludoNavidad" role="status" hidden>
-    <img src="logo-navidad.svg" alt="" width="46" height="46">
+    <img src="img/logo-navidad.svg" alt="" width="46" height="46">
     <div class="saludo-txt"><span class="saludo-titulo">Felices fiestas</span><span class="saludo-cuenta" id="saludoCuenta"></span></div>
     <button type="button" class="btn" id="saludoCerrar" aria-label="Cerrar saludo" title="Cerrar saludo"><svg class="ic ic-cerrar" aria-hidden="true" focusable="false"><use href="#i-cerrar"/></svg></button>
   </div>
@@ -212,7 +212,7 @@
   </main>
 
   <footer>
-    <p class="firma"><img src="icono.svg" alt="" width="30" height="30"><span>Creado por</span> <b>Douglas López</b></p>
+    <p class="firma"><img src="img/icono.svg" alt="" width="30" height="30"><span>Creado por</span> <b>Douglas López</b></p>
     Datos del clima: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (modelos ECMWF, GFS, ICON y GEM) · observaciones: <a href="https://aviationweather.gov/" target="_blank" rel="noopener">aviationweather.gov</a> (METAR de aeropuertos) · radar: <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a> ·
     Límites: <a href="https://www.geoboundaries.org/" target="_blank" rel="noopener">geoBoundaries</a> y
     <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> (dominio público) · distritos: INE Paraguay<br>
@@ -317,7 +317,7 @@
 
     </div>
     <div class="da-panel" id="daPanelNavidad" role="tabpanel" aria-labelledby="daTabNavidad" hidden>
-    <div class="da-nv-intro"><img src="icono-navidad.svg" alt="" width="44" height="44"><span>Decoración de fiestas del 1 de diciembre al 6 de enero. Todo es opcional.</span></div>
+    <div class="da-nv-intro"><img src="img/icono-navidad.svg" alt="" width="44" height="44"><span>Decoración de fiestas del 1 de diciembre al 6 de enero. Todo es opcional.</span></div>
     <fieldset class="da-grupo">
       <legend>Decoración navideña</legend>
       <div class="da-seg">
@@ -344,7 +344,19 @@
   </div>
 </dialog>
 
-<script src="geo.js"></script>
-<script src="app.js"></script>
+<script src="js/geo.js"></script>
+<!-- El código de la app, dividido por temas: se cargan en este orden y comparten las mismas variables -->
+<script src="js/01-base.js"></script>
+<script src="js/02-datos.js"></script>
+<script src="js/03-mapa.js"></script>
+<script src="js/04-ambiente.js"></script>
+<script src="js/05-paisaje.js"></script>
+<script src="js/06-sonido.js"></script>
+<script src="js/07-ajustes.js"></script>
+<script src="js/08-navidad.js"></script>
+<script src="js/09-detalle.js"></script>
+<script src="js/10-acciones.js"></script>
+<script src="js/11-idioma.js"></script>
+<script src="js/12-arranque.js"></script>
 </body>
 </html>

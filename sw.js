@@ -1,17 +1,20 @@
 /* Clima PY — Service Worker
  * - Guarda la app (HTML, manifest e iconos) para que abra sin internet.
- * - La página y su código (estilos.css, app.js) se piden primero a la red (así siempre ves la última versión) y, si no hay internet, usa la copia guardada.
- * - geo.js (los mapas, ~90 KB y casi nunca cambia) sale primero de la copia guardada y se renueva en segundo plano: la próxima visita ya trae la nueva.
+ * - La página y su código (css/estilos.css, js/*.js) se piden primero a la red (así siempre ves la última versión) y, si no hay internet, usa la copia guardada.
+ * - js/geo.js (los mapas, ~90 KB y casi nunca cambia) sale primero de la copia guardada y se renueva en segundo plano: la próxima visita ya trae la nueva.
  *   Al subir VERSION, el caché nuevo se arma con geo.js recién bajado de la red, así que página y datos geográficos siempre quedan alineados.
  * - Los datos del clima (Open-Meteo, METAR, RainViewer) NO se guardan aquí: la app ya conserva los últimos datos por su cuenta
  *   y así nunca se muestra un pronóstico viejo como si fuera nuevo.
  * Para publicar una versión nueva de la app, cambia el número de VERSION.
  */
-const VERSION = 'v22';
+const VERSION = 'v23';
 const CACHE = 'clima-py-' + VERSION;
-const APP = ['./', 'index.html', 'estilos.css', 'geo.js', 'app.js', 'manifest.webmanifest', 'icono-192.png', 'apple-touch-icon.png',
-  'fonts/inter-latin-wght-normal.woff2', 'fonts/inter-vietnamese-wght-normal.woff2', 'icono-navidad.svg',
-  'fonts/fraunces-latin-wght-normal.woff2', 'fonts/fraunces-vietnamese-wght-normal.woff2', 'icono.svg', 'logo-nanduti-hilos.svg', 'logo-navidad.svg', 'nanduti-navidad-hilos.svg'];
+const APP = ['./', 'index.html', 'css/estilos.css', 'js/geo.js', 'js/01-base.js', 'js/02-datos.js', 'js/03-mapa.js', 
+  'js/04-ambiente.js', 'js/05-paisaje.js', 'js/06-sonido.js', 'js/07-ajustes.js', 'js/08-navidad.js', 'js/09-detalle.js', 
+  'js/10-acciones.js', 'js/11-idioma.js', 'js/12-arranque.js', 'manifest.webmanifest', 'img/icono-192.png', 
+  'img/apple-touch-icon.png', 'fonts/inter-latin-wght-normal.woff2', 'fonts/inter-vietnamese-wght-normal.woff2', 
+  'fonts/fraunces-latin-wght-normal.woff2', 'fonts/fraunces-vietnamese-wght-normal.woff2', 'img/icono.svg', 
+  'img/icono-navidad.svg', 'img/logo-nanduti-hilos.svg', 'img/logo-navidad.svg', 'img/nanduti-navidad-hilos.svg'];
 // Código de la app: igual que la página, se pide primero a la red para que HTML, CSS y JS siempre sean de la misma versión
 const CODIGO = /\.(css|js)$/;
 // Datos geográficos: pesados y casi inmutables -> caché primero, revalidando en segundo plano

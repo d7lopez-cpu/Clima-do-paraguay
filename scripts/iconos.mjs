@@ -1,10 +1,10 @@
 // Clima PY: set de íconos «Cristal guaraní» (lineales, cuadro 24 × 24, puntas redondeadas, sin relleno).
 // Este archivo es la fuente: escribe el sprite <svg id="iconos"> en index.html, entre <!-- ICONOS:INICIO --> y <!-- ICONOS:FIN -->.
-// En app.js, icono('lluvia') devuelve <svg class="ic ic-lluvia"><use href="#i-lluvia"/></svg>; en el HTML se escribe igual a mano.
-// El grosor (1,6; 1,8 en la barra inferior) y el color salen de estilos.css: stroke = currentColor. Las partes que llevan
+// En el código (js/01-base.js), icono('lluvia') devuelve <svg class="ic ic-lluvia"><use href="#i-lluvia"/></svg>; en el HTML se escribe igual a mano.
+// El grosor (1,6; 1,8 en la barra inferior) y el color salen de css/estilos.css: stroke = currentColor. Las partes que llevan
 // un segundo color (el sol de «parcial», la lluvia) usan style="stroke:var(--ic-2, currentColor)".
 // Para agregar o cambiar un ícono: editar la tabla y correr, desde la carpeta del proyecto,  node scripts/iconos.mjs
-//   (con --galeria archivo.html [estilos.css] [oscuro|claro] además escribe una página con todos los íconos).
+//   (con --galeria archivo.html [css/estilos.css] [oscuro|claro] además escribe una página con todos los íconos).
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const nube = 'M7 18h10a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.6A3.3 3.3 0 0 0 7 18z';
@@ -98,7 +98,7 @@ console.log(`index.html: sprite con ${nombres.length} íconos${nuevo !== html ? 
 
 const g = process.argv.indexOf('--galeria');
 if (g > 0 && process.argv[g + 1]) {
-  const css = process.argv[g + 2] || 'estilos.css';
+  const css = process.argv[g + 2] || 'css/estilos.css';
   writeFileSync(process.argv[g + 1], `<!doctype html><html lang="es" data-tema="${process.argv[g + 3] || 'oscuro'}"><meta charset="utf-8"><title>Íconos</title><link rel="stylesheet" href="${css}">
 <style>body{padding:24px}.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}.c{display:grid;place-items:center;gap:6px;padding:12px;border-radius:14px;background:var(--vidrio);border:1px solid var(--borde);font-size:.75rem}.c .ic{width:28px;height:28px}</style>
 <body>${sprite}<h1>Íconos (${nombres.length})</h1><div class="g">${Object.keys(ICONOS).map(n => `<div class="c"><svg class="ic ic-${n}"><use href="#i-${n}"/></svg>${n}</div>`).join('')}</div></body></html>`);
