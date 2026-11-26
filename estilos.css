@@ -476,6 +476,12 @@ html.navidad { --nd-trama: #4ade80; --nd-anillo: #f87171; --nd-petalo: #86efac; 
 button.stat:hover:not(:disabled) { border-color: var(--borde-fuerte); }
 .stat small { display: flex; align-items: center; gap: 6px; overflow-wrap: break-word; color: var(--suave); font-size: var(--t-mini); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
 .stat small .ic { width: 15px; height: 15px; color: var(--c-dato); }
+/* celular: los títulos del resumen ocupan a veces 2 líneas («Promedio · temperatura»); todos reservan ese alto para que los valores
+   de tarjetas vecinas queden a la misma altura, y el ícono va junto a la primera línea */
+@media (max-width: 700px) {
+  .stat small { align-items: flex-start; line-height: 1.35; min-height: calc(2 * 1.35em); }
+  .stat small .ic { flex: none; margin-top: 0.12em; }
+}
 .stat b { font-size: clamp(1.45rem, 3.4vw, 1.8rem); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .stat > span { font-size: var(--t-chico); color: var(--suave); }
 @media (max-width: 560px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
