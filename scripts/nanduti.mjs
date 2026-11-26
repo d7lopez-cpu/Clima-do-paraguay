@@ -11,10 +11,10 @@
 // Fuentes: Wikipedia («Ñandutí»: urdimbre radial, apyte, dechados en el tercio exterior, círculos de refuerzo),
 // Asociación de Ñandutí en Japón y artículos de La Nación y Última Hora (bastidor, dechados, colores).
 //
-// Escribe: icono.svg, logo-nanduti.svg, logo-nanduti-hilos.svg (sin fondo: marca de agua, carga y guirnalda),
+// Escribe en img/: icono.svg, logo-nanduti.svg, logo-nanduti-hilos.svg (sin fondo: marca de agua, carga y guirnalda),
 //          icono-navidad.svg, logo-navidad.svg y, en index.html entre <!-- NANDUTI:INICIO --> y <!-- NANDUTI:FIN -->,
 //          el <symbol id="nanduti-portada"> de la portada (sus colores son variables CSS: --nd-hilo, --nd-centro, --nd-trama,
-//          --nd-anillo, --nd-petalo; los define estilos.css y cambian con el clima, el tema y la Navidad).
+//          --nd-anillo, --nd-petalo; los define css/estilos.css y cambian con el clima, el tema y la Navidad).
 // Con --png además dibuja los PNG de la app instalada (icono-192/512, maskable 192/512, apple-touch-icon) con Playwright.
 // Uso (desde la carpeta del proyecto): node scripts/nanduti.mjs [--png]
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -206,7 +206,7 @@ const archivos = {
   'logo-navidad.svg': svg({ detalle: 'completo', navidad: true }),
   'nanduti-navidad-hilos.svg': svg({ detalle: 'completo', fondo: null, navidad: true, estrella: false })   // adornos de la guirnalda
 };
-for (const [n, s] of Object.entries(archivos)) writeFileSync(n, s);
+for (const [n, s] of Object.entries(archivos)) writeFileSync('img/' + n, s);
 
 // ---- El símbolo de la portada (en index.html, con colores CSS) ----
 const ndP = nanduti(COLORES.css, 'completo');
@@ -232,7 +232,7 @@ if (process.argv.includes('--png')) {
   for (const [n, tam, s] of png) {
     await p.setViewportSize({ width: tam, height: tam });
     await p.setContent(`<html><body style="margin:0;background:transparent">${s.replace('<svg ', `<svg width="${tam}" height="${tam}" `)}</body></html>`);
-    await p.screenshot({ path: n, omitBackground: true, clip: { x: 0, y: 0, width: tam, height: tam } });
+    await p.screenshot({ path: 'img/' + n, omitBackground: true, clip: { x: 0, y: 0, width: tam, height: tam } });
   }
   await b.close();
   console.log('PNG: ' + png.map(x => x[0]).join(', '));

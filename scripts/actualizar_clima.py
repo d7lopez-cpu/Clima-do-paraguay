@@ -3,10 +3,10 @@
 y los guarda en datos.json y horas.json. Lo ejecuta GitHub Actions cada 30 minutos, así cada
 persona que abre la app lee estos archivos en vez de consultar a Open-Meteo por su cuenta.
 
-Las ciudades se leen de geo.js (la lista GEO), así que no hay que mantener otra copia.
+Las ciudades se leen de js/geo.js (la lista GEO), así que no hay que mantener otra copia.
 Solo usa la biblioteca estándar de Python (no hay que instalar nada).
 """
-import json, math, re, sys, time, unicodedata, urllib.parse, urllib.request, urllib.error
+import json, math, os, re, sys, time, unicodedata, urllib.parse, urllib.request, urllib.error
 from datetime import datetime, timezone
 
 BASE = "https://api.open-meteo.com/v1/forecast"
@@ -16,12 +16,13 @@ CAMPOS_ACTUAL = "temperature_2m,relative_humidity_2m,wind_speed_10m,precipitatio
 CAMPOS_HORAS = "temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation"
 
 
-def leer_geo(ruta_geo="geo.js", ruta_app="app.js"):
+def leer_geo(ruta_geo="js/geo.js", carpeta_js="js"):
     texto = open(ruta_geo, encoding="utf-8").read()
     i = texto.index("const GEO = ") + len("const GEO = ")
     j = texto.index("\n", i)
     geo = json.loads(texto[i:j].rstrip().rstrip(";"))
-    app = open(ruta_app, encoding="utf-8").read()
+    # el código de la app está dividido en js/01…12: se lee todo junto para encontrar PENDIENTES
+    app = "\n".join(open(os.path.join(carpeta_js, f), encoding="utf-8").read() for f in sorted(os.listdir(carpeta_js)) if re.match(r"\d\d-.*\.js$", f))
     m = re.search(r"const PENDIENTES = \{(.*?)\n  \};", app, re.S)      # localidades cuyas coordenadas se buscan con el geocodificador
     pendientes = json.loads("{" + m.group(1).replace("'", '"') + "}") if m else {}
     return geo, pendientes
