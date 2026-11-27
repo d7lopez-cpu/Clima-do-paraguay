@@ -299,10 +299,12 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
 /* ============ 7. PORTADA: ciudad, ñandutí y temperatura sobre el paisaje ============ */
 /* Capas: 1) el cielo animado de toda la página (#cielo); 2) la franja de paisaje (#escena, un solo canvas que se reutiliza para
    todas las ciudades y cambia con el clima y la hora); 3) el ñandutí, fijo, que solo cambia su brillo con el clima; 4) los datos. */
-.detalle { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "portada" "cuerpo"; gap: 0; --solape: clamp(28px, 8vw, 56px); }
-.portada { grid-area: portada; position: relative; isolation: isolate; padding-bottom: clamp(70px, 18vw, 120px); }
+.detalle { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "portada" "cuerpo"; gap: 0; --solape: 0px; --nd-tam: clamp(196px, 52vw, 272px); }
+/* Portada «postal»: arriba la ciudad, el ñandutí y la temperatura sobre el cielo; debajo el paisaje entero, sin nada encima; después el
+   pronóstico, que ya no lo tapa. */
+.portada { grid-area: portada; position: relative; isolation: isolate; display: flex; flex-direction: column; }
 .detalle-cab { position: relative; z-index: 1; min-width: 0; }
-.detalle-cuerpo { grid-area: cuerpo; position: relative; z-index: 1; display: flex; flex-direction: column; gap: var(--e-3); min-width: 0; margin-top: calc(-1 * var(--solape)); }
+.detalle-cuerpo { grid-area: cuerpo; position: relative; z-index: 1; display: flex; flex-direction: column; gap: var(--e-3); min-width: 0; margin-top: var(--e-3); }
 .hero { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--e-1); padding: var(--e-1) 0 0; }
 /* velo muy suave detrás del estado, la máx/mín y la sensación: se leen igual sobre una nube blanca o un cielo claro de día */
 .hero:not(.hero-carga)::after { content: ""; position: absolute; z-index: -1; left: 50%; bottom: -30px; width: min(560px, calc(100% + 2 * var(--relleno-pagina))); height: 230px; translate: -50% 0; pointer-events: none;
@@ -335,12 +337,12 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
 .btn-redondo.estrella { color: var(--suave); border: 1px solid var(--borde); border-radius: 50%; background: var(--vidrio); }
 .btn-redondo.estrella.on { color: var(--sel); border-color: color-mix(in oklab, var(--sel) 45%, transparent); }
 /* el ñandutí a color detrás de la temperatura (símbolo #nanduti-portada, lo genera scripts/nanduti-portada.mjs) */
-.hero-temp { position: relative; display: grid; place-items: center; width: 100%; min-height: calc(clamp(228px, 63vw, 330px) + 6px); isolation: isolate; margin: 2px 0; }   /* alto = el ñandutí: no sube hasta el texto de arriba */
-.hero-nanduti { position: absolute; z-index: -1; left: 50%; top: 50%; width: clamp(228px, 63vw, 330px); aspect-ratio: 1; translate: -50% -50%; pointer-events: none;
+.hero-temp { position: relative; display: grid; place-items: center; width: 100%; min-height: calc(var(--nd-tam) + 6px); isolation: isolate; margin: 2px 0; }   /* alto = el ñandutí: no sube hasta el texto de arriba */
+.hero-nanduti { position: absolute; z-index: -1; left: 50%; top: 50%; width: var(--nd-tam); aspect-ratio: 1; translate: -50% -50%; pointer-events: none;
   opacity: var(--nd-op); filter: drop-shadow(0 0 5px var(--nd-brillo));
   /* detrás de los números los hilos se atenúan: el ñandutí rodea la temperatura sin estorbar su lectura */
   -webkit-mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.3) 0 28%, rgba(0, 0, 0, 0.55) 40%, #000 52%); mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.3) 0 28%, rgba(0, 0, 0, 0.55) 40%, #000 52%); }
-.temp-grande { font-family: var(--fuente-titulo); font-weight: 300; font-size: var(--t-temp); line-height: 0.95; letter-spacing: -0.03em; color: var(--temp);
+.temp-grande { font-family: var(--fuente-titulo); font-weight: 300; font-size: clamp(4.4rem, 19vw, 6.4rem); line-height: 0.95; letter-spacing: -0.03em; color: var(--temp);
   font-variant-numeric: tabular-nums; margin-left: 0.1em; text-shadow: 0 2px 28px var(--temp-sombra); }
 .temp-grande .unidad { font-size: 0.3em; font-weight: 400; letter-spacing: 0; vertical-align: 1.85em; margin-left: 0.04em; color: var(--texto);
   padding: 0.05em 0.12em; border-radius: 50%; background: radial-gradient(closest-side, var(--velo-portada), transparent); }   /* halo suave: la «C» se lee sobre los hilos del ñandutí */
@@ -363,7 +365,7 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
 .menu-compartir button { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-s); background: none; color: var(--texto); font-size: 0.92rem; font-weight: 500; }
 .menu-compartir button:hover, .menu-compartir button:focus-visible { background: var(--vidrio-hover); }
 .menu-compartir .ic { width: 18px; height: 18px; color: var(--acento); }
-@media (min-width: 901px) { .hero-temp { min-height: 336px; } .portada { padding-bottom: 110px; } }
+@media (min-width: 901px) { .detalle { --nd-tam: 280px; } }
 
 body[data-cielo=tormenta] { --nd-brillo: rgba(196, 181, 253, 0.55); }
 body[data-cielo=lluvia] { --nd-brillo: rgba(147, 197, 253, 0.42); }
@@ -376,13 +378,15 @@ html.navidad { --nd-trama: #4ade80; --nd-anillo: #f87171; --nd-petalo: #86efac; 
 :root[data-tema=claro].navidad { --nd-trama: #15803d; --nd-anillo: #b91c1c; --nd-petalo: #16a34a; --nd-hilo: #64748b; --nd-centro: #b45309; --nd-medio: #b91c1c; }
 
 /* ============ 8. ESCENA: la franja de paisaje animado (el canvas lo dibuja app.js) ============ */
-/* En el celular va de borde a borde; arriba se funde con el cielo de la página y abajo la tapa en parte el pronóstico. */
-.escena { position: absolute; z-index: 0; left: calc(-1 * var(--relleno-pagina)); right: calc(-1 * var(--relleno-pagina)); bottom: 0; height: clamp(250px, 68vw, 340px);
+/* Debajo de la temperatura, de borde a borde en el celular: arriba se funde con el cielo de la página (y pasa apenas por detrás de la
+   sensación térmica, donde solo hay cielo) y abajo se ve entero, río y orillas incluidos; el pronóstico empieza después. */
+.escena { position: relative; z-index: 0; margin: -36px calc(-1 * var(--relleno-pagina)) 0; height: clamp(240px, 66vw, 330px); flex: none;
   overflow: hidden; isolation: isolate; background: transparent;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 36%, #000 86%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 36%, #000 86%, transparent 100%); }
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 26%, #000 95%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 26%, #000 95%, transparent 100%); }
+.detalle-cab { order: 0; } .escena { order: 1; }
 @media (min-width: 901px) {
-  .escena { left: 0; right: 0; height: 320px; border-radius: var(--r-xl);
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 34%, #000 82%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 34%, #000 82%, transparent 100%); }
+  .escena { margin: -24px 0 0; height: 320px; border-radius: var(--r-xl);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24%, #000 94%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 24%, #000 94%, transparent 100%); }
 }
 .escena canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; }
 .escena-etq { position: absolute; left: var(--relleno-pagina); right: var(--relleno-pagina); bottom: calc(var(--solape) + 14px); z-index: 2; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
