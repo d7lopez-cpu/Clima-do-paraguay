@@ -395,35 +395,52 @@
     ex.drawImage(c, -12, top, W, H);
   }
 
-  // Karanda'y (la palmera del Chaco y de los esteros): tronco fino, liso y gris con anillos, y una copa redonda de hojas en abanico,
-  // rígidas y de un verde grisáceo: las de arriba apuntan al cielo, las del costado salen derechas y las de abajo se doblan. Cada hoja
-  // es un abanico relleno con sus nervios. La copa se dibuja aparte y se mece entera con el viento.
-  function copaKaranday(g, s, base, luz, R) {
-    const w = s * 0.5, h = s * 0.46, cx = w / 2, cy = h * 0.48, hojas = [];
-    for (let k = 0; k < 22; k++) {
-      const a = -Math.PI / 2 + (k / 22) * 6.283 + (R() - 0.5) * 0.25, abajo = Math.sin(a);   // abajo: 1 si apunta al suelo
-      if (abajo > 0.75 && R() < 0.6) continue;
-      hojas.push({ a, L: s * (0.085 + R() * 0.03) * (abajo > 0.3 ? 0.85 : 1), pet: s * (0.035 + R() * 0.02), cae: Math.max(0, abajo) * 0.5 + 0.12, z: Math.cos(a * 1.3 + 0.8) + R() * 0.6 });
+  // Pindó (la palmera más común de Paraguay): hojas largas y arqueadas que se curvan hacia abajo, como las de antes, pero cada una
+  // con sus folíolos a los dos lados (más largos en el medio de la hoja, colgando un poco), en tonos de sombra y de luz; en el centro
+  // el cogollo y, debajo de la copa, los racimos de coquitos anaranjados. La copa se dibuja una vez aparte.
+  function copaPindo(g, s, base, luz, R) {
+    const w = s * 0.95, h = s * 0.7, cx = w / 2, cy = h * 0.3, hojas = [];
+    for (let i = 0; i < 13; i++) {
+      const ang = -Math.PI / 2 + (i - 6) * 0.42 + (R() - 0.5) * 0.18, L = s * 0.4 * (0.82 + R() * 0.22) * (Math.abs(i - 6) > 4 ? 0.9 : 1);
+      hojas.push({ ang, L, z: Math.cos(ang + Math.PI / 2) * 0.4 + R() * 0.8 - (i % 2) * 0.3 });
     }
-    hojas.sort((p, q) => p.z - q.z);                                 // de atrás (oscuras) a adelante (con luz)
-    g.lineCap = 'round'; g.lineJoin = 'round';
-    hojas.forEach((o, i) => {
-      const k = i / hojas.length, col = mezcla(base, luz, 0.15 + k * 0.55), px = cx + Math.cos(o.a) * o.pet, py = cy + Math.sin(o.a) * o.pet * 0.9 + o.cae * o.pet * 0.5;
-      g.strokeStyle = oscuro(col, 0.15); g.lineWidth = Math.max(0.8, s * 0.005); g.beginPath(); g.moveTo(cx, cy); g.lineTo(px, py); g.stroke();
-      const n = 13, abre = 1.9, puntas = [];
-      for (let j = 0; j < n; j++) {
-        const b = o.a + (j / (n - 1) - 0.5) * abre, L = o.L * (0.82 + 0.18 * Math.cos((j / (n - 1) - 0.5) * 3));
-        puntas.push([px + Math.cos(b) * L, py + Math.sin(b) * L + L * o.cae * (0.4 + 0.6 * Math.abs(Math.cos(b)))]);
-      }
-      g.fillStyle = col; g.beginPath(); g.moveTo(px, py);              // la lámina, con el borde dentado de las puntas
-      puntas.forEach(([x, y], j) => { const [qx, qy] = puntas[Math.min(n - 1, j + 1)]; g.lineTo(x, y); if (j < n - 1) g.lineTo((x + qx) / 2 * 0.93 + px * 0.07, (y + qy) / 2 * 0.93 + py * 0.07); });
-      g.closePath(); g.fill();
-      g.strokeStyle = oscuro(col, 0.22); g.lineWidth = Math.max(0.5, s * 0.0028); g.beginPath();   // nervios
-      puntas.forEach(([x, y]) => { g.moveTo(px, py); g.lineTo(px + (x - px) * 0.92, py + (y - py) * 0.92); });
+    hojas.sort((a, b) => a.z - b.z);                                 // de atrás (en sombra) a adelante (con luz)
+    g.lineCap = 'round';
+    // racimos de coquitos, detrás de las hojas verdes
+    const seca = mezcla(base, '#8a7350', 0.45);
+    for (const [dx, k] of [[-0.05, 1], [0.045, 0.85]]) {
+      const x0 = cx + dx * s, y0 = cy + s * 0.04, coco = mezcla('#e0892d', base, 0.35 + (1 - k) * 0.1);
+      g.strokeStyle = oscuro(seca, 0.2); g.lineWidth = Math.max(0.6, s * 0.003); g.beginPath();
+      for (let j = 0; j < 6; j++) { g.moveTo(x0, y0); g.quadraticCurveTo(x0 + (j - 2.5) * s * 0.006, y0 + s * 0.06, x0 + (j - 2.5) * s * 0.012, y0 + s * 0.1 * k); }
       g.stroke();
+      g.fillStyle = coco; g.beginPath();
+      for (let j = 0; j < 22; j++) { const t = 0.4 + R() * 0.6, x = x0 + (R() - 0.5) * s * 0.07 * t, y = y0 + s * 0.1 * k * t, r = Math.max(0.6, s * 0.0065); g.moveTo(x + r, y); g.arc(x, y, r, 0, 6.283); }
+      g.fill();
+    }
+    hojas.forEach((o, i) => {
+      const k = i / (hojas.length - 1), col = mezcla(base, luz, 0.12 + k * 0.5), osc = oscuro(col, 0.25), cl = claro(col, 0.12);
+      const c1x = cx + Math.cos(o.ang) * o.L * 0.55, c1y = cy + Math.sin(o.ang) * o.L * 0.75 - o.L * 0.12;
+      const ex2 = cx + Math.cos(o.ang) * o.L, ey2 = cy + Math.sin(o.ang) * o.L * 0.55 + o.L * 0.42;
+      const pt = t => { const u = 1 - t; return [u * u * cx + 2 * u * t * c1x + t * t * ex2, u * u * cy + 2 * u * t * c1y + t * t * ey2]; };
+      const tg = t => { const u = 1 - t; return [2 * u * (c1x - cx) + 2 * t * (ex2 - c1x), 2 * u * (c1y - cy) + 2 * t * (ey2 - c1y)]; };
+      // folíolos: a los dos lados del raquis; los de abajo (sombra) primero, después los de arriba (con luz)
+      for (const [lado, color, gro] of [[1, osc, 0.0042], [-1, col, 0.0045]]) {
+        g.strokeStyle = color; g.lineWidth = Math.max(0.6, s * gro); g.beginPath();
+        for (let t = 0.1; t < 0.99; t += 0.032) {
+          const [px, py] = pt(t), [tx, ty] = tg(t), d = Math.hypot(tx, ty) || 1, ux = tx / d, uy = ty / d;
+          const largo = o.L * 0.2 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.1)), 0.7) * (0.85 + R() * 0.3);
+          const a = lado * (1.05 + (R() - 0.5) * 0.3), vx = ux * Math.cos(a) - uy * Math.sin(a), vy = ux * Math.sin(a) + uy * Math.cos(a);
+          const fx = px + vx * largo + ux * largo * 0.35, fy = py + vy * largo + largo * 0.45;            // apuntan hacia la punta y cuelgan
+          g.moveTo(px, py); g.quadraticCurveTo(px + vx * largo * 0.6, py + vy * largo * 0.6, fx, fy);
+        }
+        g.stroke();
+      }
+      g.strokeStyle = cl; g.lineWidth = Math.max(0.6, s * 0.006); g.beginPath(); g.moveTo(cx, cy); g.quadraticCurveTo(c1x, c1y, ex2, ey2); g.stroke();   // raquis
     });
+    g.strokeStyle = claro(mezcla(base, luz, 0.6), 0.1); g.lineWidth = Math.max(1, s * 0.008);       // cogollo: la hoja nueva, derecha
+    g.beginPath(); g.moveTo(cx, cy); g.quadraticCurveTo(cx + s * 0.01, cy - s * 0.08, cx + s * 0.02, cy - s * 0.15); g.stroke();
   }
-  function palmaEsc(x, y, s, t, color, v, forzar, luz) {          // karanda'y: tronco curvo y copa que se mece (y se inclina) con el viento
+  function palmaEsc(x, y, s, t, color, v, forzar, luz) {          // pindó: tronco curvo y copa que se mece (y se inclina) con el viento
     luz = luz || color;
     const raf = 0.6 + 0.4 * Math.sin(t / 2300 + x * 0.01), lean = Math.min(0.09, v / 700) * raf;
     const bal = Math.sin(t / 1700 + x) * (0.012 + v / 600) * s, tx = x + s * 0.05 + bal + lean * s, ty = y - s;
@@ -431,18 +448,18 @@
     const tronco = mezcla(color, mezcla(luz, '#8d8878', 0.5), 0.4), izq = [], der = [];
     for (let i = 0; i <= 14; i++) {
       const u = i / 14, [px, py] = P(u), [qx, qy] = P(Math.min(1, u + 0.02)), d = Math.hypot(qx - px, qy - py) || 1, nx = -(qy - py) / d, ny = (qx - px) / d;
-      const r = s * (0.016 * (1 - u) + 0.01 * u + (u < 0.06 ? (0.06 - u) * 0.15 : 0)); izq.push([px + nx * r, py + ny * r]); der.push([px - nx * r, py - ny * r]);
+      const r = s * (0.022 * (1 - u) + 0.014 * u + (u < 0.06 ? (0.06 - u) * 0.15 : 0)); izq.push([px + nx * r, py + ny * r]); der.push([px - nx * r, py - ny * r]);
     }
     const gT = ex.createLinearGradient(izq[0][0], 0, der[0][0], 0); gT.addColorStop(0, claro(tronco, 0.12)); gT.addColorStop(1, oscuro(tronco, 0.25));
     ex.fillStyle = gT; ex.beginPath(); ex.moveTo(...izq[0]); izq.forEach(p => ex.lineTo(...p)); for (let i = der.length - 1; i >= 0; i--) ex.lineTo(...der[i]); ex.closePath(); ex.fill();
     ex.strokeStyle = oscuro(tronco, 0.18); ex.lineWidth = Math.max(0.5, s * 0.0025); ex.globalAlpha = 0.7; ex.beginPath();   // anillos del tronco
     for (let i = 1; i < 14; i++) { ex.moveTo(...izq[i]); ex.lineTo(...der[i]); }
     ex.stroke(); ex.globalAlpha = 1;
-    const nombre = 'karanday' + Math.round(s), R = semilla(Math.round(s * 7) + 3), w = s * 0.5, h = s * 0.46;
-    const cv = pre(nombre, [color, luz, Math.round(s)].join(), w, h, forzar, g => { copaKaranday(g, s, color, luz, R); });
+    const nombre = 'pindo' + Math.round(s), R = semilla(Math.round(s * 7) + 3), w = s * 0.95, h = s * 0.7;
+    const cv = pre(nombre, [color, luz, Math.round(s)].join(), w, h, forzar, g => { copaPindo(g, s, color, luz, R); });
     const giro = Math.min(0.45, v / 110) * raf;
     ex.save(); ex.translate(tx, ty); ex.rotate(lean * 1.5 + bal / s * 1.2 + giro * 0.35 + Math.sin(t / 900 + x) * 0.012 * (1 + v / 15));
-    ex.drawImage(cv, -w / 2, -h * 0.48, w, h); ex.restore();
+    ex.drawImage(cv, -w / 2, -h * 0.3, w, h); ex.restore();
     return u => P(u);                                              // punto del tronco (u: 0 pie … 1 copa)
   }
 
