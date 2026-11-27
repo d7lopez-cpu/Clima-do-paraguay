@@ -223,6 +223,7 @@
     const nN = { despejado: 2, parcial: 4, nublado: 6, niebla: 0, lluvia: 7, tormenta: 7 }[A.tipo];
     // las nubes dicen qué clima hace: su cantidad varía menos que la de las demás partículas
     // en 3 capas (z): lejanas (chicas, bajas, lentas y desvaídas), medias y cercanas (grandes, altas y más rápidas)
+    for (const k of [...ePre.keys()]) if (k.startsWith('nube')) ePre.delete(k);   // las nubes nuevas traen otros tamaños
     eNubes = efectoActivo('nubes') ? Array.from({ length: Math.round(nN * limitar(multFx(), 0.7, 1.3)) }, (_, i) => {
       const z = (i + 1) % 3, y = grandes ? [0.2, 0.08, 0.02][z] + Math.random() * [0.12, 0.18, 0.16][z] : [0.27, 0.1, 0.05][z] + Math.random() * [0.12, 0.25, 0.2][z];
       return { x: Math.random() * eW, y: eH * y, r: eH * (0.06 + Math.random() * 0.06) * (grandes ? 1.6 : 1) * [0.6, 0.95, 1.2][z], v: (0.008 + Math.random() * 0.014) * [0.45, 1, 1.6][z], z };
@@ -245,7 +246,8 @@
     const nuevoGranizo = g => Object.assign(g, { x: Math.random() * eW, y: -Math.random() * eH * 0.4, vy: 0.3 + Math.random() * 0.2, vx: vientoVis() / 900, r: 1 + Math.random() * 1.3, suelo: yAgua + 3 + Math.random() * (eH - yAgua - 6), reb: 0 });
     eGranizo = part('lluvia') && A.granizo ? Array.from({ length: cant(34) }, () => { const g = nuevoGranizo({ nuevo: nuevoGranizo }); g.y = Math.random() * eH * 0.7; return g; }) : [];
     eHojas = part('viento') ? Array.from({ length: cant(limitar((vientoHojas() - 12) / 25, 0, 1) * 18) }, () => ({ x: Math.random() * eW, y: eH * (0.35 + Math.random() * 0.6), v: 0.6 + Math.random() * 0.7, f: Math.random() * 6.28, a: Math.random() * 6.28, g: (Math.random() - 0.5) * 0.02, l: 1.6 + Math.random() * 1.8 })) : [];
-    ePetalos = part('especiales') && mesLapacho() ? Array.from({ length: cant(10) }, (_, i) => ({ i: i % 3, x: eW * LAPACHOS[i % 3][0], y: eH * (0.5 + Math.random() * 0.3), v: 0.5 + Math.random() * 0.5, f: Math.random() * 6.28 })) : [];
+    // flores que caen del lapacho de la orilla: siempre unas pocas, más de julio a septiembre (plena floración)
+    ePetalos = part('especiales') ? Array.from({ length: cant(mesLapacho() ? 16 : 6) }, () => ({ x: 0, y: -1, v: 0.5 + Math.random() * 0.5, f: Math.random() * 6.28 })) : [];
     if (!eTexNiebla) eTexNiebla = texturaNiebla();
     const tw = Math.max(eW * 0.7, eH * 3);
     // cada capa de niebla se escala UNA vez a su tamaño final: al pintarla solo se copia (mucho más barato que estirarla en cada cuadro)
@@ -259,27 +261,224 @@
     eSombra = ex.createLinearGradient(0, 0, 0, eH * 0.4); eSombra.addColorStop(0, 'rgba(0,0,0,0.28)'); eSombra.addColorStop(1, 'rgba(0,0,0,0)');
   }
   const BOLITAS = [[0, 0, 1], [-0.9, 0.2, 0.7], [0.9, 0.15, 0.75], [-0.4, -0.45, 0.65], [0.45, -0.4, 0.6], [1.5, 0.3, 0.5], [-1.5, 0.3, 0.5]];
+  // Una nube suave: bolitas fundidas con el borde apenas difuso; arriba la luz del cielo, abajo la panza en sombra, y cada bolita
+  // con su brillo. Se dibuja una vez por nube y por color (los colores cambian despacio con la hora y el clima).
+  function nubeSuave(r, z, cc, panza, forzar) {
+    const R0 = Math.max(4, Math.round(r)), w = R0 * 4.6, h = R0 * 2.7;
+    return pre('nube' + z + '_' + R0, [cc, panza].join(), w, h, forzar, g => {
+      const cx = R0 * 2.3, cy = R0 * 1.35, luz = mezA(aRgb(cc), [255, 255, 255], z ? 0.3 : 0.1).map(Math.round).join(','), sombra = z ? mezA(aRgb(cc), aRgb(panza), 0.8).map(Math.round).join(',') : cc;
+      g.filter = `blur(${Math.max(0.6, R0 * 0.05)}px)`;
+      const gr = g.createLinearGradient(0, cy - R0 * 1.1, 0, cy + R0 * 0.9); gr.addColorStop(0, `rgb(${luz})`); gr.addColorStop(0.55, `rgb(${cc})`); gr.addColorStop(1, `rgb(${sombra})`);
+      g.fillStyle = gr; g.beginPath();
+      for (const [dx, dy, k] of BOLITAS) { g.moveTo(cx + dx * R0 + R0 * k, cy + dy * R0); g.arc(cx + dx * R0, cy + dy * R0, R0 * k, 0, 6.283); }
+      g.fill(); g.filter = 'none';
+      if (z) {                                                      // brillo de cada bolita, arriba a la izquierda
+        g.globalCompositeOperation = 'source-atop';
+        for (const [dx, dy, k] of BOLITAS) {
+          const x = cx + (dx - 0.25 * k) * R0, y = cy + (dy - 0.35 * k) * R0, rb = R0 * k * 0.9, gb = g.createRadialGradient(x, y, 0, x, y, rb);
+          gb.addColorStop(0, 'rgba(255,255,255,0.28)'); gb.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gb; g.fillRect(x - rb, y - rb, rb * 2, rb * 2);
+        }
+        g.globalCompositeOperation = 'source-over';
+      }
+    });
+  }
   function nubeRuta(x, y, r) {                                     // una nube: varias bolitas que se funden en una sola forma (se suma al trazo abierto)
     for (const [dx, dy, k] of BOLITAS) { ex.moveTo(x + dx * r + r * k, y + dy * r); ex.arc(x + dx * r, y + dy * r, r * k, 0, 6.283); }
   }
-  function colinaEsc(y0, amp, f1, f2, ph, color) {                 // se dibuja un poco más ancha que el cuadro, por el paralaje
-    ex.fillStyle = color; ex.beginPath(); ex.moveTo(-16, eH);
-    for (let x = -16; x <= eW + 16; x += 8) { const u = x / eW * 6.283; ex.lineTo(x, y0 - amp * (Math.sin(u * f1 + ph) * 0.6 + Math.sin(u * f2 + ph * 2.3) * 0.4)); }
-    ex.lineTo(eW + 16, eH); ex.closePath(); ex.fill();
+  // ---- Piezas del paisaje dibujadas de antemano (con detalle) y reutilizadas en cada cuadro ----
+  // Colinas con monte, orillas con pasto y camino, copa de las palmeras y el lapacho: cada una se dibuja UNA vez en un lienzo aparte
+  // y en cada cuadro solo se copia (barato aunque tenga miles de trazos). Se rehace si cambian sus colores o el tamaño; mientras los
+  // colores se funden (cambio de hora o de clima, unos segundos) se rehace como mucho 4 veces por segundo.
+  const ePre = new Map();
+  function pre(nombre, clave, w, h, forzar, dibujar) {
+    const e = ePre.get(nombre), ahora = performance.now(), W = Math.ceil(w * eD), H = Math.ceil(h * eD);
+    if (e && e.clave === clave && e.W === W && e.H === H) return e.c;
+    if (e && !forzar && e.W === W && e.H === H && ahora - e.t < 250) return e.c;
+    const c = e && e.W === W && e.H === H ? e.c : document.createElement('canvas');
+    if (c.width !== W) c.width = W; if (c.height !== H) c.height = H;
+    const g = c.getContext('2d'); g.setTransform(eD, 0, 0, eD, 0, 0); g.clearRect(0, 0, w, h); dibujar(g);
+    ePre.set(nombre, { clave, c, t: ahora, W, H });
+    return c;
   }
-  function palmaEsc(x, y, s, t, color, v) {                        // palmera: tronco curvo y hojas que se mecen (y se inclinan) con el viento
+  // números «al azar» pero siempre los mismos (así el monte, el pasto y las ramas no cambian de forma al redibujarse)
+  const semilla = n => () => (n = (n * 16807) % 2147483647) / 2147483647;
+  const oscuro = (c, k) => mezcla(c, '#000000', k), claro = (c, k) => mezcla(c, '#ffffff', k);
+
+  // Colina: ladera con degradé (la luz viene de arriba) cubierta de monte: copas de árboles apretadas en la cresta y en manchones
+  // sobre la ladera, con pastizales entre medio. La lejana, con copas chicas y poco contraste (la bruma se las come).
+  function colinaEsc(y0, amp, f1, f2, ph, color, cerca, forzar) {
+    const W = eW + 32, top = Math.max(0, Math.floor(y0 - amp - eH * 0.05)), H = eH - top;
+    const cresta = xc => y0 - amp * (Math.sin((xc - 16) / eW * 6.283 * f1 + ph) * 0.6 + Math.sin((xc - 16) / eW * 6.283 * f2 + ph * 2.3) * 0.4) - top;
+    const c = pre('colina' + f1, [color, eW, eH].join(), W, H, forzar, g => {
+      const R = semilla(f1 * 977 + 13), gr = g.createLinearGradient(0, y0 - amp - top, 0, H);
+      gr.addColorStop(0, claro(color, cerca ? 0.1 : 0.05)); gr.addColorStop(0.4, color); gr.addColorStop(1, oscuro(color, cerca ? 0.22 : 0.1));
+      g.fillStyle = gr; g.beginPath(); g.moveTo(0, H);
+      for (let x = 0; x <= W; x += 6) g.lineTo(x, cresta(x));
+      g.lineTo(W, H); g.closePath(); g.fill();
+      // pastizal: motas finas
+      g.fillStyle = oscuro(color, 0.12); g.globalAlpha = 0.35; g.beginPath();
+      for (let i = 0; i < W * 0.6; i++) { const x = R() * W, y = cresta(x) + R() * (H - cresta(x)); g.moveTo(x + 0.8, y); g.arc(x, y, 0.4 + R() * 0.6, 0, 6.283); }
+      g.fill(); g.globalAlpha = 1;
+      // monte: muchas copas chicas y apretadas (textura de bosque visto de lejos), en la cresta y en manchones sobre la ladera, con
+      // pastizales entre medio. Cuatro tonos: hueco oscuro, copa, copa más clara y la luz arriba a la izquierda.
+      const rr = eH * (cerca ? 0.0085 : 0.0055), copas = [];
+      const bosque = x => Math.sin(x * 0.017 + ph) + Math.sin(x * 0.043 + ph * 2) * 0.7 + Math.sin(x * 0.11 + ph * 5) * 0.3;
+      for (let x = 0; x < W; x += rr * (0.5 + R() * 0.6)) {
+        if (bosque(x) < -0.9) continue;                                                   // claros en la cresta
+        for (let j = 0; j < 2; j++) { const r = rr * (0.7 + R() * 0.7); copas.push([x + R() * rr, cresta(x) + r * (0.3 + R() * 0.9) + j * rr * 1.2, r]); }
+      }
+      for (let i = 0; i < W * H / (rr * rr) * 0.22; i++) {           // manchones en la ladera, más grandes abajo (más cerca)
+        const x = R() * W, base = cresta(x), y = base + rr + R() * (H - base) * 0.75;
+        if (bosque(x) + (y - base) / H * 1.5 > 0.9 + Math.sin(y * 0.09 + x * 0.01) * 0.4) continue;
+        copas.push([x, y, rr * (0.7 + R() * 0.7) * (1 + (y - base) / H * 0.8)]);
+      }
+      copas.sort((a, b) => a[1] - b[1]);
+      const tonos = [[oscuro(color, cerca ? 0.22 : 0.1), 0.18, 0.28, 1.05], [oscuro(color, cerca ? 0.1 : 0.05), 0, 0, 0.92], [mezcla(color, '#6f8a3a', cerca ? 0.07 : 0.03), -0.15, -0.2, 0.55], [claro(color, cerca ? 0.05 : 0.025), -0.3, -0.4, 0.28]];
+      for (const [col, dx, dy, k] of tonos) {
+        g.fillStyle = col; g.beginPath();
+        for (const [x, y, r] of copas) { const X = x + dx * r, Y = y + dy * r; g.moveTo(X + r * k, Y); g.arc(X, Y, r * k, 0, 6.283); }
+        g.fill();
+      }
+      if (cerca) for (const [fx0, col] of LAPACHOS) {                 // lapachos lejanos en flor (rosados y uno amarillo) asomando sobre el monte
+        const x = eW * fx0 + 16, y = cresta(x) + rr * 1.5, sz = eH * 0.05, flor = mezcla(col, color, 0.3);
+        g.strokeStyle = oscuro(color, 0.35); g.lineWidth = Math.max(1, sz * 0.07); g.lineCap = 'round'; g.beginPath();
+        g.moveTo(x, y); g.lineTo(x, y - sz * 0.55); g.moveTo(x, y - sz * 0.45); g.lineTo(x - sz * 0.3, y - sz * 0.85); g.moveTo(x, y - sz * 0.5); g.lineTo(x + sz * 0.32, y - sz * 0.82); g.stroke();
+        for (const [cf, dy, n, k] of [[oscuro(flor, 0.3), 0.08, 34, 1], [flor, 0, 40, 1], [claro(flor, 0.3), -0.1, 16, 0.8]]) {
+          g.fillStyle = cf; g.beginPath();
+          for (let i = 0; i < n; i++) { const a = Math.PI * (1.05 + R() * 0.9), d = Math.sqrt(R()), px = x + Math.cos(a) * d * sz * 0.55, py = y - sz * 0.62 + Math.sin(a) * d * sz * 0.42 + dy * sz, r = Math.max(0.6, sz * 0.05) * (0.7 + R() * 0.8) * k; g.moveTo(px + r, py); g.arc(px, py, r, 0, 6.283); }
+          g.fill();
+        }
+      }
+    });
+    ex.drawImage(c, -16, top, W, H);
+    return { c, top };
+  }
+
+  // Orillas: pasto con matas de hojas finas (más grandes cuanto más cerca), borde mojado junto al agua y un camino de tierra colorada
+  // con huellas y piedritas que baja hasta el río.
+  function orillasEsc(col, kLuz, kNb, forzar) {
+    const yA = eH * 0.74, top = Math.floor(yA - eH * 0.06), W = eW + 24, H = eH - top, os = 1 - kLuz;
+    const c = pre('orillas', [col, Math.round(kLuz * 20), Math.round(kNb * 20), eW, eH].join(), W, H, forzar, g => {
+      const R = semilla(4711);
+      g.translate(12, -top);
+      const izq = new Path2D(), der = new Path2D();
+      izq.moveTo(-12, eH); izq.lineTo(-12, yA - eH * 0.05); izq.lineTo(0, yA - eH * 0.05); izq.quadraticCurveTo(eW * 0.2, yA - eH * 0.02, eW * 0.3, eH); izq.closePath();
+      der.moveTo(eW + 12, eH); der.lineTo(eW + 12, yA - eH * 0.04); der.lineTo(eW, yA - eH * 0.04); der.quadraticCurveTo(eW * 0.84, yA - eH * 0.01, eW * 0.72, eH); der.closePath();
+      const gr = g.createLinearGradient(0, yA - eH * 0.05, 0, eH); gr.addColorStop(0, claro(col, 0.08)); gr.addColorStop(0.5, col); gr.addColorStop(1, oscuro(col, 0.25));
+      g.fillStyle = gr; g.fill(izq); g.fill(der);
+      // borde mojado: una línea clara donde la tierra toca el agua
+      g.strokeStyle = `rgba(255,255,255,${0.05 + 0.1 * kLuz})`; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(0, yA - eH * 0.05); g.quadraticCurveTo(eW * 0.2, yA - eH * 0.02, eW * 0.3, eH); g.moveTo(eW, yA - eH * 0.04); g.quadraticCurveTo(eW * 0.84, yA - eH * 0.01, eW * 0.72, eH); g.stroke();
+      // camino de tierra colorada
+      const tierra = mezcla(mezcla('#a9482a', col, 0.15 + os * 0.5), '#cfd6da', kNb * 0.4), cam = new Path2D();
+      cam.moveTo(eW * 0.04, eH); cam.quadraticCurveTo(eW * 0.12, eH * 0.9, eW * 0.172, eH * 0.79); cam.lineTo(eW * 0.2, eH * 0.805); cam.quadraticCurveTo(eW * 0.17, eH * 0.9, eW * 0.16, eH); cam.closePath();
+      const gt = g.createLinearGradient(0, eH * 0.79, 0, eH); gt.addColorStop(0, oscuro(tierra, 0.15)); gt.addColorStop(1, claro(tierra, 0.06));
+      g.fillStyle = gt; g.fill(cam);
+      g.save(); g.clip(cam);
+      g.strokeStyle = oscuro(tierra, 0.22); g.lineWidth = 1.4; g.globalAlpha = 0.6; g.beginPath();      // huellas de las ruedas
+      for (const k of [0.3, 0.7]) { g.moveTo(eW * (0.04 + 0.12 * k), eH); g.quadraticCurveTo(eW * (0.12 + 0.04 * k), eH * 0.9, eW * (0.174 + 0.024 * k), eH * 0.8); }
+      g.stroke(); g.globalAlpha = 1;
+      g.fillStyle = claro(tierra, 0.25); g.beginPath();                                                  // piedritas
+      for (let i = 0; i < 60; i++) { const y = eH * (0.8 + R() * 0.2), x = eW * (0.04 + R() * 0.17); g.moveTo(x + 0.7, y); g.arc(x, y, 0.4 + R() * 0.6 * (y / eH), 0, 6.283); }
+      g.fill(); g.restore();
+      // pasto: matas de 3 a 5 hojas, en tres tonos
+      const tonos = [oscuro(col, 0.3), claro(col, 0.1), mezcla(col, '#a9b85a', 0.25 * kLuz)], lineas = [new Path2D(), new Path2D(), new Path2D()];
+      for (let i = 0; i < eW * 1.5; i++) {
+        const lado = R() < 0.5, x = lado ? R() * eW * 0.3 : eW * (0.72 + R() * 0.28), y = yA - eH * 0.05 + R() * (eH - yA + eH * 0.05);
+        if (!g.isPointInPath(lado ? izq : der, (x + 12) * eD, (y - top) * eD) || g.isPointInPath(cam, (x + 12) * eD, (y - top) * eD)) continue;
+        const h = eH * (0.009 + 0.02 * (y - yA) / (eH - yA)) * (0.6 + R() * 0.6), n = 3 + Math.floor(R() * 3), L = lineas[Math.floor(R() * 3)];
+        for (let k = 0; k < n; k++) { const a = (k / (n - 1) - 0.5) * 1.1 + (R() - 0.5) * 0.3; L.moveTo(x, y); L.quadraticCurveTo(x + Math.sin(a) * h * 0.4, y - h * 0.6, x + Math.sin(a) * h * 0.8, y - h * Math.cos(a)); }
+      }
+      g.lineWidth = Math.max(0.6, eH * 0.0024); g.lineCap = 'round';
+      lineas.forEach((L, i) => { g.strokeStyle = tonos[i]; g.stroke(L); });
+    });
+    ex.drawImage(c, -12, top, W, H);
+  }
+
+  // Karanda'y (la palmera del Chaco y de los esteros): tronco fino, liso y gris con anillos, y una copa redonda de hojas en abanico,
+  // rígidas y de un verde grisáceo: las de arriba apuntan al cielo, las del costado salen derechas y las de abajo se doblan. Cada hoja
+  // es un abanico relleno con sus nervios. La copa se dibuja aparte y se mece entera con el viento.
+  function copaKaranday(g, s, base, luz, R) {
+    const w = s * 0.5, h = s * 0.46, cx = w / 2, cy = h * 0.48, hojas = [];
+    for (let k = 0; k < 22; k++) {
+      const a = -Math.PI / 2 + (k / 22) * 6.283 + (R() - 0.5) * 0.25, abajo = Math.sin(a);   // abajo: 1 si apunta al suelo
+      if (abajo > 0.75 && R() < 0.6) continue;
+      hojas.push({ a, L: s * (0.085 + R() * 0.03) * (abajo > 0.3 ? 0.85 : 1), pet: s * (0.035 + R() * 0.02), cae: Math.max(0, abajo) * 0.5 + 0.12, z: Math.cos(a * 1.3 + 0.8) + R() * 0.6 });
+    }
+    hojas.sort((p, q) => p.z - q.z);                                 // de atrás (oscuras) a adelante (con luz)
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    hojas.forEach((o, i) => {
+      const k = i / hojas.length, col = mezcla(base, luz, 0.15 + k * 0.55), px = cx + Math.cos(o.a) * o.pet, py = cy + Math.sin(o.a) * o.pet * 0.9 + o.cae * o.pet * 0.5;
+      g.strokeStyle = oscuro(col, 0.15); g.lineWidth = Math.max(0.8, s * 0.005); g.beginPath(); g.moveTo(cx, cy); g.lineTo(px, py); g.stroke();
+      const n = 13, abre = 1.9, puntas = [];
+      for (let j = 0; j < n; j++) {
+        const b = o.a + (j / (n - 1) - 0.5) * abre, L = o.L * (0.82 + 0.18 * Math.cos((j / (n - 1) - 0.5) * 3));
+        puntas.push([px + Math.cos(b) * L, py + Math.sin(b) * L + L * o.cae * (0.4 + 0.6 * Math.abs(Math.cos(b)))]);
+      }
+      g.fillStyle = col; g.beginPath(); g.moveTo(px, py);              // la lámina, con el borde dentado de las puntas
+      puntas.forEach(([x, y], j) => { const [qx, qy] = puntas[Math.min(n - 1, j + 1)]; g.lineTo(x, y); if (j < n - 1) g.lineTo((x + qx) / 2 * 0.93 + px * 0.07, (y + qy) / 2 * 0.93 + py * 0.07); });
+      g.closePath(); g.fill();
+      g.strokeStyle = oscuro(col, 0.22); g.lineWidth = Math.max(0.5, s * 0.0028); g.beginPath();   // nervios
+      puntas.forEach(([x, y]) => { g.moveTo(px, py); g.lineTo(px + (x - px) * 0.92, py + (y - py) * 0.92); });
+      g.stroke();
+    });
+  }
+  function palmaEsc(x, y, s, t, color, v, forzar, luz) {          // karanda'y: tronco curvo y copa que se mece (y se inclina) con el viento
+    luz = luz || color;
     const raf = 0.6 + 0.4 * Math.sin(t / 2300 + x * 0.01), lean = Math.min(0.09, v / 700) * raf;
     const bal = Math.sin(t / 1700 + x) * (0.012 + v / 600) * s, tx = x + s * 0.05 + bal + lean * s, ty = y - s;
-    ex.strokeStyle = color; ex.lineCap = 'round'; ex.lineWidth = Math.max(2, s * 0.05);
-    ex.beginPath(); ex.moveTo(x, y); ex.quadraticCurveTo(x + s * 0.01, y - s * 0.55, tx, ty); ex.stroke();
-    ex.lineWidth = Math.max(1.4, s * 0.028);
-    const giro = Math.min(0.45, v / 110) * raf;                    // con viento las hojas se van hacia un lado
-    for (let i = 0; i < 9; i++) {
-      const ang = -Math.PI / 2 + (i - 4) * 0.4 * (1 - giro * 0.3) + giro + Math.sin(t / (900 - Math.min(500, v * 8)) + i + x) * 0.035 * (1 + v / 15), L = s * 0.4 * (0.85 + 0.15 * Math.cos(i * 1.3));
-      ex.beginPath(); ex.moveTo(tx, ty);
-      ex.quadraticCurveTo(tx + Math.cos(ang) * L * 0.55, ty + Math.sin(ang) * L * 0.75 - L * 0.12, tx + Math.cos(ang) * L, ty + Math.sin(ang) * L * 0.55 + L * 0.42); ex.stroke();
+    const P = u => { const w = 1 - u; return [w * w * x + 2 * u * w * (x + s * 0.01) + u * u * tx, w * w * y + 2 * u * w * (y - s * 0.55) + u * u * ty]; };
+    const tronco = mezcla(color, mezcla(luz, '#8d8878', 0.5), 0.4), izq = [], der = [];
+    for (let i = 0; i <= 14; i++) {
+      const u = i / 14, [px, py] = P(u), [qx, qy] = P(Math.min(1, u + 0.02)), d = Math.hypot(qx - px, qy - py) || 1, nx = -(qy - py) / d, ny = (qx - px) / d;
+      const r = s * (0.016 * (1 - u) + 0.01 * u + (u < 0.06 ? (0.06 - u) * 0.15 : 0)); izq.push([px + nx * r, py + ny * r]); der.push([px - nx * r, py - ny * r]);
     }
-    return u => { const v = 1 - u; return [v * v * x + 2 * u * v * (x + s * 0.01) + u * u * tx, v * v * y + 2 * u * v * (y - s * 0.55) + u * u * ty]; };   // punto del tronco (u: 0 pie … 1 copa)
+    const gT = ex.createLinearGradient(izq[0][0], 0, der[0][0], 0); gT.addColorStop(0, claro(tronco, 0.12)); gT.addColorStop(1, oscuro(tronco, 0.25));
+    ex.fillStyle = gT; ex.beginPath(); ex.moveTo(...izq[0]); izq.forEach(p => ex.lineTo(...p)); for (let i = der.length - 1; i >= 0; i--) ex.lineTo(...der[i]); ex.closePath(); ex.fill();
+    ex.strokeStyle = oscuro(tronco, 0.18); ex.lineWidth = Math.max(0.5, s * 0.0025); ex.globalAlpha = 0.7; ex.beginPath();   // anillos del tronco
+    for (let i = 1; i < 14; i++) { ex.moveTo(...izq[i]); ex.lineTo(...der[i]); }
+    ex.stroke(); ex.globalAlpha = 1;
+    const nombre = 'karanday' + Math.round(s), R = semilla(Math.round(s * 7) + 3), w = s * 0.5, h = s * 0.46;
+    const cv = pre(nombre, [color, luz, Math.round(s)].join(), w, h, forzar, g => { copaKaranday(g, s, color, luz, R); });
+    const giro = Math.min(0.45, v / 110) * raf;
+    ex.save(); ex.translate(tx, ty); ex.rotate(lean * 1.5 + bal / s * 1.2 + giro * 0.35 + Math.sin(t / 900 + x) * 0.012 * (1 + v / 15));
+    ex.drawImage(cv, -w / 2, -h * 0.48, w, h); ex.restore();
+    return u => P(u);                                              // punto del tronco (u: 0 pie … 1 copa)
+  }
+
+  // Lapacho rosado: tronco y ramas que se abren en abanico (cada rama se divide en 2 o 3), y en la punta de cada ramita un racimo
+  // de flores rosadas en tres tonos (sombra, flor y la luz del sol desde arriba a la izquierda). En flor no tiene hojas.
+  function lapachoEsc(x, y, s, t, v, cTronco, cFlor, forzar) {
+    const w = s * 1.25, h = s * 1.35;
+    const cv = pre('lapacho', [cTronco, cFlor, Math.round(s)].join(), w, h, forzar, g => {
+      const R = semilla(4242), puntas = [], tronco = mezcla(cTronco, '#4a3a30', 0.35);
+      g.strokeStyle = tronco; g.lineCap = 'round';
+      const rama = (x0, y0, ang, L, ancho, n) => {
+        const x1 = x0 + Math.cos(ang) * L, y1 = y0 + Math.sin(ang) * L, mx = (x0 + x1) / 2 + (R() - 0.5) * L * 0.25, my = (y0 + y1) / 2 + (R() - 0.5) * L * 0.15;
+        g.lineWidth = ancho; g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(mx, my, x1, y1); g.stroke();
+        if (n <= 1) puntas.push([x1, y1, n]);                                 // flores en las ramitas de arriba y en las puntas
+        if (!n) return;
+        const hijos = n >= 4 ? 2 : 2 + (R() < 0.5 ? 1 : 0), abre = n === 5 ? 0.85 : n === 4 ? 0.75 : 0.9;
+        for (let i = 0; i < hijos; i++) {
+          let a = ang + (i / (hijos - 1) - 0.5) * abre + (R() - 0.5) * 0.3;
+          a = Math.max(-Math.PI + 0.45, Math.min(-0.45, a));                 // las ramas suben y se abren: copa en cúpula ancha
+          rama(x1, y1, a, L * (0.7 + R() * 0.14), ancho * 0.66, n - 1);
+        }
+      };
+      rama(w / 2, h, -Math.PI / 2 + (R() - 0.5) * 0.08, s * 0.3, s * 0.06, 5);
+      const r0 = Math.max(0.7, s * 0.009), rc = s * 0.085;
+      for (const [col, dx, dy, n, k] of [[mezcla(cFlor, '#4a1030', 0.42), 0.12, 0.3, 22, 1], [cFlor, 0, 0, 26, 1], [mezcla(cFlor, '#ffd6ea', 0.45), -0.25, -0.35, 12, 0.8]]) {
+        g.fillStyle = col; g.beginPath();
+        for (const [px, py, nv] of puntas) for (let i = 0, m = nv ? Math.round(n * 0.7) : n; i < m; i++) {
+          const a = R() * 6.283, d = Math.sqrt(R()) * rc, fx = px + Math.cos(a) * d + dx * rc, fy = py + Math.sin(a) * d * 0.75 + dy * rc, r = r0 * (0.7 + R() * 0.9) * k;
+          g.moveTo(fx + r, fy); g.arc(fx, fy, r, 0, 6.283);
+        }
+        g.fill();
+      }
+    });
+    const bal = Math.sin(t / 2100 + x) * (0.004 + v / 1800);
+    ex.save(); ex.translate(x, y); ex.rotate(bal); ex.drawImage(cv, -w / 2, -h, w, h); ex.restore();
+    return { cx: x, cy: y - h * 0.72, ancho: w * 0.42, suelo: y };
   }
   // ---- Temporada (grupo «especiales») ----
   const COL_GUIR = ['239,68,68', '251,191,36', '34,197,94', '96,165,250'];   // rojo, dorado, verde y azul (#ef4444 #fbbf24 #22c55e #60a5fa)
@@ -471,9 +670,9 @@
         let hay = false;
         for (const n of eNubes) if (n.z === z) { hay = true; n.x += n.v * dt * (1 + A.viento / 20); if (n.x - n.r * 3 > eW) n.x = -n.r * 3; }
         if (!hay) continue;
-        if (z) { ex.fillStyle = `rgba(${panza},${kCca})`; ex.beginPath(); for (const n of eNubes) if (n.z === z) nubeRuta(n.x + dx, n.y + dy + n.r * 0.2, n.r * 0.93); ex.fill(); }
-        ex.fillStyle = z ? `rgba(${vEsc.cc},${kCca})` : `rgba(${lejos},${kCca * 0.8})`; ex.beginPath();
-        for (const n of eNubes) if (n.z === z) nubeRuta(n.x + dx, n.y + dy - (z ? n.r * 0.04 : 0), n.r); ex.fill();
+        ex.globalAlpha = z ? kCca : kCca * 0.8;
+        for (const n of eNubes) if (n.z === z) { const r = n.r, c = nubeSuave(r, z, z ? vEsc.cc : lejos, panza, !anim); ex.drawImage(c, n.x + dx - r * 2.3, n.y + dy - r * 1.35, r * 4.6, r * 2.7); }
+        ex.globalAlpha = 1;
       }
     }
     // arcoíris: lluvia débil con sol de día, del lado opuesto al sol
@@ -492,12 +691,12 @@
     // los fuegos artificiales del 24 y del 31 se dibujan en el cielo de toda la pantalla (fuegosCielo): en la franja del paisaje
     // quedaban chicos y tapados por la portada   // la clase sin-fuegos los apaga (panel)
     // colinas lejanas y cercanas
-    ex.translate(pX(0.25), 0); colinaEsc(eH * 0.56, eH * 0.07, 2, 5, 0.6, T[0]); ex.translate(-pX(0.25), 0);
+    ex.translate(pX(0.25), 0); colinaEsc(eH * 0.56, eH * 0.07, 2, 5, 0.6, T[0], false, !anim); ex.translate(-pX(0.25), 0);
     // bruma atmosférica: lo lejano se funde con el color del horizonte (más de día, menos de noche)
     const hz = hexA(P[2]).join(','), aBr = 0.22 + 0.16 * kLuz;
     const gb = ex.createLinearGradient(0, eH * 0.46, 0, eH * 0.64); gb.addColorStop(0, `rgba(${hz},0)`); gb.addColorStop(1, `rgba(${hz},${aBr})`);
     ex.fillStyle = gb; ex.fillRect(0, eH * 0.46, eW, eH * 0.18);
-    ex.translate(pX(0.45), 0); colinaEsc(eH * 0.65, eH * 0.07, 3, 7, 2.1, T[1]); ex.translate(-pX(0.45), 0);
+    ex.translate(pX(0.45), 0); const colCerca = colinaEsc(eH * 0.65, eH * 0.07, 3, 7, 2.1, T[1], true, !anim); ex.translate(-pX(0.45), 0);
     const gb2 = ex.createLinearGradient(0, eH * 0.6, 0, yAgua); gb2.addColorStop(0, `rgba(${hz},0)`); gb2.addColorStop(1, `rgba(${hz},${aBr * 0.45})`);
     ex.fillStyle = gb2; ex.fillRect(0, eH * 0.6, eW, yAgua - eH * 0.6);
     const kCiu = eLuces.length ? (1 - kLuz) ** 1.5 * (A.tipo === 'niebla' ? 0.35 : A.lluvia ? 0.6 : 1) : 0;
@@ -513,25 +712,6 @@
       }
       ex.globalAlpha = 1;
     }
-    // lapachos en flor sobre la colina (julio a septiembre): pequeños y apagados según la luz, para que sean un detalle
-    if (esp && mesLapacho()) {
-      const os = 1 - kLuz, s = eH * 0.05;
-      LAPACHOS.forEach(([fx0, col]) => {
-        const x = eW * fx0, y = altColina(x) + 2, c = mezcla(mezcla(col, T[1], 0.2 + os * 0.55), '#dfe6ea', kNb * 0.6);
-        ex.strokeStyle = T[2]; ex.lineWidth = Math.max(1.2, s * 0.09); ex.beginPath(); ex.moveTo(x, y); ex.lineTo(x, y - s * 0.75); ex.stroke();
-        ex.fillStyle = c; ex.beginPath();
-        [[0, -1, 0.5], [-0.42, -0.82, 0.38], [0.44, -0.84, 0.36], [-0.15, -1.25, 0.34], [0.22, -1.18, 0.33]].forEach(([dx, dy, k]) => { ex.moveTo(x + dx * s + k * s, y + dy * s); ex.arc(x + dx * s, y + dy * s, k * s, 0, 6.283); });
-        ex.fill();
-      });
-      if (ePetalos.length) {
-        const vv = vientoVis(); ex.fillStyle = mezcla('#f08cbf', T[1], 0.2 + os * 0.5); ex.beginPath();
-        ePetalos.forEach(p => {
-          if (dt) { p.x += (0.004 + vv / 3000) * p.v * dt; p.y += 0.006 * p.v * dt; p.f += dt / 500; if (p.y > yAgua || p.x > eW) { const lx = eW * LAPACHOS[p.i][0]; p.x = lx + (Math.random() - 0.5) * eH * 0.05; p.y = altColina(lx) - eH * 0.05; } }
-          const x = p.x + Math.sin(p.f) * 3; ex.moveTo(x + 1.3, p.y); ex.arc(x, p.y, 1.3, 0, 6.283);
-        });
-        ex.fill();
-      }
-    }
     // ondas de calor: el aire sobre las colinas tiembla (se corre en franjas finas, como un espejismo)
     if (esp && anim && kCalor > 0.02) {
       const y0 = Math.round(eH * 0.47), y1 = Math.round(yAgua), paso = 3;
@@ -541,6 +721,16 @@
     // río: toma el color del cielo, con destellos que se mueven
     const ga = ex.createLinearGradient(0, yAgua, 0, eH); ga.addColorStop(0, mezcla(P[2], '#0b1c2c', 0.18)); ga.addColorStop(1, mezcla(P[1], '#06101c', 0.55));
     ex.fillStyle = ga; ex.fillRect(0, yAgua, eW, eH - yAgua);
+    {                                                               // la colina con su monte se refleja en el río (la lluvia y la niebla lo borran)
+      const a = 0.28 * (1 - (A.lluvia || 0) * 0.7) * (A.tipo === 'niebla' ? 0.4 : 1);
+      if (a > 0.02) {
+        ex.save(); ex.beginPath(); ex.rect(0, yAgua, eW, eH - yAgua); ex.clip(); ex.globalAlpha = a;
+        ex.translate(pX(0.45), yAgua); ex.scale(1, -0.6); ex.translate(0, -yAgua); ex.drawImage(colCerca.c, -16, colCerca.top, eW + 32, eH - colCerca.top);
+        ex.restore();
+        const gv = ex.createLinearGradient(0, yAgua, 0, yAgua + eH * 0.12); gv.addColorStop(0, `rgba(${hexA(P[2]).join(',')},0)`); gv.addColorStop(1, `rgba(${hexA(P[2]).join(',')},0.25)`);
+        ex.fillStyle = gv; ex.fillRect(0, yAgua, eW, eH * 0.12);
+      }
+    }
     const brillo = vEsc.br, hAg = eH - yAgua;
     for (let i = 0; i < 26; i++) {
       const x = (i * 97 + t * 0.012 * (i % 3 + 1)) % eW, y = yAgua + ((i * 37) % 100) / 100 * hAg;
@@ -580,9 +770,7 @@
     }
     // orillas y palmeras
     const dxO = pX(1); ex.translate(dxO, 0);
-    ex.fillStyle = T[2];
-    ex.beginPath(); ex.moveTo(-12, eH); ex.lineTo(-12, yAgua - eH * 0.05); ex.lineTo(0, yAgua - eH * 0.05); ex.quadraticCurveTo(eW * 0.2, yAgua - eH * 0.02, eW * 0.3, eH); ex.fill();
-    ex.beginPath(); ex.moveTo(eW + 12, eH); ex.lineTo(eW + 12, yAgua - eH * 0.04); ex.lineTo(eW, yAgua - eH * 0.04); ex.quadraticCurveTo(eW * 0.84, yAgua - eH * 0.01, eW * 0.72, eH); ex.fill();
+    orillasEsc(T[2], kLuz, kNb, !anim);                              // pasto, borde mojado y camino de tierra colorada
     {                                                               // charcos: reflejan el cielo; con lluvia, anillos que se abren; después se secan
       const obj = efectoActivo('lluvia') ? Math.max(A.lluvia ? 0.6 + 0.4 * A.lluvia : 0, A.mojado || 0) : 0;
       eMoj = eMoj < 0 || !anim ? obj : eMoj + (obj - eMoj) * (1 - Math.exp(-dt / 2500));
@@ -605,8 +793,25 @@
       }
     }
     const vp = efectoActivo('viento') && !simple ? vientoVis() : 0;
-    const pa = palmaEsc(eW * 0.08, yAgua - eH * 0.04, eH * 0.7, t, T[3], vp), pb = palmaEsc(eW * 0.17, yAgua - eH * 0.01, eH * 0.44, t + 900, T[3], vp);
-    const pc = palmaEsc(eW * 0.92, yAgua - eH * 0.035, eH * 0.62, t + 400, T[3], vp), pd = palmaEsc(eW * 0.84, yAgua - eH * 0.005, eH * 0.4, t + 1600, T[3], vp);
+    {                                                               // el lapacho rosado de la orilla derecha, con sus flores caídas
+      const os = 1 - kLuz, sL = Math.min(eH * 0.5, eW * 0.34), xL = eW * 0.79, yL = eH * 0.965;
+      const flor = mezcla(mezcla('#e8559f', T[2], 0.1 + os * 0.68), '#dfe6ea', kNb * 0.5);
+      ex.fillStyle = mezcla(flor, "#ffffff", 0.15); ex.globalAlpha = 0.7; ex.beginPath();   // flores caídas sobre el pasto, alrededor del tronco
+      for (let k = 0; k < 9; k++) { const px = xL + (k - 4) * sL * 0.06 + Math.sin(k * 2.3) * sL * 0.03, py = yL + eH * (0.005 + ((k * 7) % 5) * 0.006); ex.moveTo(px + sL * 0.03, py); ex.ellipse(px, py, sL * 0.03, eH * 0.006, 0, 0, 6.283); }
+      ex.fill(); ex.globalAlpha = 1;
+      const L = lapachoEsc(xL, yL, sL, t, vp, T[3], flor, !anim);
+      if (ePetalos.length) {
+        const vv = vientoVis(); ex.fillStyle = mezcla(flor, '#ffffff', 0.18); ex.beginPath();
+        ePetalos.forEach(p => {
+          if (dt) { p.x += (0.004 + vv / 3000) * p.v * dt; p.y += 0.008 * p.v * dt; p.f += dt / 500; }
+          if (p.y < 0 || p.y > L.suelo || p.x > eW + 5) { p.x = L.cx + (Math.random() * 2 - 1) * L.ancho * 0.9; p.y = L.cy + Math.random() * sL * 0.12; }
+          const px = p.x + Math.sin(p.f) * 3; ex.moveTo(px + 1.6, p.y); ex.ellipse(px, p.y, 1.6, 1.1, p.f, 0, 6.283);
+        });
+        ex.fill();
+      }
+    }
+    const pa = palmaEsc(eW * 0.08, yAgua - eH * 0.04, eH * 0.7, t, T[3], vp, !anim, T[1]), pb = palmaEsc(eW * 0.17, yAgua - eH * 0.01, eH * 0.44, t + 900, T[3], vp, !anim, T[1]);
+    const pc = palmaEsc(eW * 0.92, yAgua - eH * 0.035, eH * 0.62, t + 400, T[3], vp, !anim, T[1]), pd = palmaEsc(eW * 0.84, yAgua - eH * 0.005, eH * 0.4, t + 1600, T[3], vp, !anim, T[1]);
     const navidad = esp && document.documentElement.classList.contains('navidad');
     if (navidad) {                                                // Navidad: pino decorado, luces en espiral, guirnaldas (todo bajo «especiales»)
       const cab = mezcla(T[3], '#000000', 0.3), fija = !anim || document.documentElement.classList.contains('navidad-quieta');
