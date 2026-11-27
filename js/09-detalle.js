@@ -198,9 +198,29 @@
         ${vis !== null ? dato('ojo', 'Visibilidad', vis >= 10000 ? Math.round(vis / 1000) + ' km' : (vis / 1000).toFixed(1).replace('.', ',') + ' km') : ''}
         ${dato('luna', 'Luna', `${L.t} · ${L.ilum}%`)}
         ${d ? dato('hoja', 'Calidad del aire', '…', 'aireDato') : ''}
+        ${a && esNumero(a.apparent_temperature) ? htmlTerere(a) : ''}
         ${d ? htmlSol(d) : `${dato('amanecer', 'Amanecer', falta)}${dato('atardecer', 'Atardecer', falta)}`}
       </div>
       ${d ? htmlObs(c, a) : ''}`;
+  }
+  // ---- Índice tereré: qué tan buen día es para un tereré (0 a 10). Sube con el calor que se siente (15 °C → 0, 32 °C → 10);
+  // la lluvia le resta 3 y la tormenta 4. Debajo de 4, mejor un mate. Usa la sensación térmica en °C, aunque la app muestre °F.
+  function indiceTerere(a) {
+    if (!a || !esNumero(a.apparent_temperature)) return null;
+    const cod = Number(a.weather_code) || 0, tormenta = cod >= 95, lluvia = (cod >= 51 && cod <= 67) || (cod >= 80 && cod <= 82);
+    const n = limitar((a.apparent_temperature - 15) / 17 * 10, 0, 10) - (tormenta ? 4 : lluvia ? 3 : 0);
+    return Math.round(limitar(n, 0, 10));
+  }
+  const fraseTerere = n => n >= 8 ? 'Día ideal para un tereré' : n >= 6 ? 'Buen día para un tereré' : n >= 4 ? 'Tereré o mate, como prefieras'
+    : n >= 2 ? 'Más para un mate' : 'Día de mate caliente (y sopa paraguaya)';
+  function htmlTerere(a) {
+    const n = indiceTerere(a);
+    const barra = Array.from({ length: 10 }, (_, k) => `<i${k < n ? ' class="on"' : ''}></i>`).join('');
+    return `<div class="dato dato-terere" data-c="guampa" id="terereDato">
+      ${icono('guampa')}
+      <div class="terere-texto"><small>Índice tereré</small><b>${n}/10 · <span>${fraseTerere(n)}</span></b></div>
+      <div class="terere-barra" role="img" aria-label="${n} de 10">${barra}</div>
+    </div>`;
   }
   const nivelUvCorto = u => u >= 11 ? 'Extremo' : u >= 8 ? 'Muy alto' : u >= 6 ? 'Alto' : u >= 3 ? 'Moderado' : 'Bajo';
   // Salida y puesta del sol en una tarjeta ancha, con el arco del día y el sol donde está ahora (hora de Asunción)
@@ -353,7 +373,8 @@
     const w = clima(a.weather_code, a.is_day);
     const t = esNumero(a.temperature_2m) ? `${Math.round(aU(a.temperature_2m))}°${UT()}` : '--';
     const url = location.origin + location.pathname + '#c=' + encodeURIComponent(c.n);
-    const texto = `Clima en ${c.n}: ${t}, ${w.texto}. Máx ${grados(d.daily.temperature_2m_max[0])} / Mín ${grados(d.daily.temperature_2m_min[0])}.`;
+    const texto = `Clima en ${c.n}: ${t}, ${w.texto}. Máx ${grados(d.daily.temperature_2m_max[0])} / Mín ${grados(d.daily.temperature_2m_min[0])}.` +
+      (indiceTerere(a) !== null ? ` Índice tereré: ${indiceTerere(a)}/10.` : '');
     return { texto, url };
   }
   async function copiarTexto(txt) {

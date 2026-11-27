@@ -37,6 +37,12 @@ const iconoDe = (p, sel) => p.$eval(sel, e => { const u = e.querySelector('use')
       return `${await nombreCiudad(p)}, ${items} filas`;
     });
     await captura(p, 'escritorio-oscuro', { fullPage: true });
+    await paso('Índice tereré: nota de 0 a 10, frase y barra', async () => {
+      const t = await p.$eval('#terereDato', e => ({ txt: e.innerText, on: e.querySelectorAll('.terere-barra i.on').length, tramos: e.querySelectorAll('.terere-barra i').length }));
+      const n = Number((t.txt.match(/(\d+)\/10/) || [])[1]);
+      ok(n >= 0 && n <= 10, 'sin nota: ' + t.txt); ok(t.tramos === 10 && t.on === n, `barra ${t.on}/${t.tramos} para nota ${n}`);
+      return t.txt.replace(/\s+/g, ' ');
+    });
 
     await paso('Buscar una ciudad (escribir + Enter)', async () => {
       await p.fill('#buscador', 'Encarna');

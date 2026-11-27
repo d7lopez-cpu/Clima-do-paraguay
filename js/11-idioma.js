@@ -62,6 +62,8 @@
     "Gibosa menguante": "Gibosa okañýva", "Cuarto menguante": "Cuarto okañýva", "Menguante": "Okañýva",
     "Buena": "Iporã", "Moderada": "Mbytépe", "Dañina para sensibles": "Ivaíva umi imbarete'ỹvape", "Dañina": "Ivaíva", "Muy dañina": "Ivaiterei", "Peligrosa": "Peligro",
     // --- detalle de la ciudad ---
+    "Índice tereré": "Tereré ra'ãha", "Día ideal para un tereré": "Ára iporãitéva tereré haguã", "Buen día para un tereré": "Ára porã tereré haguã",
+    "Tereré o mate, como prefieras": "Tereré térã kay'u, eipotaháicha", "Más para un mate": "Kay'u haguãve", "Día de mate caliente (y sopa paraguaya)": "Kay'u aku ára (ha sopa paraguaya)",
     "Capital del país": "Tetã táva guasu", "Asunción (capital)": "Asunción (táva guasu)", "Sensación térmica": "Ñandu hakuha", "Lluvia ahora": "Ama ko'ág̃a", "Índice UV (máx. hoy)": "Índice UV (ko árape ijyvatevéva)",
     "Amanecer": "Ko'ẽmbota", "Atardecer": "Ka'aru", "Luna": "Jasy", "Calidad del aire": "Aire reko", "Presión": "Presión",
     "Próximas horas": "Aravo oúva", "Gráfico 24 h": "Ra'ãnga 24 aravo", "Próximos días": "Ára oúva",

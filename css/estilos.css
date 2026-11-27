@@ -31,7 +31,9 @@
   color-scheme: dark;
   /* --- Página --- */
   --fondo-html: #0a1433;
-  --fondo-1: #0a1433; --fondo-2: #172a63; --fondo-3: #2b2463;      /* degradado de la noche azul */
+  --fondo-1: #0a1433; --fondo-2: #14305c; --fondo-3: #0f3a33;      /* noche azul que baja al verde oscuro del monte (antes terminaba en violeta) */
+  /* --- Colores del país: rosa del lapacho, verde del monte, tierra colorada (acentos y detalles chicos) --- */
+  --lapacho: #f4a3c6; --monte: #5fd08a; --tierra: #f0916f;
   --tinte-cielo: 16%;                                             /* cuánto tiñe el clima real al fondo (siempre oscuro: el texto no pierde contraste) */
   --cielo-canvas-opacidad: 0.8;
   --halo: rgba(244, 163, 198, 0.16);                              /* resplandor lapacho detrás del contenido */
@@ -53,7 +55,7 @@
   --tarjeta-sombra: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 14px 34px -22px rgba(0, 0, 0, 0.75);
   --ahora-fondo: linear-gradient(180deg, rgba(244, 163, 198, 0.24), rgba(244, 163, 198, 0.07)); --ahora-borde: rgba(244, 163, 198, 0.65); --ahora-texto: #ffe6f0;
   /* un color por dato (íconos de las tarjetas) */
-  --c-sens: #f9a8d4; --c-hum: #38bdf8; --c-vie: #22d3ee; --c-pre: #d8b4fe; --c-llu: #60a5fa; --c-uv: #fbbf24; --c-par: #34d399; --c-vis: #a5b4fc; --c-luna: #e2e8f0; --c-aire: #86efac;
+  --c-sens: #f9a8d4; --c-hum: #38bdf8; --c-vie: #22d3ee; --c-pre: #f0a184; --c-llu: #60a5fa; --c-uv: #fbbf24; --c-par: #34d399; --c-vis: #a5b4fc; --c-luna: #e2e8f0; --c-aire: #86efac;
   --acento: #f4a3c6;                                              /* rosa lapacho */
   --acento-texto: #2a0f1f;
   --celeste: #93c5fd;
@@ -71,6 +73,7 @@
   --c-tormenta: #c4b5fd; --c-granizo: #bae6fd; --c-frio: #bae6fd; --c-calor: #fca5a5; --c-viento: #a5f3fc; --c-dato: #93c5fd;
   /* --- Ñandutí (marca de agua, separadores, carga) --- */
   --nanduti: #c7d2fe; --nanduti-opacidad: 0.16;
+  --puntilla: rgba(244, 163, 198, 0.42);                          /* encaje del ñandutí bajo los títulos de las cajas */
   /* --- Cuadros flotantes, barra inferior y panel --- */
   --flotante-fondo: rgba(9, 16, 42, 0.94); --nav-fondo: rgba(9, 16, 42, 0.82); --dialogo-fondo: #111a3d; --velo: rgba(4, 8, 22, 0.62);
   --mapa-fondo: rgba(5, 10, 32, 0.45);
@@ -110,8 +113,9 @@
 
 :root[data-tema=claro] {
   color-scheme: light;
-  --fondo-html: #eef3ff;
-  --fondo-1: #eef3ff; --fondo-2: #fff8f1; --fondo-3: #fdeef4;
+  --fondo-html: #edf3fb;
+  --fondo-1: #edf3fb; --fondo-2: #fbf3e8; --fondo-3: #e8f3ea;      /* cielo claro, tierra cálida y verde del monte */
+  --lapacho: #a8306d; --monte: #1d7a45; --tierra: #b0442b;
   --tinte-cielo: 0%;
   --cielo-canvas-opacidad: 0.35;
   --halo: rgba(190, 58, 124, 0.08);
@@ -127,7 +131,7 @@
   --nd-op: 0.6; --nd-brillo: transparent; --temp-sombra: rgba(255, 255, 255, 0.9); --pill-portada: rgba(255, 255, 255, 0.85); --velo-portada: rgba(255, 255, 255, 0.7);
   --tarjeta-fondo: #ffffff; --tarjeta-sombra: 0 6px 16px -10px rgba(11, 42, 111, 0.35);
   --ahora-fondo: rgba(0, 56, 168, 0.07); --ahora-borde: rgba(0, 56, 168, 0.45); --ahora-texto: #0038a8;
-  --c-sens: #be185d; --c-hum: #0369a1; --c-vie: #0e7490; --c-pre: #7e22ce; --c-llu: #1d4ed8; --c-uv: #b45309; --c-par: #047857; --c-vis: #4338ca; --c-luna: #475569; --c-aire: #15803d;
+  --c-sens: #be185d; --c-hum: #0369a1; --c-vie: #0e7490; --c-pre: #b0442b; --c-llu: #1d4ed8; --c-uv: #b45309; --c-par: #047857; --c-vis: #4338ca; --c-luna: #475569; --c-aire: #15803d;
   --acento: #a8306d;                                              /* lapacho oscuro (algo más que #be3a7c de la guía, para AA en los enlaces) */
   --acento-texto: #ffffff;
   --celeste: #1d4ed8;
@@ -140,6 +144,7 @@
   --c-sol: #b45309; --c-luna: #4f46e5; --c-nube: #475569; --c-niebla: #475569; --c-llovizna: #0369a1; --c-lluvia: #0369a1;
   --c-tormenta: #6d28d9; --c-granizo: #0369a1; --c-frio: #0369a1; --c-calor: #b91c1c; --c-viento: #0e7490; --c-dato: #1d4ed8;
   --nanduti: #0038a8; --nanduti-opacidad: 0.10;
+  --puntilla: rgba(168, 48, 109, 0.35);
   --flotante-fondo: rgba(255, 255, 255, 0.97); --nav-fondo: rgba(255, 255, 255, 0.94); --dialogo-fondo: #ffffff; --velo: rgba(20, 33, 61, 0.45);
   --mapa-fondo: #e6edfb;
   --esq-base: rgba(11, 42, 111, 0.06); --esq-brillo: rgba(11, 42, 111, 0.14);
@@ -314,7 +319,11 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
 .dep-nombre { display: flex; align-items: center; justify-content: center; gap: 10px; max-width: 100%; color: var(--texto); font-size: 0.88rem; font-weight: 500;
   position: relative; z-index: 1; text-shadow: 0 1px 2px var(--temp-sombra), 0 0 12px var(--temp-sombra); }
 .dep-nombre span { min-width: 0; text-align: center; }
-.dep-nombre::before, .dep-nombre::after { content: ""; flex: 0 0 22px; height: 1px; background: currentColor; opacity: 0.55; }
+/* a los lados del departamento: un hilo que termina en una roseta chica de ñandutí (la de la derecha, espejada) */
+.dep-nombre::before, .dep-nombre::after { content: ""; flex: 0 0 32px; height: 12px; background: var(--lapacho); opacity: 0.8;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2012'%3E%3Cg%20fill='none'%20stroke='%23000'%20stroke-width='1'%3E%3Cpath%20d='M0%206H18.5'/%3E%3Ccircle%20cx='25.5'%20cy='6'%20r='4.8'/%3E%3Ccircle%20cx='25.5'%20cy='6'%20r='1.8'/%3E%3Cpath%20d='M25.5%201.2v9.6M20.7%206h9.6M22.1%202.6l6.8%206.8M28.9%202.6l-6.8%206.8'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2012'%3E%3Cg%20fill='none'%20stroke='%23000'%20stroke-width='1'%3E%3Cpath%20d='M0%206H18.5'/%3E%3Ccircle%20cx='25.5'%20cy='6'%20r='4.8'/%3E%3Ccircle%20cx='25.5'%20cy='6'%20r='1.8'/%3E%3Cpath%20d='M25.5%201.2v9.6M20.7%206h9.6M22.1%202.6l6.8%206.8M28.9%202.6l-6.8%206.8'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat; }
+.dep-nombre::after { transform: scaleX(-1); }
 .btn-redondo { display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--borde); background: var(--vidrio); color: var(--texto); }
 .btn-redondo:hover { background: var(--vidrio-hover); border-color: var(--borde-fuerte); }
 .btn-redondo .ic { width: 20px; height: 20px; }
@@ -412,6 +421,14 @@ html.navidad { --nd-trama: #4ade80; --nd-anillo: #f87171; --nd-petalo: #86efac; 
 .dato[data-c=presion] { --c: var(--c-pre); } .dato[data-c=lluvia] { --c: var(--c-llu); } .dato[data-c=uv] { --c: var(--c-uv); }
 .dato[data-c=paraguas] { --c: var(--c-par); } .dato[data-c=ojo] { --c: var(--c-vis); } .dato[data-c=luna] { --c: var(--c-luna); }
 .dato[data-c=hoja] { --c: var(--c-aire); } .dato[data-c=amanecer], .dato[data-c=atardecer] { --c: var(--c-uv); }
+/* índice tereré: tarjeta ancha con la guampa, la nota (0 a 10), la frase y una barra de 10 tramos en verde yerba */
+.dato.dato-terere { grid-column: 1 / -1; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "ic txt" "ic barra"; row-gap: 8px; align-items: center; }
+.dato[data-c=guampa] { --c: var(--monte); --ic-2: var(--tierra); }
+.terere-texto { grid-area: txt; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.dato .terere-texto b span { font-weight: 500; font-size: 0.95rem; }
+.terere-barra { grid-area: barra; display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; }
+.terere-barra i { height: 6px; border-radius: 3px; background: var(--borde); }
+.terere-barra i.on { background: var(--monte); }
 .dato.dato-sol > .sol-lado { width: auto; height: auto; grid-area: auto; }   /* que no le apliquen el tamaño del ícono de las demás tarjetas */
 .dato-sol { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); }
 .sol-lado { display: flex; flex-direction: column; align-items: center; gap: 1px; text-align: center; min-width: 6.5em; }
@@ -431,7 +448,12 @@ html.navidad { --nd-trama: #4ade80; --nd-anillo: #f87171; --nd-petalo: #86efac; 
 }
 /* cajas del pronóstico */
 .pronostico-caja { background: var(--tarjeta-fondo); border: 1px solid var(--borde); border-radius: var(--r-xl); padding: var(--e-3) var(--e-4) var(--e-4); box-shadow: var(--tarjeta-sombra); min-width: 0; }
-.caja-titulo { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-2); margin-bottom: var(--e-3); }
+.caja-titulo { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-2); margin-bottom: var(--e-3);
+  position: relative; padding-bottom: 14px; }
+/* «puntilla»: el borde de encaje del ñandutí (festones con piquitos), bajo el título de cada caja y arriba del pie */
+.caja-titulo::after, footer::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 9px; background: var(--puntilla); pointer-events: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%209'%3E%3Cg%20fill='none'%20stroke='%23000'%20stroke-width='1'%3E%3Cpath%20d='M0%201.2H16M0%201.2Q4%208%208%201.2Q12%208%2016%201.2M4%201.2v3.4M12%201.2v3.4'/%3E%3C/g%3E%3Ccircle%20cx='4'%20cy='7.6'%20r='1'/%3E%3Ccircle%20cx='12'%20cy='7.6'%20r='1'/%3E%3C/svg%3E") left center / 16px 9px repeat-x;
+          mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%209'%3E%3Cg%20fill='none'%20stroke='%23000'%20stroke-width='1'%3E%3Cpath%20d='M0%201.2H16M0%201.2Q4%208%208%201.2Q12%208%2016%201.2M4%201.2v3.4M12%201.2v3.4'/%3E%3C/g%3E%3Ccircle%20cx='4'%20cy='7.6'%20r='1'/%3E%3Ccircle%20cx='12'%20cy='7.6'%20r='1'/%3E%3C/svg%3E") left center / 16px 9px repeat-x; }
 .caja-titulo h4 { display: inline-flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 600; color: var(--texto); }
 .caja-titulo h4 .ic { width: 20px; height: 20px; color: var(--acento); }
 .pestanas { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); gap: 6px; }
@@ -614,7 +636,8 @@ button.stat:hover:not(:disabled) { border-color: var(--borde-fuerte); }
 #aviso { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 60; display: none; max-width: min(92vw, 520px); text-align: center;
   background: var(--flotante-fondo); color: var(--texto); border: 1px solid var(--borde-fuerte); padding: 11px 18px; border-radius: var(--r); font-size: 0.9rem; font-weight: 500;
   box-shadow: var(--sombra-flotante); }
-footer { color: var(--suave); font-size: var(--t-chico); text-align: center; line-height: 1.7; padding: var(--e-2) 0 var(--e-6); }
+footer { position: relative; color: var(--suave); font-size: var(--t-chico); text-align: center; line-height: 1.7; padding: var(--e-6) 0 var(--e-6); }
+footer::before { top: 0; bottom: auto; left: 12%; right: 12%; }
 /* firma del creador: el ñandutí y el nombre en la tipografía de los títulos, separada de los créditos de datos por una línea fina */
 .firma { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 10px; margin: 0 auto var(--e-4); padding-bottom: var(--e-4);
   max-width: 420px; border-bottom: 1px solid var(--borde); font-family: var(--fuente-titulo); font-size: 1.05rem; color: var(--texto); }
