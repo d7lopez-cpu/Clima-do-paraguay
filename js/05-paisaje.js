@@ -340,7 +340,7 @@
         g.fill();
       }
       if (cerca) for (const [fx0, col] of LAPACHOS) {                 // lapachos lejanos en flor (rosados y uno amarillo) asomando sobre el monte
-        const x = eW * fx0 + 16, y = cresta(x) + rr * 1.5, sz = eH * 0.05, flor = mezcla(col, color, 0.3);
+        const lum = hexA(color).reduce((m, v, i) => m + v * [0.3, 0.59, 0.11][i], 0) / 255, x = eW * fx0 + 16, y = cresta(x) + rr * 1.5, sz = eH * 0.05, flor = mezcla(col, color, limitar(0.3 + (0.35 - lum) * 1.6, 0.3, 0.75));   // de noche, más apagados
         g.strokeStyle = oscuro(color, 0.35); g.lineWidth = Math.max(1, sz * 0.07); g.lineCap = 'round'; g.beginPath();
         g.moveTo(x, y); g.lineTo(x, y - sz * 0.55); g.moveTo(x, y - sz * 0.45); g.lineTo(x - sz * 0.3, y - sz * 0.85); g.moveTo(x, y - sz * 0.5); g.lineTo(x + sz * 0.32, y - sz * 0.82); g.stroke();
         for (const [cf, dy, n, k] of [[oscuro(flor, 0.3), 0.08, 34, 1], [flor, 0, 40, 1], [claro(flor, 0.3), -0.1, 16, 0.8]]) {
@@ -465,10 +465,10 @@
 
   // Lapacho rosado: tronco y ramas que se abren en abanico (cada rama se divide en 2 o 3), y en la punta de cada ramita un racimo
   // de flores rosadas en tres tonos (sombra, flor y la luz del sol desde arriba a la izquierda). En flor no tiene hojas.
-  function lapachoEsc(x, y, s, t, v, cTronco, cFlor, forzar) {
+  function lapachoEsc(x, y, s, t, v, cTronco, cFlor, forzar, os = 0) {   // os: cuánto es de noche (0 a 1)
     const w = s * 1.25, h = s * 1.35;
-    const cv = pre('lapacho', [cTronco, cFlor, Math.round(s)].join(), w, h, forzar, g => {
-      const R = semilla(4242), puntas = [], tronco = mezcla(cTronco, '#4a3a30', 0.35);
+    const cv = pre('lapacho', [cTronco, cFlor, Math.round(s), Math.round(os * 10)].join(), w, h, forzar, g => {
+      const R = semilla(4242), puntas = [], tronco = mezcla(cTronco, '#4a3a30', 0.35 * (1 - os * 0.85));   // de noche el tronco queda en sombra
       g.strokeStyle = tronco; g.lineCap = 'round';
       const rama = (x0, y0, ang, L, ancho, n) => {
         const x1 = x0 + Math.cos(ang) * L, y1 = y0 + Math.sin(ang) * L, mx = (x0 + x1) / 2 + (R() - 0.5) * L * 0.25, my = (y0 + y1) / 2 + (R() - 0.5) * L * 0.15;
@@ -484,7 +484,7 @@
       };
       rama(w / 2, h, -Math.PI / 2 + (R() - 0.5) * 0.08, s * 0.3, s * 0.06, 5);
       const r0 = Math.max(0.7, s * 0.009), rc = s * 0.085;
-      for (const [col, dx, dy, n, k] of [[mezcla(cFlor, '#4a1030', 0.42), 0.12, 0.3, 22, 1], [cFlor, 0, 0, 26, 1], [mezcla(cFlor, '#ffd6ea', 0.45), -0.25, -0.35, 12, 0.8]]) {
+      for (const [col, dx, dy, n, k] of [[mezcla(cFlor, '#2a0818', 0.42 + os * 0.15), 0.12, 0.3, 22, 1], [cFlor, 0, 0, 26, 1], [mezcla(cFlor, os > 0.5 ? '#c9b8e8' : '#ffd6ea', 0.45 - os * 0.3), -0.25, -0.35, 12, 0.8]]) {
         g.fillStyle = col; g.beginPath();
         for (const [px, py, nv] of puntas) for (let i = 0, m = nv ? Math.round(n * 0.7) : n; i < m; i++) {
           const a = R() * 6.283, d = Math.sqrt(R()) * rc, fx = px + Math.cos(a) * d + dx * rc, fy = py + Math.sin(a) * d * 0.75 + dy * rc, r = r0 * (0.7 + R() * 0.9) * k;
@@ -536,43 +536,108 @@
     }
     ex.globalAlpha = 1;
   }
-  // Pino de Navidad decorado (geometría de la referencia de diseño, escena de 350×150, con el pie del tronco en (80, 132)):
-  // tres pisos de follaje con degradado y luz lateral, tronco, guirnalda dorada de cuentas, 14 esferas de luz, estrella con brillo
-  // y dos regalos. De noche el follaje se oscurece un poco para no desentonar con el paisaje. Devuelve P(x, y): de la referencia a px.
-  const PINO_PISOS = [[34, 124, 80, 136, 126, 124, 95, 86, 80, 90, 65, 86], [44, 94, 80, 104, 116, 94, 91, 62, 80, 65, 69, 62], [55, 68, 80, 76, 105, 68, 80, 30, 80, 30, 80, 30]];
-  const PINO_FOCOS = [[80, 44], [73, 56], [88, 54], [64, 80], [80, 84], [97, 78], [56, 102], [72, 108], [90, 106], [106, 98], [48, 120], [64, 126], [96, 126], [112, 118]];
+  // Pino de Navidad decorado, bien llamativo (coordenadas de referencia: el pie del tronco en (80, 132), unas 100 × 110 unidades):
+  // cuatro pisos de ramas con agujas, sombra y luz lateral; esferas brillantes y adornitos de ñandutí colgados; guirnaldas doradas
+  // con un destello que las recorre; 26 luces de colores que titilan; estrella grande con rayos; un resplandor cálido alrededor
+  // (más de noche) y regalos al pie. El follaje y los adornos fijos se dibujan una vez aparte. Devuelve P(x, y): de la referencia a px.
+  const PINO_PISOS = [[96, 134, 47], [74, 114, 40], [52, 92, 31], [30, 68, 21]];   // [arriba, abajo, medio ancho] de cada piso
+  const PINO_FOCOS = (() => {                                       // luces repartidas dentro de los pisos (siempre las mismas)
+    const R = semilla(777), l = [];
+    for (const [arriba, abajo, hw] of PINO_PISOS) for (let q = 0; q < Math.round(hw / 6.5); q++) {
+      const y = arriba + (abajo - arriba) * (0.35 + 0.6 * R()), a = hw * (y - arriba) / (abajo - arriba) * 0.85; l.push([80 + (R() * 2 - 1) * a, y]);
+    }
+    return l;
+  })();
   function pinoNavidad(X, Y, k, t, fija, kLuz, noche) {
     const P = (x, y) => [X + (x - 80) * k, Y + (y - 132) * k], os = noche * 0.45;
-    const ruta = () => { ex.beginPath(); for (const p of PINO_PISOS) { const [a, b, c, d, e, f, g, h, i, j, l, m] = p; ex.moveTo(...P(a, b)); ex.quadraticCurveTo(...P(c, d), ...P(e, f)); ex.lineTo(...P(g, h)); ex.quadraticCurveTo(...P(i, j), ...P(l, m)); ex.closePath(); } };
-    ex.fillStyle = mezcla('#4a2f1c', '#1a120c', os); ex.fillRect(...P(76, 122), 8 * k, 10 * k);   // tronco
-    const [x0, y0] = P(34, 30), [x1, y1] = P(126, 136);
-    const gv = ex.createLinearGradient(x0, y0, x1, y1); gv.addColorStop(0, mezcla('#23854a', '#0c2a22', os)); gv.addColorStop(1, mezcla('#0b3a20', '#051510', os));
-    ruta(); ex.fillStyle = gv; ex.fill();
-    const gl = ex.createLinearGradient(x0, 0, x1, 0); gl.addColorStop(0, `rgba(63,174,102,${0.55 * (1 - os)})`); gl.addColorStop(0.5, 'rgba(63,174,102,0)');
-    ex.fillStyle = gl; ex.fill();                                                                    // luz lateral
-    ex.strokeStyle = '#fbbf24'; ex.lineWidth = 1.6 * k; ex.lineCap = 'round'; ex.setLineDash([0.1, 3.2 * k]); ex.beginPath();   // guirnalda dorada de cuentas
-    for (const [a, b, c, d, e, f] of [[60, 64, 80, 78, 100, 62], [52, 90, 80, 106, 110, 88], [42, 118, 80, 134, 120, 116]]) { ex.moveTo(...P(a, b)); ex.quadraticCurveTo(...P(c, d), ...P(e, f)); }
-    ex.stroke(); ex.setLineDash([]);
+    // resplandor cálido alrededor del árbol
+    const [gx, gy] = P(80, 82), rg = 78 * k, gw = ex.createRadialGradient(gx, gy, 0, gx, gy, rg);
+    gw.addColorStop(0, `rgba(255,205,120,${0.1 + 0.28 * noche})`); gw.addColorStop(1, 'rgba(255,205,120,0)');
+    ex.fillStyle = gw; ex.fillRect(gx - rg, gy - rg, rg * 2, rg * 2);
+    const kq = Math.round(k * 20) / 20, nq = Math.round(os * 10) / 10;
+    const spr = pre('pino', [kq, nq].join(), 104 * kq, 118 * kq, false, g => {
+      const R = semilla(2412), Q = (x, y) => [(x - 28) * kq, (y - 24) * kq];
+      const gt = g.createLinearGradient(...Q(76, 0), ...Q(84, 0)); gt.addColorStop(0, mezcla('#6b4428', '#1a120c', nq)); gt.addColorStop(1, mezcla('#3a2516', '#0c0806', nq));
+      g.fillStyle = gt; g.fillRect(...Q(76, 124), 8 * kq, 14 * kq);
+      for (const [arriba, abajo, hw] of PINO_PISOS) {
+        const forma = new Path2D(), n = Math.round(hw / 4.5) * 2;
+        forma.moveTo(...Q(80, arriba));
+        forma.quadraticCurveTo(...Q(80 + hw * 0.45, (arriba + abajo) / 2), ...Q(80 + hw, abajo));
+        for (let m = n; m >= 0; m--) { const x = 80 - hw + (2 * hw) * m / n; forma.lineTo(...Q(x, abajo - (m % 2 ? 4.5 : 0) + Math.abs(x - 80) / hw * 1.5)); }
+        forma.quadraticCurveTo(...Q(80 - hw * 0.45, (arriba + abajo) / 2), ...Q(80, arriba)); forma.closePath();
+        g.save(); g.translate(0, 3 * kq); g.fillStyle = 'rgba(0,0,0,0.3)'; g.fill(forma); g.restore();            // sombra sobre el piso de abajo
+        const gv = g.createLinearGradient(...Q(80 - hw, 0), ...Q(80 + hw, 0));
+        gv.addColorStop(0, mezcla('#34a862', '#0e2e24', nq)); gv.addColorStop(0.55, mezcla('#1a6e40', '#0a2218', nq)); gv.addColorStop(1, mezcla('#0b4024', '#04120c', nq));
+        g.fillStyle = gv; g.fill(forma);
+        g.save(); g.clip(forma); g.lineCap = 'round'; g.lineWidth = Math.max(0.6, 0.9 * kq);
+        for (const [col, al] of [[mezcla('#6fd090', '#1d4a38', nq), 0.6], [mezcla('#0b3a20', '#04120c', nq), 0.6]]) {    // agujas: claras y oscuras
+          g.strokeStyle = col; g.globalAlpha = al; g.beginPath();
+          for (let q = 0; q < hw * 4; q++) {
+            const v = R(), y = arriba + (abajo - arriba) * Math.sqrt(R()), ancho = hw * (y - arriba) / (abajo - arriba), x = 80 + (v * 2 - 1) * ancho, dir = x < 80 ? -1 : 1, L = 3 + R() * 3;
+            g.moveTo(...Q(x, y)); g.lineTo(...Q(x + dir * L * 0.8, y + L * 0.6));
+          }
+          g.stroke();
+        }
+        g.restore(); g.globalAlpha = 1;
+      }
+      // esferas brillantes (rojo, dorado, azul y plateado) con su reflejo
+      const ESF = ['#e11d48', '#f59e0b', '#2563eb', '#e5e7eb', '#db2777'];
+      PINO_PISOS.forEach(([arriba, abajo, hw], p) => {
+        for (let q = 0; q < 3 + (p < 2 ? 1 : 0); q++) {
+          const y = arriba + (abajo - arriba) * (0.55 + 0.35 * R()), a = hw * (y - arriba) / (abajo - arriba) * 0.8, x = 80 + (R() * 2 - 1) * a, r = (2.6 + R() * 1.2) * kq, [ox, oy] = Q(x, y);
+          const col = mezcla(ESF[(p * 3 + q) % ESF.length], '#0a1020', nq * 0.8), ge = g.createRadialGradient(ox - r * 0.35, oy - r * 0.4, r * 0.1, ox, oy, r);
+          ge.addColorStop(0, claro(col, 0.6)); ge.addColorStop(0.45, col); ge.addColorStop(1, oscuro(col, 0.45));
+          g.strokeStyle = 'rgba(253,230,138,0.6)'; g.lineWidth = Math.max(0.5, 0.5 * kq); g.beginPath(); g.moveTo(ox, oy - r); g.lineTo(ox, oy - r - 1.8 * kq); g.stroke();
+          g.fillStyle = ge; g.beginPath(); g.arc(ox, oy, r, 0, 6.283); g.fill();
+        }
+      });
+      // adornitos de ñandutí (blanco y dorado) colgando
+      g.lineWidth = Math.max(0.5, 0.45 * kq);
+      for (const [x, y] of [[66, 84], [95, 104], [72, 124], [88, 62]]) {
+        const [ox, oy] = Q(x, y), r = 3.6 * kq;
+        g.strokeStyle = mezcla('#fff7e0', '#9a8a60', nq); g.beginPath(); g.arc(ox, oy, r, 0, 6.283); g.moveTo(ox + r * 0.4, oy); g.arc(ox, oy, r * 0.4, 0, 6.283);
+        for (let m = 0; m < 12; m++) { const a = m * 0.5236; g.moveTo(ox + Math.cos(a) * r * 0.4, oy + Math.sin(a) * r * 0.4); g.lineTo(ox + Math.cos(a) * r, oy + Math.sin(a) * r); }
+        g.stroke(); g.fillStyle = '#fbbf24'; g.beginPath(); g.arc(ox, oy, r * 0.22, 0, 6.283); g.fill();
+      }
+    });
+    ex.drawImage(spr, ...P(28, 24), 104 * k, 118 * k);
+    // guirnaldas doradas de cuentas, con un destello que las recorre
+    const curvas = PINO_PISOS.map(([arriba, abajo, hw]) => { const y = arriba + (abajo - arriba) * 0.62, a = hw * 0.62 * 0.85; return [80 - a, y - 3, 80, y + 5, 80 + a, y + 2]; });
+    ex.lineCap = 'round'; ex.setLineDash([0.1, 3 * k]);
+    for (const [col, w, off] of [['#fbbf24', 1.7, 0], ['#fff7d6', 1, fija ? 0 : -t / 120]]) {
+      ex.strokeStyle = col; ex.lineWidth = w * k; ex.lineDashOffset = off; ex.globalAlpha = off ? 0.55 + 0.45 * noche : 1; ex.beginPath();
+      for (const [a, b, c, d, e, f] of curvas) { ex.moveTo(...P(a, b)); ex.quadraticCurveTo(...P(c, d), ...P(e, f)); }
+      ex.stroke();
+    }
+    ex.setLineDash([]); ex.lineDashOffset = 0; ex.globalAlpha = 1;
     if (!eSprGuir) eSprGuir = spritesGuirnalda();
-    PINO_FOCOS.forEach(([x, y], j) => { const [px, py] = P(x, y); foco(px, py, 2.5 * k, 2.5 * k, j, brilloFoco(j, t, fija), noche); });
+    PINO_FOCOS.forEach(([x, y], j) => { const [px, py] = P(x, y); foco(px, py, 2.2 * k, 2.2 * k, j, brilloFoco(j, t, fija), Math.max(noche, 0.45)); });
     ex.globalAlpha = 1;
     // regalos al pie
-    const regalo = (x, y, w, h, col, lazo) => { const [a, b] = P(x, y); ex.fillStyle = mezcla(col, '#000000', os * 0.6); ex.fillRect(a, b, w * k, h * k); ex.strokeStyle = '#fde68a'; ex.lineWidth = 1.2 * k; ex.beginPath(); ex.moveTo(a + w * k / 2, b); ex.lineTo(a + w * k / 2, b + h * k); ex.moveTo(a, b + h * k / 2); ex.lineTo(a + w * k, b + h * k / 2); if (lazo) { ex.moveTo(a + w * k / 2, b); ex.quadraticCurveTo(a + w * k / 2 - 5 * k, b - 4 * k, a + w * k / 2 - 6 * k, b - 1 * k); ex.moveTo(a + w * k / 2, b); ex.quadraticCurveTo(a + w * k / 2 + 5 * k, b - 4 * k, a + w * k / 2 + 6 * k, b - 1 * k); } ex.stroke(); };
-    regalo(90, 122, 15, 11, '#b91c1c', true); regalo(56, 125, 12, 8, '#1d4ed8', false);
-    // estrella dorada en la punta: brillo suave (más de noche) que late despacio salvo si `fija`
-    const [sx, sy] = P(80, 27.5), lat = fija ? 1 : 1 + 0.08 * Math.sin(t / 2200), rb = 15 * k * lat * (0.8 + 0.4 * noche);
-    const gs = ex.createRadialGradient(sx, sy, 0, sx, sy, rb); gs.addColorStop(0, `rgba(253,230,138,${0.5 + 0.35 * noche})`); gs.addColorStop(1, 'rgba(253,230,138,0)');
+    const regalo = (x, y, w, h, col) => {
+      const [a, b] = P(x, y); ex.fillStyle = mezcla(col, '#000000', os * 0.6); ex.fillRect(a, b, w * k, h * k);
+      ex.fillStyle = 'rgba(255,255,255,0.18)'; ex.fillRect(a, b, w * k * 0.35, h * k);
+      ex.strokeStyle = '#fde68a'; ex.lineWidth = 1.2 * k; ex.beginPath(); ex.moveTo(a + w * k / 2, b); ex.lineTo(a + w * k / 2, b + h * k); ex.moveTo(a, b + h * k / 2); ex.lineTo(a + w * k, b + h * k / 2);
+      ex.moveTo(a + w * k / 2, b); ex.quadraticCurveTo(a + w * k * 0.2, b - 3.5 * k, a + w * k / 2 - 0.5, b); ex.moveTo(a + w * k / 2, b); ex.quadraticCurveTo(a + w * k * 0.8, b - 3.5 * k, a + w * k / 2 + 0.5, b); ex.stroke();
+    };
+    regalo(88, 122, 15, 12, '#b91c1c'); regalo(55, 125, 13, 9, '#1d4ed8'); regalo(103, 126, 11, 8, '#7c3aed'); regalo(70, 127, 10, 7, '#059669');
+    // estrella dorada grande en la punta: brillo y rayos que giran despacio (quietos si `fija`)
+    const [sx, sy] = P(80, 26), lat = fija ? 1 : 1 + 0.1 * Math.sin(t / 1600), rb = 22 * k * lat * (0.85 + 0.4 * noche);
+    const gs = ex.createRadialGradient(sx, sy, 0, sx, sy, rb); gs.addColorStop(0, `rgba(253,230,138,${0.6 + 0.35 * noche})`); gs.addColorStop(1, 'rgba(253,230,138,0)');
     ex.fillStyle = gs; ex.fillRect(sx - rb, sy - rb, rb * 2, rb * 2);
-    ex.fillStyle = '#fbbf24'; ex.strokeStyle = '#fff3c4'; ex.lineWidth = 0.8 * k; ex.lineJoin = 'round'; ex.beginPath();
-    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = (i % 2 ? 3.3 : 8) * k; ex[i ? 'lineTo' : 'moveTo'](sx + Math.cos(a) * r, sy + 1.5 * k + Math.sin(a) * r); }
+    ex.save(); ex.translate(sx, sy); ex.rotate(fija ? 0 : t / 6000); ex.strokeStyle = `rgba(255,240,190,${0.35 + 0.4 * noche})`; ex.lineWidth = 0.8 * k; ex.beginPath();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, L = (i % 2 ? 10 : 16) * k * lat; ex.moveTo(Math.cos(a) * 6 * k, Math.sin(a) * 6 * k); ex.lineTo(Math.cos(a) * L, Math.sin(a) * L); }
+    ex.stroke(); ex.restore();
+    ex.fillStyle = '#fbbf24'; ex.strokeStyle = '#fff3c4'; ex.lineWidth = 0.9 * k; ex.lineJoin = 'round'; ex.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = (i % 2 ? 4.2 : 10) * k; ex[i ? 'lineTo' : 'moveTo'](sx + Math.cos(a) * r, sy + 1.5 * k + Math.sin(a) * r); }
     ex.closePath(); ex.fill(); ex.stroke();
     return P;
   }
   // Luces en espiral alrededor de un tronco (tr: función de palmaEsc); las que quedan "detrás" del tronco se ven más tenues
-  function lucesEspiral(tr, t, fija, noche, ancho) {
+  function lucesEspiral(tr, t, fija, noche, ancho, yMax = Infinity) {   // yMax: solo las luces más arriba que esa altura
     for (let k = 0; k < 13; k++) {
       const u = 0.06 + k * 0.054, [x, y] = tr(u), fase = u * Math.PI * 9, atras = Math.cos(fase) < 0;
-      if (libreDeEtq(x, y, ancho) !== y) continue;                  // no se dibujan debajo de las etiquetas
+      if (y > yMax || libreDeEtq(x, y, ancho) !== y) continue;      // no se dibujan debajo de las etiquetas (ni detrás del pino)
       foco(x + Math.sin(fase) * ancho, y, Math.max(1.4, ancho * 0.42), Math.max(1.4, ancho * 0.42), k + 2, brilloFoco(k + 2, t, fija) * (atras ? 0.5 : 1), noche * (atras ? 0.5 : 1));
     }
     ex.globalAlpha = 1;
@@ -812,11 +877,11 @@
     const vp = efectoActivo('viento') && !simple ? vientoVis() : 0;
     {                                                               // el lapacho rosado de la orilla derecha, con sus flores caídas
       const os = 1 - kLuz, sL = Math.min(eH * 0.5, eW * 0.34), xL = eW * 0.79, yL = eH * 0.965;
-      const flor = mezcla(mezcla('#e8559f', T[2], 0.1 + os * 0.68), '#dfe6ea', kNb * 0.5);
+      const flor = mezcla(mezcla(mezcla('#e8559f', '#5a1838', os * 0.62), T[2], 0.08 + os * 0.22), '#dfe6ea', kNb * 0.5);   // de noche: rosa oscuro, apenas azulado por la luna
       ex.fillStyle = mezcla(flor, "#ffffff", 0.15); ex.globalAlpha = 0.7; ex.beginPath();   // flores caídas sobre el pasto, alrededor del tronco
       for (let k = 0; k < 9; k++) { const px = xL + (k - 4) * sL * 0.06 + Math.sin(k * 2.3) * sL * 0.03, py = yL + eH * (0.005 + ((k * 7) % 5) * 0.006); ex.moveTo(px + sL * 0.03, py); ex.ellipse(px, py, sL * 0.03, eH * 0.006, 0, 0, 6.283); }
       ex.fill(); ex.globalAlpha = 1;
-      const L = lapachoEsc(xL, yL, sL, t, vp, T[3], flor, !anim);
+      const L = lapachoEsc(xL, yL, sL, t, vp, T[3], flor, !anim, os);
       if (ePetalos.length) {
         const vv = vientoVis(); ex.fillStyle = mezcla(flor, '#ffffff', 0.18); ex.beginPath();
         ePetalos.forEach(p => {
@@ -832,18 +897,16 @@
     const navidad = esp && document.documentElement.classList.contains('navidad');
     if (navidad) {                                                // Navidad: pino decorado, luces en espiral, guirnaldas (todo bajo «especiales»)
       const cab = mezcla(T[3], '#000000', 0.3), fija = !anim || document.documentElement.classList.contains('navidad-quieta');
-      const noche = 1 - kLuz, kP = eH / 200;
+      const noche = 1 - kLuz;
       if (!eSprGuir) eSprGuir = spritesGuirnalda();
-      guirnalda(pd, pc, 0.66, 0.52, t + 700, noche, cab, 2, fija, kLuz, true);                       // orilla derecha: guirnalda con ñandutí
-      lucesEspiral(pa, t, fija, noche, eH * 0.024);                                                  // palmera alta de la izquierda: luces en espiral
-      // en pantallas angostas el pino se achica y se corre a la derecha de la palmera chica, para no tapar su tronco ni asomar sobre el río
-      const angosta = eW < eH * 3.2, kPino = angosta ? eH / 240 : kP;
-      if (angosta) {                                              // un montículo de la misma tierra de la orilla bajo el pino (no queda sobre el agua)
-        const xP = eW * 0.285, yP = eH * 0.93;
-        ex.fillStyle = T[2]; ex.beginPath(); ex.moveTo(xP - 80 * kPino, eH + 2); ex.quadraticCurveTo(xP - 6 * kPino, yP - 74 * kPino, xP + 84 * kPino, eH + 2); ex.fill();
-      }
-      const P = pinoNavidad(angosta ? eW * 0.285 : eW * 0.205, angosta ? eH * 0.93 : eH * 0.885, kPino, t, fija, kLuz, noche), ap = P(57, 70);   // pino decorado en la orilla izquierda
-      guirnalda(() => ap, pa, 0, 0.5, t + 300, noche, cab, 5, fija, kLuz, false);                    // guirnalda del pino a la palmera
+      guirnalda(pa, pb, 0.55, 0.8, t + 700, noche, cab, 2, fija, kLuz, true);                        // entre las palmeras de la izquierda: guirnalda con ñandutí
+      lucesEspiral(pa, t, fija, noche, eH * 0.02);                                                   // palmera alta de la izquierda: luces en espiral
+      // el pino, en la orilla derecha sobre el pasto (delante de las palmeras, lejos del camino y del tronco del lapacho)
+      const kPino = Math.min(eH / 215, eW / 385), xPino = Math.min(eW - 46 * kPino - 4, eW * 0.9), yEstrella = eH * 0.95 - 120 * kPino;
+      lucesEspiral(pc, t + 500, fija, noche, eH * 0.018, yEstrella);                                // las dos palmeras de la derecha, arriba del pino
+      lucesEspiral(pd, t + 900, fija, noche, eH * 0.016, yEstrella);
+      guirnalda(pd, pc, 0.82, 0.66, t + 1300, noche, cab, 7, fija, kLuz, false);                   // y una guirnalda entre ellas
+      pinoNavidad(xPino, eH * 0.95, kPino, t, fija, kLuz, noche);
     }
     ex.translate(-dxO, 0);
     // luciérnagas
