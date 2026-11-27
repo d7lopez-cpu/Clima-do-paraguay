@@ -628,6 +628,17 @@ button.stat:hover:not(:disabled) { border-color: var(--borde-fuerte); }
 .comp-tabla table { border-collapse: collapse; width: 100%; min-width: 440px; font-size: 0.88rem; }
 .comp-tabla th, .comp-tabla td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--borde); }
 .comp-tabla th[scope=row] { color: var(--suave); font-weight: 500; white-space: nowrap; }
+.comp-tabla td { overflow-wrap: normal; word-break: normal; }                 /* «Llovizna leve» se parte entre palabras, nunca a la mitad */
+.comp-et { display: none; }
+@media (max-width: 560px) {                                                    /* celular: nombre de la fila arriba, valores debajo, sin columna de nombres */
+  .comp-tabla table { min-width: 0; table-layout: fixed; }
+  .comp-tabla .comp-esquina, .comp-tabla th[scope=row] { display: none; }
+  .comp-et { display: table-row; }
+  .comp-et th { padding: 10px 6px 0; border-bottom: 0; font-size: var(--t-mini); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--suave); }
+  .comp-tabla th, .comp-tabla td { padding: 4px 6px 8px; vertical-align: top; }
+  .comp-tabla thead th { padding-bottom: 8px; font-size: 0.8rem; hyphens: auto; -webkit-hyphens: auto; }   /* «Mallor-quín» con guion, no «Mallorquí / n» */
+  .comp-tabla .con-ic { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }   /* ícono arriba del texto: «Despejado» entra entero */
+}
 .comp-tabla .ic { width: 18px; height: 18px; }
 .con-ic { display: inline-flex; align-items: center; gap: 6px; }
 .comp-punto { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }

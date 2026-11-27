@@ -480,11 +480,14 @@
     const res = await Promise.allSettled(nombres.map(n => cargarDetalle(porNombre.get(n))));
     if (mi !== tokenComp) return;
     const items = nombres.map((n, i) => ({ c: porNombre.get(n), d: res[i].status === 'fulfilled' ? res[i].value : null, col: COLORES_COMP[compSel.indexOf(n)] }));
-    const fila = (titulo, f) => `<tr><th scope="row">${titulo}</th>${items.map(x => `<td>${x.d ? f(x.d) : '--'}</td>`).join('')}</tr>`;
+    // En celular el nombre de cada fila va en su propia línea, a todo el ancho, arriba de los valores (antes era una columna a la
+    // izquierda: con 3 ciudades la tabla no entraba, se corría de costado y los nombres quedaban cortados). En pantalla ancha, columna.
+    const fila = (titulo, f) => `<tr class="comp-et"><th colspan="${items.length}">${titulo}</th></tr>` +
+      `<tr><th scope="row">${titulo}</th>${items.map(x => `<td>${x.d ? f(x.d) : '--'}</td>`).join('')}</tr>`;
     const num = (v, u) => esNumero(v) ? Math.round(v) + u : '--';
     $('compRes').innerHTML = `${graficoComp(items)}
       <div class="comp-tabla"><table>
-        <thead><tr><th></th>${items.map(x => `<th scope="col"><span class="comp-punto" style="background:${x.col}"></span>${escObs(x.c.n)}</th>`).join('')}</tr></thead>
+        <thead><tr><th class="comp-esquina"></th>${items.map(x => `<th scope="col"><span class="comp-punto" style="background:${x.col}"></span>${escObs(x.c.n)}</th>`).join('')}</tr></thead>
         <tbody>
           ${fila('Ahora', d => { const w = clima(d.current.weather_code, d.current.is_day); return `<span class="con-ic">${w.svg}<span>${w.texto}</span></span>`; })}
           ${fila('Temperatura', d => `<b>${grados(d.current.temperature_2m) + UT()}</b>`)}

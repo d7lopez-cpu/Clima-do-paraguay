@@ -8,7 +8,7 @@
   // (Web Audio: ruido y osciladores, no se descarga nada) y solo suena si la persona toca 🔈.
   // MEZCLA LIMPIA: en cada estado suena UNA cama (el fondo: brisa, lluvia o grillos de noche) y como mucho DOS acentos
   // (aves, chicharras, ranas, ráfagas, granizo, truenos), elegidos por prioridad en escena(); el resto calla del todo.
-  //  ☀️ día: brisa y aves; con calor de verano (≥ 28 °C, de noviembre a marzo) chicharras · 🌇 hora dorada: coro de aves
+  //  ☀️ día: brisa y aves del monte (benteveo, chopí, zorzal, hornero, chingolo, palomas, cotorras, pájaro campana); con calor de verano (≥ 28 °C, de noviembre a marzo) chicharras · 🌇 hora dorada: coro de aves
   //  🌙 noche (≥ 12 °C): grillos (más rápidos cuanto más calor) y ranas · ☁️ nublado: brisa y aves lejanas · 🌫️ niebla: todo amortiguado
   //  🌧️ lluvia: siseo y gotas según la intensidad; la lluvia fuerte saca a las aves y los insectos · ⛈️ tormenta: lluvia fuerte y truenos
   //  (con granizo, códigos 96/99, golpeteo sobre el techo) · 💨 viento: brisa desde 3 km/h, ráfagas desde 15 km/h, silbido desde 35 km/h
@@ -357,25 +357,75 @@
     g.gain.setValueAtTime(0.0001, T); g.gain.exponentialRampToValueAtTime(vol, T + Math.min(0.02, dur / 3)); g.gain.exponentialRampToValueAtTime(0.0001, T + dur);
     o.connect(g); g.connect(dest); vigilar(o).start(T); o.stop(T + dur + 0.05);
   }
-  function llamadaAve() {
-    if (!hayLugar(16)) return;
-    const sal = salida(au.aves), v = azar(0.4, 1), r = Math.random();
-    if (r < 0.38) {                                                // silbido de 2 a 5 notas
-      const n = Math.round(azar(2, 5)), base = azar(2200, 3800), dir = Math.random() < 0.5 ? 1 : -1; let t = 0;
-      for (let i = 0; i < n; i++) { const f0 = base * (1 + dir * i * 0.06), d = azar(0.07, 0.16); tono(sal, f0, f0 * azar(1.15, 1.5), t, d, 0.075 * v); t += d + azar(0.05, 0.11); }
-    } else if (r < 0.58) {                                         // trino rápido
-      const n = Math.round(azar(8, 16)), f = azar(3000, 5200);
-      for (let i = 0; i < n; i++) tono(sal, i % 2 ? f * 1.1 : f, i % 2 ? f : f * 1.1, i * 0.05, 0.04, 0.045 * v);
-    } else if (r < 0.82) {                                         // arrullo de paloma: cu-CU-cu-cuuu
-      const f = azar(380, 470); let t = 0;
-      [[0.35, 1], [0.16, 1.08], [0.16, 1.08], [0.42, 0.98]].forEach(([d, k]) => { tono(sal, f * k, f * k * 0.93, t, d, 0.15 * v, { hz: 5.5, prof: 6 }); t += d + 0.07; });
-    } else {                                                       // dos "píos" que suben
-      tono(sal, azar(1600, 2400), azar(3800, 5200), 0, azar(0.1, 0.17), 0.075 * v);
-      tono(sal, azar(1700, 2500), azar(4000, 5400), 0.22, azar(0.1, 0.17), 0.068 * v);
+  // Un canto con curva de tono (puntos [s, Hz]); arm: nivel del 2.º armónico (voz más llena y áspera, como la del benteveo)
+  function canto(dest, curva, t0, vol, arm) {
+    const { ctx } = au, T = ctx.currentTime + MARGEN + t0, dur = curva[curva.length - 1][0], g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, T); g.gain.exponentialRampToValueAtTime(vol, T + Math.min(0.015, dur / 4));
+    g.gain.setValueAtTime(vol, T + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, T + dur);
+    g.connect(dest);
+    for (const [k, a] of arm ? [[1, 1], [2, arm]] : [[1, 1]]) {
+      const o = ctx.createOscillator(); let d = g;
+      curva.forEach(([s, f], i) => i ? o.frequency.exponentialRampToValueAtTime(f * k, T + s) : o.frequency.setValueAtTime(f * k, T + s));
+      if (a !== 1) { d = ctx.createGain(); d.gain.value = a; d.connect(g); }
+      o.connect(d); vigilar(o).start(T); o.stop(T + dur + 0.05);
     }
   }
-  function rana() {                                                // 2 a 5 croares graves, "pulsados" como una rana de verdad
+  // Aves del monte paraguayo, cada una con su canto (sintetizado a partir de cómo suenan de verdad):
+  //  benteveo o pitogüé («bien-te-veo»), chopí («cho-pí», el que le da el nombre), zorzal colorado o havía (frases aflautadas),
+  //  hornero u ogaraity (el trino que se acelera), chingolo (silbidos y un trino), palomas (el arrullo), cotorras (charla áspera, más
+  //  en la hora dorada) y, de vez en cuando, el pájaro campana (el ave nacional: un «tán» metálico que suena lejos, en el monte).
+  const AVES_DIA = [['benteveo', 0.2], ['chopi', 0.12], ['zorzal', 0.14], ['hornero', 0.1], ['chingolo', 0.1], ['paloma', 0.16], ['cotorras', 0.1], ['campana', 0.08]];
+  function llamadaAve() {
+    if (!hayLugar(24)) return;
+    const sal = salida(au.aves), v = azar(0.45, 1), pesos = AVES_DIA.map(([n, p]) => [n, n === 'cotorras' && amb.dorado ? 0.3 : p]);
+    let r = Math.random() * pesos.reduce((a, x) => a + x[1], 0), cual = pesos[0][0];
+    for (const [n, p] of pesos) { if (r < p) { cual = n; break; } r -= p; }
+    if (cual === 'benteveo') {                                     // bien - te - veo: dos notas cortas y una larga que cae
+      const k = azar(0.92, 1.08);
+      canto(sal, [[0, 2900 * k], [0.06, 3300 * k]], 0, 0.08 * v, 0.3);
+      canto(sal, [[0, 2500 * k], [0.07, 2750 * k]], 0.11, 0.07 * v, 0.3);
+      canto(sal, [[0, 3300 * k], [0.08, 3550 * k], [0.3, 2300 * k]], 0.22, 0.09 * v, 0.35);
+    } else if (cual === 'chopi') {                                 // cho-pí, a veces dos veces
+      const k = azar(0.9, 1.1), n = Math.random() < 0.4 ? 2 : 1;
+      for (let i = 0; i < n; i++) { canto(sal, [[0, 1750 * k], [0.15, 1350 * k]], i * 0.75, 0.09 * v); canto(sal, [[0, 1900 * k], [0.22, 3100 * k]], i * 0.75 + 0.21, 0.1 * v); }
+    } else if (cual === 'zorzal') {                                // frase aflautada de 4 a 7 notas, con saltos
+      const NOTAS = [1900, 2150, 2400, 2550, 2850, 3200], n = Math.round(azar(4, 7)); let t = 0;
+      for (let i = 0; i < n; i++) { const f = NOTAS[Math.floor(Math.random() * NOTAS.length)], d = azar(0.1, 0.22); canto(sal, [[0, f], [d * 0.4, f * azar(1.02, 1.12)], [d, f * azar(0.9, 1)]], t, 0.07 * v); t += d + azar(0.04, 0.12); }
+    } else if (cual === 'hornero') {                               // trino que se acelera y baja, y se frena al final
+      const n = Math.round(azar(9, 13)); let t = 0, f = azar(3000, 3400);
+      for (let i = 0; i < n; i++) { canto(sal, [[0, f * 1.06], [0.035, f * 0.9]], t, 0.06 * v); const u = i / n; t += 0.15 - 0.09 * Math.sin(Math.PI * Math.min(1, u * 1.3)); f *= 0.985; }
+    } else if (cual === 'chingolo') {                              // dos o tres silbidos claros y un trino
+      const k = azar(0.92, 1.08); let t = 0;
+      for (const [f0, d] of [[3300, 0.24], [3900, 0.18], [3500, 0.16]].slice(0, Math.random() < 0.5 ? 2 : 3)) { canto(sal, [[0, f0 * k], [d, f0 * k * 0.98]], t, 0.06 * v); t += d + 0.06; }
+      for (let i = 0; i < 5; i++) canto(sal, [[0, 4600 * k], [0.03, 4200 * k]], t + i * 0.055, 0.04 * v);
+    } else if (cual === 'paloma') {                                // arrullo: cu-CU-cu-cuuu
+      const f = azar(380, 470); let t = 0;
+      [[0.35, 1], [0.16, 1.08], [0.16, 1.08], [0.42, 0.98]].forEach(([d, k]) => { tono(sal, f * k, f * k * 0.93, t, d, 0.15 * v, { hz: 5.5, prof: 6 }); t += d + 0.07; });
+    } else if (cual === 'cotorras') {                              // varias cotorras charlando: chillidos cortos y ásperos
+      const n = Math.round(azar(3, 6)); let t = 0;
+      for (let i = 0; i < n; i++) { const f = azar(1900, 2700), d = azar(0.06, 0.12); canto(sal, [[0, f], [d * 0.5, f * azar(1.1, 1.3)], [d, f * 0.85]], t, 0.035 * v, 0.6); t += d + azar(0.03, 0.14); }
+    } else campana(sal, v);
+  }
+  // Pájaro campana: golpes metálicos (parciales inarmónicos que se apagan rápido), espaciados; se oye lejos, con el eco del monte
+  function campana(sal, v) {
+    const { ctx } = au, n = Math.round(azar(2, 4)), f = azar(1100, 1350); let t = 0;
+    for (let i = 0; i < n; i++) {
+      const T = ctx.currentTime + MARGEN + t;
+      [[1, 1, 0.45], [2.02, 0.35, 0.25], [3.1, 0.15, 0.15]].forEach(([k, a, d]) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.setValueAtTime(f * k * 1.01, T); o.frequency.exponentialRampToValueAtTime(f * k, T + 0.05);
+        g.gain.setValueAtTime(0.0001, T); g.gain.exponentialRampToValueAtTime(0.11 * v * a, T + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, T + d);
+        o.connect(g); g.connect(sal); vigilar(o).start(T); o.stop(T + d + 0.05);
+      });
+      t += azar(0.9, 1.6);
+    }
+  }
+  // De noche: ranas (croares pulsados), el kururú (sapo: un trino grave y largo) y, sin lluvia, a veces el urutau (silbidos tristes que bajan)
+  function rana() {
     if (!hayLugar(10)) return;
+    const r = Math.random();
+    if (r < 0.2) return kururu();
+    if (r < 0.32 && !amb.lluvia) return urutau();
     const { ctx } = au, sal = salida(au.ranas), n = Math.round(azar(2, 5)), f = azar(150, 240); let t = 0;
     for (let i = 0; i < n; i++) {
       const T = ctx.currentTime + MARGEN + t, d = azar(0.1, 0.2), o = ctx.createOscillator(), bp = ctx.createBiquadFilter(), g = ctx.createGain(), mod = ctx.createGain(), am = ctx.createOscillator(), ag = ctx.createGain();
@@ -387,6 +437,20 @@
       vigilar(o).start(T); am.start(T); o.stop(T + d + 0.05); am.stop(T + d + 0.05);
       t += azar(0.17, 0.25);
     }
+  }
+  function kururu() {                                              // un trino grave de 1,5 a 3 s: pulsos rápidos de un tono áspero
+    const { ctx } = au, sal = salida(au.ranas), T = ctx.currentTime + MARGEN, d = azar(1.5, 3), f = azar(620, 780);
+    const o = ctx.createOscillator(), bp = ctx.createBiquadFilter(), am = ctx.createGain(), p = ctx.createOscillator(), pf = ctx.createBiquadFilter(), pg = ctx.createGain(), g = ctx.createGain();
+    o.type = 'sawtooth'; o.frequency.value = f; bp.type = 'bandpass'; bp.frequency.value = f * 1.5; bp.Q.value = 3;
+    p.type = 'square'; p.frequency.value = azar(13, 17); pf.type = 'lowpass'; pf.frequency.value = 60; pg.gain.value = 0.5; am.gain.value = 0.5;
+    p.connect(pf); pf.connect(pg); pg.connect(am.gain);
+    g.gain.setValueAtTime(0.0001, T); g.gain.exponentialRampToValueAtTime(0.07, T + 0.15); g.gain.setValueAtTime(0.07, T + d - 0.3); g.gain.exponentialRampToValueAtTime(0.0001, T + d);
+    o.connect(bp); bp.connect(am); am.connect(g); g.connect(sal);
+    vigilar(o).start(T); p.start(T); o.stop(T + d + 0.05); p.stop(T + d + 0.05);
+  }
+  function urutau() {                                              // 4 a 6 silbidos aflautados que van bajando, el primero más largo
+    const sal = salida(au.ranas), f0 = azar(820, 980), n = Math.round(azar(4, 6)); let t = 0, f = f0;
+    for (let i = 0; i < n; i++) { const d = i ? azar(0.4, 0.5) : 0.75; tono(sal, f * 1.02, f * 0.96, t, d, (i ? 0.09 : 0.11), { hz: 4.5, prof: f * 0.006 }); t += d + azar(0.3, 0.45); f *= [0.89, 0.94, 0.94, 0.95, 0.95][i] || 0.95; }
   }
   function gota(T) {                                               // una gota (a la hora T del reloj del audio): un toque corto y apagado
     if (!au || !hayLugar()) return;
@@ -504,7 +568,7 @@
       viento: v >= 35 ? 'viento fuerte' : v >= 18 ? 'viento' : 'brisa suave',
       lluvia: tipo === 'tormenta' ? 'lluvia fuerte' : ll >= 0.7 ? 'aguacero' : 'gotas sobre las hojas',
       grillos: e.db.grillos !== undefined && e.db.grillos < -2 ? 'grillos lejanos' : 'grillos',
-      aves: dorado ? 'coro de aves' : e.tasaAves < 0.5 ? 'aves lejanas' : 'aves',
+      aves: dorado ? 'coro de aves' : e.tasaAves < 0.5 ? 'aves lejanas' : 'aves del monte',
       ranas: e.db.ranas !== undefined && e.db.ranas <= -9 ? 'ranas lejanas' : 'ranas',
       rafagas: v >= 35 ? 'ráfagas fuertes de viento' : 'ráfagas de viento',
       chicharras: 'chicharras', granizo: 'golpeteo de granizo', truenos: 'truenos'
