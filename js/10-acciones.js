@@ -289,3 +289,29 @@
     aviso('Conexión recuperada. Actualizando el clima…');
     if (!document.hidden) actualizarTodo();
   });
+
+  // ---- Menú del celular: idioma, tema, °C/°F, sonido, efectos, ajustes, avisos y accesos rápidos ----
+  // En pantallas grandes todo está a la vista (el botón no se muestra); en el celular se despliega bajo la barra superior.
+  const cabecera = document.querySelector('.cabecera');
+  function abrirMenu(si) {
+    cabecera.classList.toggle('menu-abierto', si);
+    $('btnMenu').setAttribute('aria-expanded', String(si));
+  }
+  $('btnMenu').addEventListener('click', () => abrirMenu(!cabecera.classList.contains('menu-abierto')));
+  // los accesos que llevan a otra parte cierran el menú; los interruptores (tema, sonido…) lo dejan abierto para seguir ajustando
+  $('menuPanel').addEventListener('click', e => { if (e.target.closest('.acciones button, #btnAjustesAnim, #btnAcerca')) abrirMenu(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && cabecera.classList.contains('menu-abierto')) { abrirMenu(false); $('btnMenu').focus(); } });
+
+  // ---- «Acerca de Clima PY»: quién la hizo, versión, cómo instalarla, privacidad y fuentes de datos ----
+  const dlgAcerca = $('dlgAcerca');
+  $('btnAcerca').addEventListener('click', async () => {
+    $('acercaInstalar').hidden = !promptInstalar;                  // el botón de instalar, solo si el navegador lo ofrece
+    if (typeof dlgAcerca.showModal === 'function') dlgAcerca.showModal(); else dlgAcerca.setAttribute('open', '');
+    try {                                                          // la versión es la del service worker (VERSION en sw.js)
+      const v = (await (await fetch('sw.js', { cache: 'no-cache' })).text()).match(/const VERSION = '([^']+)'/);
+      if (v) $('acercaVersion').textContent = 'Versión ' + v[1].replace(/^v/, '');
+    } catch (e) { /* sin internet: queda sin número */ }
+  });
+  $('acercaInstalar').addEventListener('click', () => { dlgAcerca.close(); $('btnInstalar').click(); });
+  dlgAcerca.addEventListener('close', () => { $('btnAcerca').focus(); });
+  dlgAcerca.addEventListener('click', e => { if (e.target === dlgAcerca) dlgAcerca.close(); });   // tocar fuera de la hoja la cierra

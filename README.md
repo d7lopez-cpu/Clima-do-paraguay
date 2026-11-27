@@ -4,12 +4,16 @@ El clima de **263 ciudades y localidades de Paraguay** en un mapa: temperatura, 
 
 👉 **Usar la app:** https://d7lopez-cpu.github.io/Clima-do-paraguay/
 
+![Clima PY en el celular: portada con el ñandutí tricolor, modo campo y mapa de calor](img/readme-capturas.png)
+
 Se puede instalar en el celular como una app (desde el menú del navegador: *Agregar a la pantalla de inicio*) y abre aunque no haya internet, mostrando los últimos datos guardados.
 
 ## Qué ofrece
 
 - **Mapa de los 18 departamentos** con capas de temperatura, humedad, viento y lluvia, y un deslizador para ver las próximas 24 horas.
 - **Pronóstico de cada ciudad** por horas (con «Ahora» destacado) o en gráfico, y los **próximos 7 días** en filas con probabilidad de lluvia y rango de temperatura; tarjetas de sensación, humedad, viento, presión, lluvia, UV, probabilidad de lluvia, visibilidad, luna, calidad del aire y una de salida y puesta del sol con el arco del día.
+- **Para el campo:** caja plegable en el detalle con la lluvia de los últimos 7 días y la prevista, el riesgo de helada, las horas aptas para fumigar (viento, lluvia, calor y humedad), la humedad del suelo, el balance de agua de la semana y un consejo de siembra. Orientativo, con datos de Open-Meteo; se pide solo si la caja está abierta.
+- **Acerca de Clima PY** (en el menú): versión, creador, cómo instalarla, privacidad y fuentes de datos.
 - **Datos medidos, no solo calculados:** cerca de un aeropuerto (≤ 25 km) se usan las observaciones reales (METAR); en el resto del país se muestra cuánto difiere el modelo de lo medido.
 - **Probabilidad de lluvia con ensambles** de 4 modelos (ECMWF, GFS, ICON y GEM) y rango probable de temperatura.
 - **Compartir** el clima de una ciudad (menú del celular, copiar enlace o WhatsApp), con enlace directo a esa ciudad.

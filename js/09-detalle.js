@@ -158,7 +158,8 @@
     return `
       <div class="hero">
         <div class="ciudad-fila">
-          <span class="hero-lado">${d ? `<button class="btn-redondo" data-compartir="1" aria-label="Compartir el clima de esta ciudad" title="Compartir">${icono('compartir')}</button>` : ''}</span>
+          <span class="hero-lado compartir-caja">${d ? `<button class="btn-redondo" data-compartir="1" aria-label="Compartir el clima de esta ciudad" title="Compartir"${navigator.share ? '' : ' aria-haspopup="menu" aria-expanded="false" aria-controls="menuCompartir"'}>${icono('compartir')}</button>` +
+            (navigator.share ? '' : `<div class="menu-compartir" id="menuCompartir" role="menu" hidden><button role="menuitem" data-compartir="copiar">${icono('enlace')}<span>Copiar enlace</span></button><button role="menuitem" data-compartir="wa">${icono('compartir')}<span>WhatsApp</span></button></div>`) : ''}</span>
           <div class="ciudad-centro">
             <h3 class="ciudad-nombre${c.n.length > 16 ? ' largo' : ''}">${icono('ubicacion')}${n}</h3>
             <div class="dep-nombre" title="${c.dep === 'Asunción' ? 'Capital del país' : 'Departamento ' + escObs(c.dep)}"><span>${c.dep === 'Asunción' ? 'Capital del país' : escObs(c.dep)}</span></div>
@@ -173,7 +174,6 @@
         ${mm}
         ${sens}
         ${d && d.rangoDia && d.rangoDia.max[0] ? `<div class="rango-prob" title="Rango del 10 % al 90 % de las simulaciones de 4 modelos">Máx. probable ${Math.round(aU(d.rangoDia.max[0][0])) === Math.round(aU(d.rangoDia.max[0][1])) ? grados(d.rangoDia.max[0][0]) + ' (muy segura)' : grados(d.rangoDia.max[0][0]) + '–' + grados(d.rangoDia.max[0][1])}</div>` : ''}
-        ${d && !navigator.share ? `<div class="hero-acciones"><button class="btn" data-compartir="wa" aria-label="Enviar el clima por WhatsApp">WhatsApp</button></div>` : ''}
       </div>`;
   }
   // Cuerpo: avisos, datos y verificación con aeropuertos. Los datos del clima actual (humedad, viento, lluvia, presión) salen
@@ -326,8 +326,9 @@
         ${PESTANAS.map(([id, txt]) => `<button class="pestana${pestana === id ? ' on' : ''}" data-tab="${id}" id="tab-${id}" role="tab" aria-controls="pronostico" aria-selected="${pestana === id}" tabindex="${pestana === id ? 0 : -1}">${txt}</button>`).join('')}
       </div></div>
       <div id="pronostico" role="tabpanel" aria-labelledby="tab-${pestana}">${htmlPronostico(d)}</div>
-      </div>` + htmlDatos(c, d.current, d) + htmlDias7(d));
+      </div>` + htmlDatos(c, d.current, d) + htmlDias7(d) + htmlCampoCaja());
     llenarAire(c);
+    if (campoAbierto) llenarCampo(c);
   }
   const PESTANAS = [['horas', 'Próximas horas'], ['grafico', 'Gráfico 24 h']];   // los días tienen su propia tarjeta (htmlDias7)
   // Cambiar de pestaña solo redibuja el pronóstico (no toda la tarjeta), con una entrada suave
@@ -346,7 +347,7 @@
     const fila = caja.querySelector('.fila-scroll, .dias');
     if (fila) animarCascada(fila); else animarEntrada(caja);
   }
-  // ---- Compartir el clima de la ciudad (Web Share; si no existe: copiar enlace y WhatsApp) ----
+  // ---- Compartir el clima de la ciudad (Web Share; si no existe: menú con copiar enlace y WhatsApp) ----
   function datosCompartir() {
     const { c, d } = detalleActual, a = d.current;
     const w = clima(a.weather_code, a.is_day);
@@ -364,16 +365,29 @@
       const ok = document.execCommand('copy'); ta.remove(); return ok;
     } catch (_) { return false; }
   }
+  // Un solo botón: con la hoja de compartir del sistema (la mayoría de los celulares), esa; sin ella, un menú chico con
+  // «Copiar enlace» y «WhatsApp» (antes había un botón «WhatsApp» suelto debajo de la temperatura)
+  function menuCompartir(abrir) {
+    const m = $('menuCompartir'), b = document.querySelector('#detalle [data-compartir="1"]');
+    if (!m || !b) return;
+    m.hidden = !abrir; b.setAttribute('aria-expanded', String(abrir));
+    if (abrir) m.querySelector('button').focus();
+  }
   async function compartir(modo) {
     if (!detalleActual) return;
     const { texto, url } = datosCompartir();
-    if (modo === 'wa') { window.open('https://wa.me/?text=' + encodeURIComponent(texto + ' ' + url), '_blank', 'noopener'); return; }
-    if (navigator.share) {
+    if (modo === 'wa') { menuCompartir(false); window.open('https://wa.me/?text=' + encodeURIComponent(texto + ' ' + url), '_blank', 'noopener'); return; }
+    if (modo === '1' && navigator.share) {
       try { await navigator.share({ title: 'Clima PY', text: texto, url }); return; }
       catch (e) { if (e && e.name === 'AbortError') return; }   // si la persona cancela no se hace nada; otro error: se copia el enlace
     }
+    if (modo === '1' && $('menuCompartir')) { menuCompartir($('menuCompartir').hidden); return; }
+    menuCompartir(false);
     aviso(await copiarTexto(texto + ' ' + url) ? 'Enlace copiado' : 'No se pudo copiar el enlace');
   }
+  // el menú de compartir se cierra al tocar afuera o con Escape
+  document.addEventListener('click', e => { const m = $('menuCompartir'); if (m && !m.hidden && !e.target.closest('.compartir-caja')) menuCompartir(false); });
+  document.addEventListener('keydown', e => { const m = $('menuCompartir'); if (e.key === 'Escape' && m && !m.hidden) { menuCompartir(false); const b = document.querySelector('#detalle [data-compartir="1"]'); if (b) b.focus(); } });
   $('detalle').addEventListener('click', e => {
     const comp = e.target.closest('[data-compartir]');
     if (comp) { compartir(comp.dataset.compartir); return; }
@@ -412,6 +426,96 @@
     }
     return graficoHoras(d, inicio);
   }
+
+  // ---- Modo campo: lluvia acumulada, helada, viento para fumigar y humedad del suelo (orientativo) ----
+  // Se pide a Open-Meteo solo si la caja está abierta (una consulta por ciudad cada 30 min como mucho). Criterios usados:
+  //  · fumigar: viento de 3 a 15 km/h (menos: el producto queda suspendido; más: deriva), ráfagas ≤ 25 km/h, probabilidad de lluvia
+  //    < 30 %, temperatura ≤ 30 °C y humedad ≥ 45 % (con calor y aire seco el producto se evapora); al menos 2 horas seguidas;
+  //  · helada: mínima ≤ 3 °C (riesgo, a nivel del suelo puede helar) y ≤ 0 °C (helada fuerte);
+  //  · suelo (3 a 9 cm): < 0,15 m³/m³ seco, hasta 0,30 con humedad adecuada, hasta 0,40 húmedo, más: saturado;
+  //  · balance de agua de la semana: lluvia prevista − evapotranspiración de referencia (ET₀, lo que pierde un cultivo de referencia).
+  let campoAbierto = leer('clima-py-campo', '0') === '1';
+  const cacheCampo = new Map();
+  function htmlCampoCaja() {
+    return `<details class="pronostico-caja campo" id="campo"${campoAbierto ? ' open' : ''}>
+      <summary class="caja-titulo"><h4>${icono('hoja')}<span>Para el campo</span></h4><span class="campo-sub">Lluvia, helada, fumigación y suelo</span></summary>
+      <div id="campoCuerpo"><p class="carga-txt">Cargando…</p></div></details>`;
+  }
+  async function cargarCampo(c) {
+    const g = cacheCampo.get(c.n);
+    if (g && Date.now() - g.t < 30 * 60000) return g.k;
+    const url = `${OM.clima}?latitude=${c.lat}&longitude=${c.lon}&daily=precipitation_sum,et0_fao_evapotranspiration,temperature_2m_min` +
+      `&hourly=wind_speed_10m,wind_gusts_10m,precipitation_probability,temperature_2m,relative_humidity_2m,soil_moisture_0_to_1cm,soil_moisture_3_to_9cm` +
+      `&past_days=7&forecast_days=7&timezone=America%2FAsuncion`;
+    const k = await pedirClima(url, 12000, 1);
+    if (!k || !k.daily || !k.hourly) throw new ErrorApi('datos');
+    cacheCampo.set(c.n, { t: Date.now(), k });
+    return k;
+  }
+  const mm = v => (Math.round(v * 10) / 10).toString().replace('.', ',') + ' mm';
+  const DIA_CORTO = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const nombreDia = (f, hoy) => f === hoy ? 'hoy' : Math.round((Date.parse(f) - Date.parse(hoy)) / 864e5) === 1 ? 'mañana' : DIA_CORTO[new Date(f + 'T12:00:00').getDay()];
+  function analizarCampo(k) {
+    const ahora = horaAsuncion(), hoy = ahora.slice(0, 10), D = k.daily, H = k.hourly, suma = a => a.filter(esNumero).reduce((x, y) => x + y, 0);
+    const iHoy = D.time.indexOf(hoy), pasado = iHoy > 0 ? D.precipitation_sum.slice(0, iHoy) : [], futuro = iHoy >= 0 ? D.precipitation_sum.slice(iHoy) : [];
+    const r = { lluviaPasada: suma(pasado), lluviaFutura: suma(futuro), et0: iHoy >= 0 ? suma(D.et0_fao_evapotranspiration.slice(iHoy)) : NaN, lluvia48: suma(futuro.slice(0, 2)) };
+    // helada: la mínima más baja de los próximos días
+    let iMin = -1; for (let i = Math.max(0, iHoy); i < D.time.length; i++) if (esNumero(D.temperature_2m_min[i]) && (iMin < 0 || D.temperature_2m_min[i] < D.temperature_2m_min[iMin])) iMin = i;
+    r.minima = iMin >= 0 ? { t: D.temperature_2m_min[iMin], dia: nombreDia(D.time[iMin], hoy) } : null;
+    // fumigación: ventanas de horas aptas en las próximas 24 h
+    const i0 = H.time.findIndex(t => String(t).slice(0, 13) >= ahora), motivos = { viento: 0, calma: 0, lluvia: 0, calor: 0, seco: 0 };
+    const ventanas = []; let ini = -1;
+    for (let i = Math.max(0, i0); i0 >= 0 && i < Math.min(H.time.length, i0 + 24); i++) {
+      const w = H.wind_speed_10m[i], g = H.wind_gusts_10m[i], pp = H.precipitation_probability[i] ?? 0, t = H.temperature_2m[i], hr = H.relative_humidity_2m[i];
+      const fallas = [w > 15 || g > 25 ? 'viento' : '', w < 3 ? 'calma' : '', pp >= 30 ? 'lluvia' : '', t > 30 ? 'calor' : '', esNumero(hr) && hr < 45 ? 'seco' : ''].filter(Boolean);
+      fallas.forEach(f => motivos[f]++);
+      if (!fallas.length && ini < 0) ini = i;
+      if ((fallas.length || i === Math.min(H.time.length, i0 + 24) - 1) && ini >= 0) { const fin = fallas.length ? i : i + 1; if (fin - ini >= 2) ventanas.push([ini, fin]); ini = -1; }
+    }
+    const hora = i => String(H.time[i]).slice(11, 16), diaDe = i => nombreDia(String(H.time[i]).slice(0, 10), hoy);
+    // «hoy de 11:00 a 15:00»; si la ventana pasa al día siguiente: «desde hoy 20:00 hasta mañana 06:00»
+    r.fumigar = ventanas.length ? ventanas.slice(0, 2).map(([a, b]) => {
+      const fin = b < H.time.length ? b : H.time.length - 1, mismoDia = diaDe(fin) === diaDe(a) || (b >= H.time.length);
+      return mismoDia ? `${diaDe(a)} de ${hora(a)} a ${b < H.time.length ? hora(b) : '24:00'}` : `desde ${diaDe(a)} ${hora(a)} hasta ${diaDe(fin)} ${hora(fin)}`;
+    }) : null;
+    r.motivo = Object.entries(motivos).sort((a, b) => b[1] - a[1])[0];
+    // suelo: humedad a 3–9 cm en la hora actual
+    const s = i0 >= 0 ? H.soil_moisture_3_to_9cm[i0] : null;
+    r.suelo = esNumero(s) ? { v: s, nivel: s < 0.15 ? 'seco' : s <= 0.3 ? 'adecuado' : s <= 0.4 ? 'húmedo' : 'saturado' } : null;
+    return r;
+  }
+  function htmlCampo(r) {
+    const dato = (ic, c, val, tit) => `<div class="dato" data-c="${c}">${icono(ic)}<b>${val}</b><small>${tit}</small></div>`;
+    const balance = r.lluviaFutura - r.et0, MOT = { viento: 'viento fuerte o ráfagas', calma: 'falta de viento (el producto queda suspendido)', lluvia: 'probabilidad de lluvia', calor: 'calor', seco: 'aire muy seco' };
+    const helada = !r.minima ? '--' : r.minima.t <= 0 ? `Helada fuerte ${r.minima.dia} (${grados(r.minima.t)})` : r.minima.t <= 3 ? `Riesgo ${r.minima.dia} (${grados(r.minima.t)})` : 'Sin riesgo';
+    let consejo;
+    if (r.suelo && (r.suelo.nivel === 'saturado' || r.lluvia48 >= 30)) consejo = 'Suelo muy húmedo o lluvia fuerte cerca: mejor esperar para entrar con máquinas o sembrar.';
+    else if (r.suelo && r.suelo.nivel === 'seco' && r.lluviaFutura >= 10) consejo = `Suelo seco, pero se esperan ${mm(r.lluviaFutura)} esta semana: conviene sembrar después de esa lluvia.`;
+    else if (r.suelo && r.suelo.nivel === 'seco') consejo = 'Suelo seco y poca lluvia a la vista: atención al riego y a la siembra.';
+    else if (r.suelo) consejo = 'Suelo con humedad y sin lluvias fuertes cerca: buenas condiciones para sembrar.';
+    else consejo = '';
+    return `<div class="datos campo-datos">
+        ${dato('lluvia', 'lluvia', mm(r.lluviaPasada), 'Lluvia últimos 7 días')}
+        ${dato('paraguas', 'paraguas', mm(r.lluviaFutura), 'Lluvia prevista 7 días')}
+        ${dato('frio', 'ojo', helada, r.minima ? `Helada · mínima ${grados(r.minima.t)} ${r.minima.dia === 'hoy' || r.minima.dia === 'mañana' ? r.minima.dia : 'el ' + r.minima.dia}` : 'Helada')}
+        ${dato('hoja', 'hoja', r.suelo ? r.suelo.nivel[0].toUpperCase() + r.suelo.nivel.slice(1) : '--', r.suelo ? `Humedad del suelo a 3–9 cm (${r.suelo.v.toFixed(2).replace('.', ',')})` : 'Humedad del suelo')}
+      </div>
+      <div class="alerta campo-fumigar">${icono('viento')}<span><b>Fumigar:</b> ${r.fumigar ? 'horas aptas ' + r.fumigar.join(' y ') : 'sin horas aptas en las próximas 24 h, sobre todo por ' + MOT[r.motivo[0]]}.</span></div>
+      <div class="alerta">${icono('humedad')}<span><b>Agua de la semana:</b> ${balance >= 0 ? `sobran unos ${mm(balance)}` : `faltan unos ${mm(-balance)}`} (lluvia prevista menos lo que pierden los cultivos por evaporación).</span></div>
+      ${consejo ? `<div class="alerta">${icono('hoja')}<span><b>Siembra:</b> ${consejo}</span></div>` : ''}
+      <p class="ayuda">Orientativo, con datos de modelos de Open-Meteo para este punto. Fumigar: viento de 3 a 15 km/h, sin lluvia, menos de 30 °C y humedad de 45 % o más.</p>`;
+  }
+  async function llenarCampo(c) {
+    const caja = $('campoCuerpo'); if (!caja) return;
+    try { const r = analizarCampo(await cargarCampo(c)); if (detalleActual && detalleActual.c.n === c.n && $('campoCuerpo')) $('campoCuerpo').innerHTML = htmlCampo(r); }
+    catch (e) { if ($('campoCuerpo')) $('campoCuerpo').innerHTML = `<p class="ayuda">No se pudieron cargar los datos para el campo. Revisa tu conexión.</p>`; }
+  }
+  // abrir o cerrar la caja: se recuerda y, al abrirla, se piden los datos
+  $('detalle').addEventListener('toggle', e => {
+    if (e.target.id !== 'campo') return;
+    campoAbierto = e.target.open; guardar('clima-py-campo', campoAbierto ? '1' : '0');
+    if (campoAbierto && detalleActual) llenarCampo(detalleActual.c);
+  }, true);
 
   // Próximos 7 días, en filas: día, ícono, probabilidad de lluvia y la barra de mínima a máxima (en la escala de toda la semana;
   // la franja clara es el rango probable de los ensambles, si lo hay)

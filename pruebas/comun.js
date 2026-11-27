@@ -37,6 +37,18 @@ function crear(REPO) {
       }
     };
   }
+  // Modo campo simulado: 7 días hacia atrás y 7 hacia adelante (fechas de hoy, hora de Asunción), viento por hora y humedad del suelo
+  function campo() {
+    const p = {}; new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Asuncion', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
+    const hoy = Date.UTC(+p.year, p.month - 1, +p.day), dia = k => new Date(hoy + k * 864e5).toISOString().slice(0, 10);
+    const dias = Array.from({ length: 14 }, (_, i) => dia(i - 7)), lluvia = [0, 12.4, 3.1, 0, 0, 25.8, 1.2, 0, 0.4, 8.6, 18.2, 0, 0, 2.1];
+    const time = [], W = [], G = [], PP = [], T = [], HR = [], S1 = [], S2 = [];
+    for (let k = 0; k < 14 * 24; k++) { const h = k % 24; time.push(dias[Math.floor(k / 24)] + 'T' + String(h).padStart(2, '0') + ':00');
+      W.push(Math.round(4 + 9 * Math.max(0, Math.sin((h - 6) / 12 * Math.PI)) + (h < 5 ? 1 : 0))); G.push(W[k] + 6); PP.push(h >= 15 && h <= 19 ? 45 : 10);
+      T.push(Math.round(21 + 9 * Math.max(0, Math.sin((h - 7) / 13 * Math.PI)))); HR.push(Math.round(85 - 35 * Math.max(0, Math.sin((h - 7) / 13 * Math.PI)))); S1.push(0.21); S2.push(0.24); }
+    return { daily: { time: dias, precipitation_sum: lluvia, et0_fao_evapotranspiration: dias.map(() => 5.2), temperature_2m_min: dias.map((_, i) => 19 + (i % 4)) },
+      hourly: { time, wind_speed_10m: W, wind_gusts_10m: G, precipitation_probability: PP, temperature_2m: T, relative_humidity_2m: HR, soil_moisture_0_to_1cm: S1, soil_moisture_3_to_9cm: S2 } };
+  }
   // Rutas: Open-Meteo simulado; lo demás de afuera se corta. `sustituir` = { 'css/estilos.css': '/ruta/local.css', ... }
   async function rutas(p, sustituir = {}, cambios = {}) {
     const actual = n => Object.assign({}, datos.datos[n], cambios[n] || {});
@@ -54,7 +66,7 @@ function crear(REPO) {
       if (u.hostname === 'api.open-meteo.com') {
         const la = u.searchParams.get('latitude').split(',').map(Number), lo = u.searchParams.get('longitude').split(',').map(Number);
         const ns = la.map((v, i) => cerca(v, lo[i]));
-        let body = u.searchParams.get('daily') ? detalle(ns[0]) : u.searchParams.get('current') ? ns.map(n => ({ current: actual(n) })) : ns.map(n => ({ hourly: horas[n] }));
+        let body = (u.searchParams.get('hourly') || '').includes('soil_moisture') ? campo() : u.searchParams.get('daily') ? detalle(ns[0]) : u.searchParams.get('current') ? ns.map(n => ({ current: actual(n) })) : ns.map(n => ({ hourly: horas[n] }));
         if (Array.isArray(body) && body.length === 1) body = body[0];
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
       }
