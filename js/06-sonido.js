@@ -651,17 +651,6 @@
   });
   $('btnFx').classList.toggle('on', fx); $('btnFx').setAttribute('aria-pressed', fx);
 
-  // ---- Menú del celular: idioma, tema, °C/°F, sonido, efectos, ajustes, avisos y accesos rápidos ----
-  // En pantallas grandes todo está a la vista (el botón no se muestra); en el celular se despliega bajo la barra superior.
-  const cabecera = document.querySelector('.cabecera');
-  function abrirMenu(si) {
-    cabecera.classList.toggle('menu-abierto', si);
-    $('btnMenu').setAttribute('aria-expanded', String(si));
-  }
-  $('btnMenu').addEventListener('click', () => abrirMenu(!cabecera.classList.contains('menu-abierto')));
-  // los accesos que llevan a otra parte cierran el menú; los interruptores (tema, sonido…) lo dejan abierto para seguir ajustando
-  $('menuPanel').addEventListener('click', e => { if (e.target.closest('.acciones button, #btnAjustesAnim')) abrirMenu(false); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && cabecera.classList.contains('menu-abierto')) { abrirMenu(false); $('btnMenu').focus(); } });
 
 
   document.addEventListener('visibilitychange', () => {

@@ -204,7 +204,8 @@ const archivos = {
   'logo-nanduti-hilos.svg': svg({ detalle: 'completo', fondo: null }),
   'icono-navidad.svg': svg({ detalle: 'simple', navidad: true }),
   'logo-navidad.svg': svg({ detalle: 'completo', navidad: true }),
-  'nanduti-navidad-hilos.svg': svg({ detalle: 'completo', fondo: null, navidad: true, estrella: false })   // adornos de la guirnalda
+  'nanduti-navidad-hilos.svg': svg({ detalle: 'completo', fondo: null, navidad: true, estrella: false }),   // adornos de la guirnalda
+  'nanduti-carga.svg': svg({ detalle: 'simple', fondo: null })   // indicador de carga (liviano: se ve antes que todo lo demás)
 };
 for (const [n, s] of Object.entries(archivos)) writeFileSync('img/' + n, s);
 

@@ -151,8 +151,14 @@ const ESCENARIOS = {
     });
     await paso(E, 'compartir', async () => {
       await p.evaluate(() => { window.__abierto = []; window.open = (...a) => { window.__abierto.push(a[0]); return null; }; });
-      const bs = await p.locator('#detalle [data-compartir]').all();
-      for (const bt of bs) { await bt.click(); await p.waitForTimeout(400); }
+      // el botón redondo abre el menú (copiar enlace / WhatsApp) cuando no hay hoja de compartir del sistema
+      const bs = await p.locator('#detalle [data-compartir="1"]').all();
+      for (const op of ['copiar', 'wa']) {
+        if (!bs.length) break;
+        await bs[0].click(); await p.waitForTimeout(200);
+        const item = p.locator(`#menuCompartir [data-compartir="${op}"]`);
+        if (await item.isVisible()) { await item.click(); await p.waitForTimeout(400); }
+      }
       const r = await p.evaluate(async () => ({ ab: window.__abierto, clip: await navigator.clipboard.readText().catch(() => ''), aviso: document.getElementById('aviso').textContent }));
       if (!bs.length) anotar(E, 'compartir', 'no hay botón de compartir');
       if (!r.clip.includes('http') && !r.ab.length) anotar(E, 'compartir', `no copió ni abrió nada (aviso «${r.aviso}»)`);

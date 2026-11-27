@@ -47,7 +47,7 @@
   /* portada: el ñandutí tricolor (scripts/nanduti.mjs), con los colores de la bandera: hilos, apyte y aros en blanco; lóbulos del
      borde y estrella central en azul; flores botella en rojo; los lóbulos con degradé rojo → blanco → azul (en Navidad: verde y rojo) */
   --nd-hilo: #f8fafc; --nd-centro: #ffffff; --nd-trama: #4d7cff; --nd-anillo: #ff4f43; --nd-petalo: #8fa9ff; --nd-medio: #ffffff;
-  --nd-op: 0.78; --nd-brillo: rgba(77, 124, 255, 0.35); --temp-sombra: rgba(10, 20, 51, 0.65); --pill-portada: rgba(10, 20, 51, 0.55); --velo-portada: rgba(10, 20, 51, 0.7);
+  --nd-op: 0.78; --nd-brillo: rgba(77, 124, 255, 0.35); --temp-sombra: rgba(10, 20, 51, 0.65); --pill-portada: rgba(10, 20, 51, 0.55); --velo-portada: rgba(10, 20, 51, 0.8);
   /* tarjetas de vidrio y la hora «Ahora» */
   --tarjeta-fondo: linear-gradient(140deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.035));
   --tarjeta-sombra: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 14px 34px -22px rgba(0, 0, 0, 0.75);
@@ -230,7 +230,7 @@ select option { background: var(--dialogo-fondo); color: var(--texto); }
 .esq-stat .esq, .esqueleto .dato .esq { display: inline-block; line-height: 1.1; }
 /* Ñandutí: indicador de carga (gira; quieto con «reducir movimiento») */
 .carga-nanduti { display: block; width: 76px; height: 76px; margin: 0 auto; background: var(--nanduti); opacity: 0.6;
-  -webkit-mask: url("../img/logo-nanduti-hilos.svg") center / contain no-repeat; mask: url("../img/logo-nanduti-hilos.svg") center / contain no-repeat; }
+  -webkit-mask: url("../img/nanduti-carga.svg") center / contain no-repeat; mask: url("../img/nanduti-carga.svg") center / contain no-repeat; }
 .carga-txt { color: var(--suave); font-size: var(--t-chico); margin-top: var(--e-3); text-align: center; }
 
 /* ============ 6. BARRA SUPERIOR Y MENÚ ============ */
@@ -333,7 +333,8 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
   -webkit-mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.3) 0 28%, rgba(0, 0, 0, 0.55) 40%, #000 52%); mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.3) 0 28%, rgba(0, 0, 0, 0.55) 40%, #000 52%); }
 .temp-grande { font-family: var(--fuente-titulo); font-weight: 300; font-size: var(--t-temp); line-height: 0.95; letter-spacing: -0.03em; color: var(--temp);
   font-variant-numeric: tabular-nums; margin-left: 0.1em; text-shadow: 0 2px 28px var(--temp-sombra); }
-.temp-grande .unidad { font-size: 0.3em; font-weight: 400; letter-spacing: 0; vertical-align: 1.85em; margin-left: 0.04em; color: var(--texto); }
+.temp-grande .unidad { font-size: 0.3em; font-weight: 400; letter-spacing: 0; vertical-align: 1.85em; margin-left: 0.04em; color: var(--texto);
+  padding: 0.05em 0.12em; border-radius: 50%; background: radial-gradient(closest-side, var(--velo-portada), transparent); }   /* halo suave: la «C» se lee sobre los hilos del ñandutí */
 .temp-grande .esq { font-size: 0.8em; }
 .estado { display: inline-flex; align-items: center; gap: var(--e-2); font-size: 1.15rem; font-weight: 500; text-shadow: 0 1px 2px var(--temp-sombra), 0 0 14px var(--temp-sombra); }
 .estado .ic { width: 28px; height: 28px; }
@@ -345,6 +346,14 @@ h1 { font-family: var(--fuente-titulo); font-weight: 600; font-size: var(--t-log
 .rango-prob { color: var(--suave); font-size: var(--t-chico); }
 .hero-acciones { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--e-2); margin-top: var(--e-2); }
 .hero-acciones .btn { background: var(--pill-portada); border-color: var(--borde-fuerte); }
+/* menú de compartir (en navegadores sin la hoja de compartir del sistema) */
+.compartir-caja { position: relative; }
+.menu-compartir { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; gap: 2px; min-width: 190px; padding: 6px;
+  border-radius: var(--r-m); background: var(--flotante-fondo); border: 1px solid var(--borde); box-shadow: var(--sombra-flotante); text-align: left; }
+.menu-compartir[hidden] { display: none; }
+.menu-compartir button { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-s); background: none; color: var(--texto); font-size: 0.92rem; font-weight: 500; }
+.menu-compartir button:hover, .menu-compartir button:focus-visible { background: var(--vidrio-hover); }
+.menu-compartir .ic { width: 18px; height: 18px; color: var(--acento); }
 @media (min-width: 901px) { .hero-temp { min-height: 336px; } .portada { padding-bottom: 110px; } }
 
 body[data-cielo=tormenta] { --nd-brillo: rgba(196, 181, 253, 0.55); }
@@ -757,3 +766,31 @@ html.navidad .barra-nav { border-color: rgba(253, 230, 138, 0.22); }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ============ «ACERCA DE CLIMA PY» ============ */
+.btn-acerca { min-height: 44px; margin-left: var(--e-2); padding: 0 var(--e-3); font-size: var(--t-chico); }
+.btn-acerca .ic { width: 16px; height: 16px; }
+.acerca .da-cuerpo { gap: var(--e-2); line-height: 1.55; padding-top: var(--e-4); }
+.acerca h3 { margin-top: var(--e-3); font-size: 0.95rem; font-weight: 600; color: var(--texto); }
+.acerca p, .acerca li { color: var(--suave); font-size: 0.92rem; }
+.acerca b { color: var(--texto); }
+.acerca ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.ac-marca { display: flex; align-items: center; gap: var(--e-4); }
+.ac-marca img { width: 84px; height: 84px; border-radius: 20px; flex: none; }
+.acerca .ac-nombre { font-family: var(--fuente-titulo); font-size: 1.6rem; font-weight: 600; color: var(--texto) !important; line-height: 1.1; }
+.acerca .ac-version { font-size: var(--t-chico) !important; }
+.ac-firma { margin-top: 4px; }
+.ac-firma b { color: var(--dorado); font-family: var(--fuente-titulo); font-weight: 600; }
+.btn-primario { justify-self: start; background: var(--activo-fondo); color: var(--activo-texto); border-color: transparent; }
+@media (max-width: 900px) { .btn-acerca { margin-left: 0; margin-top: var(--e-2); } .menu-panel .sub { display: flex; flex-direction: column; align-items: flex-start; } }
+
+/* ============ MODO CAMPO (caja plegable en el detalle) ============ */
+.campo > summary { list-style: none; cursor: pointer; margin-bottom: 0; min-height: 44px; }
+.campo > summary::-webkit-details-marker { display: none; }
+.campo > summary::after { content: ""; width: 10px; height: 10px; margin-left: auto; border-right: 2px solid var(--suave); border-bottom: 2px solid var(--suave); rotate: 45deg; translate: 0 -3px; transition: rotate var(--d-2); }
+.campo[open] > summary::after { rotate: 225deg; translate: 0 3px; }
+.campo[open] > summary { margin-bottom: var(--e-3); }
+.campo-sub { color: var(--suave); font-size: var(--t-chico); flex: 1 1 100%; order: 3; }
+#campoCuerpo { display: flex; flex-direction: column; gap: var(--e-2); }
+.campo-datos { margin-bottom: var(--e-1); }
+.campo .alerta b { color: var(--texto); }

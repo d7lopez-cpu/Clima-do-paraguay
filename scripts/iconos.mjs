@@ -78,6 +78,7 @@ const ICONOS = {
   menu: p('M4 7h16M4 12h16M4 17h16'),
   paraguas: p('M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9zM12 3v1M12 12v6.5a2 2 0 0 1-4 0'),
   reloj: p('M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 7.5V12l3 2'),
+  enlace: p('M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.2 1.2M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2'),
 };
 // alias: nombres que usan el paisaje (data-icono) y la interfaz
 const ALIAS = { dia: 'despejado', noche: 'noche-clara', 'despejado-noche': 'noche-clara', temperatura: 'sensacion', aire: 'hoja', luna: 'noche-clara' };

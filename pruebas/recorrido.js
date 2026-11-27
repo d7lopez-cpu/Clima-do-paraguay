@@ -209,13 +209,32 @@ const iconoDe = (p, sel) => p.$eval(sel, e => { const u = e.querySelector('use')
       ok(await p.$eval('#daFondo', e => e.checked), 'restablecer no volvió a encender el fondo');
       await p.keyboard.press('Escape'); ok(await p.$eval('#dlgAnim', e => !e.open), 'Escape no cerró');
     });
-    await paso('Compartir (sin menú del sistema: copia el enlace)', async () => {
-      await p.click('#detalle [data-compartir="1"]'); await p.waitForTimeout(400);
+    await paso('Compartir (sin hoja del sistema: menú con copiar enlace y WhatsApp)', async () => {
+      await p.click('#detalle [data-compartir="1"]'); await p.waitForTimeout(200);
+      ok(await p.isVisible('#menuCompartir'), 'el menú de compartir no se abrió');
+      ok(await p.$('#menuCompartir [data-compartir="wa"]'), 'falta la opción de WhatsApp en el menú');
+      await p.click('#menuCompartir [data-compartir="copiar"]'); await p.waitForTimeout(400);
+      ok(!(await p.isVisible('#menuCompartir')), 'el menú no se cerró después de copiar');
       const av = await texto(p, '#aviso'); ok(/copiado/i.test(av), 'aviso: ' + av);
       const clip = await p.evaluate(() => navigator.clipboard.readText().catch(() => ''));
       ok(/#c=/.test(clip), 'el portapapeles no tiene el enlace: ' + clip);
-      ok(await p.$('#detalle [data-compartir="wa"]'), 'falta el botón de WhatsApp');
       return clip.slice(0, 70) + '…';
+    });
+    await paso('Modo campo: se abre, carga lluvia, helada, suelo y horas para fumigar', async () => {
+      if (!(await p.$eval('#campo', e => e.open))) await p.click('#campo > summary');
+      await p.waitForFunction(() => /Fumigar:/.test(document.getElementById('campoCuerpo').textContent), null, { timeout: 8000 });
+      const t = await texto(p, '#campoCuerpo');
+      ok(/mm/.test(t) && /Helada/.test(t) && /suelo/i.test(t), 'faltan datos: ' + t.slice(0, 120));
+      await p.click('#campo > summary'); ok(await p.$eval('#campo', e => !e.open), 'no se cerró');
+      return t.match(/Fumigar:[^.]*/)[0].slice(0, 70);
+    });
+    await paso('Acerca de Clima PY: abre, muestra la versión y la firma, y cierra', async () => {
+      await p.click('#btnAcerca'); await p.waitForFunction(() => /Versión \d+/.test(document.getElementById('acercaVersion').textContent), null, { timeout: 5000 });
+      ok(await p.$eval('#dlgAcerca', e => e.open), 'no se abrió');
+      ok(/Douglas López/.test(await texto(p, '#dlgAcerca .ac-firma')), 'falta la firma');
+      const v = await texto(p, '#acercaVersion');
+      await p.keyboard.press('Escape'); ok(await p.$eval('#dlgAcerca', e => !e.open), 'Escape no cerró');
+      return v;
     });
     await paso('Avisos de tormenta (🔔)', async () => {
       await p.click('#btnAvisos'); await p.waitForTimeout(300);
