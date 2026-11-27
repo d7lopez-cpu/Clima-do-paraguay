@@ -7,7 +7,7 @@
  *   y así nunca se muestra un pronóstico viejo como si fuera nuevo.
  * Para publicar una versión nueva de la app, cambia el número de VERSION.
  */
-const VERSION = 'v24';
+const VERSION = 'v25';
 const CACHE = 'clima-py-' + VERSION;
 const APP = ['./', 'index.html', 'css/estilos.css', 'js/geo.js', 'js/01-base.js', 'js/02-datos.js', 'js/03-mapa.js', 
   'js/04-ambiente.js', 'js/05-paisaje.js', 'js/06-sonido.js', 'js/07-ajustes.js', 'js/08-navidad.js', 'js/09-detalle.js', 
