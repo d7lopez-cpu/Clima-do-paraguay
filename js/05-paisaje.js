@@ -740,10 +740,13 @@
   }
   // Barra de navegación del celular
   document.querySelectorAll('.barra-nav [data-ir]').forEach(b => b.addEventListener('click', () => { const s = $(b.dataset.ir); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
-  $('navComparar').addEventListener('click', () => $('btnComparar').click());
+  // «Comparar»: si ya está abierto, solo lleva hasta ahí (antes el mismo toque lo cerraba)
+  $('navComparar').addEventListener('click', () => { if ($('comparar').hidden) $('btnComparar').click(); else $('comparar').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) document.querySelectorAll('.barra-nav [data-ir]').forEach(b => b.classList.toggle('on', b.dataset.ir === e.target.id)); }), { rootMargin: '-40% 0px -50% 0px' });
-    ['detalle', 'seccionMapa', 'seccionLista'].forEach(id => { if ($(id)) io.observe($(id)); });
+    // la sección que cruza la franja del medio de la pantalla marca su botón; «Comparar» también (antes, mirando la comparación, quedaba marcado «Mapa»)
+    const destino = b => b.dataset.ir || (b.id === 'navComparar' ? 'comparar' : '');
+    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) document.querySelectorAll('.barra-nav button').forEach(b => b.classList.toggle('on', destino(b) === e.target.id)); }), { rootMargin: '-40% 0px -50% 0px' });
+    ['detalle', 'comparar', 'seccionMapa', 'seccionLista'].forEach(id => { if ($(id)) io.observe($(id)); });
   }
 
   function ajustarCielo() {
