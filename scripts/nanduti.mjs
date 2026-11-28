@@ -223,8 +223,9 @@ console.log(`Ñandutí: ${Object.keys(archivos).join(', ')} y el símbolo de la 
 if (process.argv.includes('--png')) {
   const { chromium } = createRequire(import.meta.url)('playwright');
   const png = [
-    ['icono-512.png', 512, svg({ detalle: 'completo' })],
-    ['icono-192.png', 192, svg({ detalle: 'simple' })],
+    // cuadrados y llenos (sin esquinas transparentes): si un celular usa este ícono en vez del adaptable, no le pone un borde blanco
+    ['icono-512.png', 512, svg({ detalle: 'completo', fondo: 'pleno', escala: 0.86 })],
+    ['icono-192.png', 192, svg({ detalle: 'simple', fondo: 'pleno', escala: 0.86 })],
     ['icono-maskable-512.png', 512, svg({ detalle: 'completo', fondo: 'pleno', escala: 0.74 })],   // dentro de la zona segura
     ['icono-maskable-192.png', 192, svg({ detalle: 'simple', fondo: 'pleno', escala: 0.74 })],
     ['apple-touch-icon.png', 180, svg({ detalle: 'simple', fondo: 'pleno', escala: 0.86 })]
